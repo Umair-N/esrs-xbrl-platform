@@ -22,5 +22,5 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
-ALLOWED_ORIGINS = ["http://localhost:3000"]
+ALLOWED_ORIGINS = ["http://localhost:3000" , "https://esrs-xbrl-platform.onrender.com"]
 
