@@ -17,6 +17,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ReportDocument } from "@/types/report";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+
 interface FileUploaderProps {
   onReportLoaded: (report: ReportDocument) => void;
 }
@@ -64,7 +66,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:8000/api/files/upload", {
+      const response = await fetch(`${API_BASE_URL}/api/files/upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${getAuthToken()}`,
@@ -102,20 +104,17 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     setUploadSuccess(null);
 
     try {
-      const response = await fetch(
-        "http://localhost:8000/api/files/upload-text",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getAuthToken()}`,
-          },
-          body: JSON.stringify({
-            text: rawText,
-            title: "Pasted Report",
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/reports/text`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({
+          text: rawText,
+          title: "Pasted Report",
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
