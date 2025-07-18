@@ -11,8 +11,13 @@ import {
   ApiError,
 } from "../types/auth";
 
-const API_BASE_URL = "http://localhost:8000";
+console.log(process.env.NODE_ENV);
+const API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://esrs-xbrl-platform.onrender.com"
+    : "http://localhost:8000";
 
+console.log(API_BASE_URL);
 class AuthService {
   private baseURL: string;
 
