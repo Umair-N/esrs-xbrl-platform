@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState, useRef } from "react"
-import type { ReportDocument, ReportBlock } from "@/types/report"
-import { cn } from "@/lib/utils"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
+import { useState, useRef } from "react";
+import type { ReportDocument, ReportBlock } from "@/types/report";
+import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
   Edit2,
   Check,
@@ -18,19 +18,33 @@ import {
   AlignRight,
   Heading1,
   Heading2,
-} from "lucide-react"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { JSX } from "react/jsx-runtime"
+} from "lucide-react";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { JSX } from "react/jsx-runtime";
 
 interface TextEditorProps {
-  report: ReportDocument
-  selectedBlockId: string | null
-  onBlockSelect: (blockId: string) => void
-  onReportChange: (report: ReportDocument) => void
-  onTextHighlight: (blockId: string, selectedText: string, startIndex: number, endIndex: number) => void
+  report: ReportDocument;
+  selectedBlockId: string | null;
+  onBlockSelect: (blockId: string) => void;
+  onReportChange: (report: ReportDocument) => void;
+  onTextHighlight: (
+    blockId: string,
+    selectedText: string,
+    startIndex: number,
+    endIndex: number
+  ) => void;
 }
 
 export function TextEditor({
@@ -40,141 +54,158 @@ export function TextEditor({
   onReportChange,
   onTextHighlight,
 }: TextEditorProps) {
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null)
-  const [editedContent, setEditedContent] = useState("")
-  const [selectedText, setSelectedText] = useState({ text: "", startIndex: 0, endIndex: 0 })
-  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState("");
+  const [selectedText, setSelectedText] = useState({
+    text: "",
+    startIndex: 0,
+    endIndex: 0,
+  });
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) {
-      onBlockSelect(blockId)
+      onBlockSelect(blockId);
     }
-  }
+  };
 
   const startEditing = (block: ReportBlock) => {
-    setEditingBlockId(block.id)
-    setEditedContent(block.content)
-  }
+    setEditingBlockId(block.id);
+    setEditedContent(block.content);
+  };
 
   const saveEditing = () => {
-    if (!editingBlockId) return
+    if (!editingBlockId) return;
 
     const updatedReport = {
       ...report,
       blocks: report.blocks.map((block) =>
-        block.id === editingBlockId ? { ...block, content: editedContent } : block,
+        block.id === editingBlockId
+          ? { ...block, content: editedContent }
+          : block
       ),
       updatedAt: new Date().toISOString(),
-    }
+    };
 
-    onReportChange(updatedReport)
-    setEditingBlockId(null)
-  }
+    onReportChange(updatedReport);
+    setEditingBlockId(null);
+  };
 
   const cancelEditing = () => {
-    setEditingBlockId(null)
-  }
+    setEditingBlockId(null);
+  };
 
   const handleTextSelection = (blockId: string) => {
     if (window.getSelection) {
-      const selection = window.getSelection()
+      const selection = window.getSelection();
       if (selection && selection.toString().length > 0) {
-        const range = selection.getRangeAt(0)
-        const selectedText = selection.toString()
+        const range = selection.getRangeAt(0);
+        const selectedText = selection.toString();
 
         // Get the parent element of the selection
-        const parentElement = range.commonAncestorContainer.parentElement
+        const parentElement = range.commonAncestorContainer.parentElement;
 
         // Make sure we're selecting within the correct block
-        if (parentElement && parentElement.closest(`[data-block-id="${blockId}"]`)) {
+        if (
+          parentElement &&
+          parentElement.closest(`[data-block-id="${blockId}"]`)
+        ) {
           // Calculate the start and end indices of the selection
-          const blockContent = report.blocks.find((b) => b.id === blockId)?.content || ""
-          const startIndex = blockContent.indexOf(selectedText)
-          const endIndex = startIndex + selectedText.length
+          const blockContent =
+            report.blocks.find((b) => b.id === blockId)?.content || "";
+          const startIndex = blockContent.indexOf(selectedText);
+          const endIndex = startIndex + selectedText.length;
 
           if (startIndex >= 0) {
-            setSelectedText({ text: selectedText, startIndex, endIndex })
-            onTextHighlight(blockId, selectedText, startIndex, endIndex)
+            setSelectedText({ text: selectedText, startIndex, endIndex });
+            onTextHighlight(blockId, selectedText, startIndex, endIndex);
           }
         }
       }
     }
-  }
+  };
 
   const applyFormatting = (format: string) => {
-    if (!editingBlockId || !textAreaRef.current) return
+    if (!editingBlockId || !textAreaRef.current) return;
 
-    const textarea = textAreaRef.current
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = editedContent.substring(start, end)
+    const textarea = textAreaRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = editedContent.substring(start, end);
 
-    let formattedText = ""
-    let newCursorPosition = end
+    let formattedText = "";
+    let newCursorPosition = end;
 
     switch (format) {
       case "bold":
-        formattedText = `**${selectedText}**`
-        newCursorPosition = end + 4
-        break
+        formattedText = `**${selectedText}**`;
+        newCursorPosition = end + 4;
+        break;
       case "italic":
-        formattedText = `*${selectedText}*`
-        newCursorPosition = end + 2
-        break
+        formattedText = `*${selectedText}*`;
+        newCursorPosition = end + 2;
+        break;
       case "underline":
-        formattedText = `__${selectedText}__`
-        newCursorPosition = end + 4
-        break
+        formattedText = `__${selectedText}__`;
+        newCursorPosition = end + 4;
+        break;
       case "h1":
-        formattedText = `# ${selectedText}`
-        newCursorPosition = end + 2
-        break
+        formattedText = `# ${selectedText}`;
+        newCursorPosition = end + 2;
+        break;
       case "h2":
-        formattedText = `## ${selectedText}`
-        newCursorPosition = end + 3
-        break
+        formattedText = `## ${selectedText}`;
+        newCursorPosition = end + 3;
+        break;
       case "list":
-        formattedText = `- ${selectedText}`
-        newCursorPosition = end + 2
-        break
+        formattedText = `- ${selectedText}`;
+        newCursorPosition = end + 2;
+        break;
       default:
-        return
+        return;
     }
 
-    const newContent = editedContent.substring(0, start) + formattedText + editedContent.substring(end)
-    setEditedContent(newContent)
+    const newContent =
+      editedContent.substring(0, start) +
+      formattedText +
+      editedContent.substring(end);
+    setEditedContent(newContent);
 
     // Set cursor position after the formatting
     setTimeout(() => {
-      textarea.focus()
-      textarea.setSelectionRange(newCursorPosition, newCursorPosition)
-    }, 0)
-  }
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
+  };
 
   // Function to render tagged content with highlighting
   const renderTaggedContent = (block: ReportBlock) => {
     if (block.tags.length === 0) {
-      return <p className="whitespace-pre-wrap">{block.content}</p>
+      return <p className="whitespace-pre-wrap">{block.content}</p>;
     }
 
     // Sort tags by their position in the text
     const sortedTags = [...block.tags].sort((a, b) => {
-      const aPos = a.startIndex || 0
-      const bPos = b.startIndex || 0
-      return aPos - bPos
-    })
+      const aPos = a.startIndex || 0;
+      const bPos = b.startIndex || 0;
+      return aPos - bPos;
+    });
 
     // Create an array of text segments and tagged segments
-    const segments: JSX.Element[] = []
-    let lastIndex = 0
+    const segments: JSX.Element[] = [];
+    let lastIndex = 0;
 
     sortedTags.forEach((tag, index) => {
-      const startIndex = tag.startIndex || 0
-      const endIndex = tag.endIndex || block.content.length
+      const startIndex = tag.startIndex || 0;
+      const endIndex = tag.endIndex || block.content.length;
 
       // Add text before the tag
       if (startIndex > lastIndex) {
-        segments.push(<span key={`text-${index}`}>{block.content.substring(lastIndex, startIndex)}</span>)
+        segments.push(
+          <span key={`text-${index}`}>
+            {block.content.substring(lastIndex, startIndex)}
+          </span>
+        );
       }
 
       // Add the tagged text
@@ -191,7 +222,9 @@ export function TextEditor({
           <HoverCardContent className="w-80">
             <div className="space-y-2">
               <h4 className="font-medium">{tag.concept.label}</h4>
-              <p className="text-sm text-muted-foreground">{tag.concept.definition}</p>
+              <p className="text-sm text-muted-foreground">
+                {tag.concept.definition}
+              </p>
               <div className="flex flex-wrap gap-2 pt-1">
                 <Badge variant="outline">{tag.concept.type}</Badge>
                 <Badge variant="outline">{tag.concept.periodType}</Badge>
@@ -200,46 +233,57 @@ export function TextEditor({
               <div className="text-xs">
                 <p className="font-medium">Context: {tag.context.label}</p>
                 <p className="text-muted-foreground mt-1">
-                  Entity: {tag.context.entityName} ({tag.context.entityIdentifier})
+                  Entity: {tag.context.entityName} (
+                  {tag.context.entityIdentifier})
                 </p>
                 <p className="text-muted-foreground">
                   Period:{" "}
                   {tag.context.periodType === "instant"
-                    ? `As of ${new Date(tag.context.instantDate || "").toLocaleDateString()}`
-                    : `${new Date(tag.context.startDate || "").toLocaleDateString()} to ${new Date(tag.context.endDate || "").toLocaleDateString()}`}
+                    ? `As of ${new Date(
+                        tag.context.instantDate || ""
+                      ).toLocaleDateString()}`
+                    : `${new Date(
+                        tag.context.startDate || ""
+                      ).toLocaleDateString()} to ${new Date(
+                        tag.context.endDate || ""
+                      ).toLocaleDateString()}`}
                 </p>
               </div>
             </div>
           </HoverCardContent>
-        </HoverCard>,
-      )
+        </HoverCard>
+      );
 
-      lastIndex = endIndex
-    })
+      lastIndex = endIndex;
+    });
 
     // Add any remaining text
     if (lastIndex < block.content.length) {
-      segments.push(<span key="text-last">{block.content.substring(lastIndex)}</span>)
+      segments.push(
+        <span key="text-last">{block.content.substring(lastIndex)}</span>
+      );
     }
 
-    return <div className="whitespace-pre-wrap">{segments}</div>
-  }
+    return <div className="whitespace-pre-wrap">{segments}</div>;
+  };
 
   return (
     <div className="space-y-4 max-h-[600px] overflow-y-auto p-2">
       {report.blocks.map((block) => (
         <div
-          key={block.id}
+          // key={block.id}
           data-block-id={block.id}
           className={cn(
             "p-3 rounded-md border transition-colors",
             selectedBlockId === block.id && !editingBlockId
               ? "border-primary bg-primary/5"
               : "border-border hover:border-primary/50",
-            editingBlockId === block.id ? "border-primary" : "",
+            editingBlockId === block.id ? "border-primary" : ""
           )}
           onClick={() => handleBlockClick(block.id)}
-          onMouseUp={() => selectedBlockId === block.id && handleTextSelection(block.id)}
+          onMouseUp={() =>
+            selectedBlockId === block.id && handleTextSelection(block.id)
+          }
         >
           {editingBlockId === block.id ? (
             <div className="space-y-2">
@@ -247,7 +291,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("bold")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("bold")}
+                      >
                         <Bold className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -258,7 +306,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("italic")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("italic")}
+                      >
                         <Italic className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -269,7 +321,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("underline")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("underline")}
+                      >
                         <Underline className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -282,7 +338,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("h1")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("h1")}
+                      >
                         <Heading1 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -293,7 +353,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("h2")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("h2")}
+                      >
                         <Heading2 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -304,7 +368,11 @@ export function TextEditor({
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button size="icon" variant="ghost" onClick={() => applyFormatting("list")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => applyFormatting("list")}
+                      >
                         <List className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -371,14 +439,16 @@ export function TextEditor({
                   size="sm"
                   variant="ghost"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    startEditing(block)
+                    e.stopPropagation();
+                    startEditing(block);
                   }}
                 >
                   <Edit2 className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="prose dark:prose-invert max-w-none">{renderTaggedContent(block)}</div>
+              <div className="prose dark:prose-invert max-w-none">
+                {renderTaggedContent(block)}
+              </div>
               {block.tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {block.tags.map((tag) => (
@@ -397,5 +467,5 @@ export function TextEditor({
         </div>
       ))}
     </div>
-  )
+  );
 }
