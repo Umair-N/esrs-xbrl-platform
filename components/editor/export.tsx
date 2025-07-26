@@ -324,7 +324,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
 
         {/* Action Buttons */}
         <div className="space-y-2">
-          <Button
+          {/* <Button
             onClick={handleSaveProject}
             disabled={isSaving}
             className="w-full"
@@ -332,7 +332,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
           >
             <Save className="mr-2 h-4 w-4" />
             {isSaving ? "Saving..." : "Save Project"}
-          </Button>
+          </Button> */}
 
           <Button
             onClick={handleExportXBRL}
@@ -340,7 +340,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
             className="w-full"
           >
             <Download className="mr-2 h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export ESRS iXBRL"}
+            {isExporting ? "Exporting..." : "Export iXBRL"}
           </Button>
         </div>
 
