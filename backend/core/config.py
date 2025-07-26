@@ -26,5 +26,5 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://esrs-xbrl-platform.vercel.app/ ",
     "https://esrs-xbrl-platform.vercel.app",
-    "https://briskbold.vercel.app/",
+    "https://briskbold.vercel.app",
 ]
