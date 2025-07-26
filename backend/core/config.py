@@ -1,6 +1,6 @@
-
 # File: config.py
 import os
+
 from passlib.context import CryptContext
 
 # Database configuration
@@ -22,5 +22,9 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
-ALLOWED_ORIGINS = ["http://localhost:3000" , "https://esrs-xbrl-platform.vercel.app/ " , "https://esrs-xbrl-platform.vercel.app"]
-
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://esrs-xbrl-platform.vercel.app/ ",
+    "https://esrs-xbrl-platform.vercel.app",
+    "https://briskbold.vercel.app/",
+]
