@@ -49,10 +49,55 @@ ${namespaces}>
   <style type="text/css">
     body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
     h1, h2, h3 { color: #2c5282; }
-    .tagged-value { background-color: #e6f3ff; padding: 2px 4px; border-radius: 3px; }
-    .monetary { font-weight: bold; color: #2d5016; }
-    .percentage { color: #744210; }
+    
+    /* Style iXBRL elements directly without class attributes */
+    ix\\:nonNumeric, ix\\:nonFraction {
+      background-color: #e6f3ff;
+      padding: 2px 4px;
+      border-radius: 3px;
+      display: inline;
+      border: 1px solid #b3d9ff;
+      margin: 0 1px;
+    }
+    
+    /* Style monetary values */
+    ix\\:nonFraction[unitRef="U-EUR"], ix\\:nonFraction[unitRef="U-USD"] {
+      font-weight: bold;
+      color: #2d5016;
+      background-color: #e8f5e8;
+      border-color: #c3e6c3;
+    }
+    
+    /* Style percentage values */
+    ix\\:nonFraction[unitRef="pure"] {
+      color: #744210;
+      background-color: #fff3cd;
+      border-color: #ffeaa7;
+    }
+    
     .section { margin-bottom: 30px; }
+    .content-block { 
+      margin-bottom: 15px; 
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-left: 4px solid #007bff;
+    }
+    
+    /* Hover effects for tagged elements */
+    ix\\:nonNumeric:hover, ix\\:nonFraction:hover {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transform: translateY(-1px);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    /* Additional styling for better readability */
+    ix\\:nonNumeric::before, ix\\:nonFraction::before {
+      content: "📊";
+      font-size: 10px;
+      margin-right: 2px;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -174,7 +219,7 @@ function generateReportContent(report: ReportDocument): string {
     }
 
     section.blocks.forEach((block) => {
-      content += generateBlockContent(block);
+      content += generateBlockContentWithTagsDetailed(block);
     });
 
     content += `  </div>\n\n`;
@@ -239,39 +284,61 @@ function getSectionTitle(category: string): string {
   return titles[category] || "Sustainability Disclosures";
 }
 
-function generateBlockContent(block: any): string {
+function generateBlockContentWithTagsDetailed(block: any): string {
   if (block.tags.length === 0) {
-    return `    <p>${escapeHTML(block.content)}</p>\n`;
+    return `    <div class="content-block">${escapeHTML(
+      block.content
+    )}</div>\n`;
   }
 
-  let content = `    <p>\n`;
+  const sortedTags = [...block.tags].sort(
+    (a, b) => (a.startIndex || 0) - (b.startIndex || 0)
+  );
 
-  block.tags.forEach((tag: XbrlTag, index: number) => {
-    const concept = tag.concept;
-    const taggedText = extractTaggedText(block.content, tag);
-    const label = generateLabelFromConcept(concept.id);
+  let content = block.content;
+  let processedContent = "";
+  let lastIndex = 0;
 
-    content += `      <b>${escapeHTML(label)}:</b>\n`;
-    content += `      ${generateiXBRLTag(tag, taggedText)}\n`;
+  sortedTags.forEach((tag: XbrlTag, index: number) => {
+    const startIndex = tag.startIndex || 0;
+    const endIndex = tag.endIndex || startIndex;
 
-    if (index < block.tags.length - 1) {
-      content += `\n`;
+    if (startIndex !== endIndex && startIndex < block.content.length) {
+      // Add content before the tag (escaped)
+      processedContent += escapeHTML(content.substring(lastIndex, startIndex));
+
+      // Add the tagged content with tooltip
+      const taggedText = content.substring(startIndex, endIndex);
+      const ixbrlTag = generateiXBRLTagWithTooltip(tag, taggedText, index + 1);
+      processedContent += ixbrlTag;
+
+      lastIndex = endIndex;
     }
   });
 
-  content += `    </p>\n\n`;
+  // Add remaining content after the last tag (escaped)
+  processedContent += escapeHTML(content.substring(lastIndex));
 
-  return content;
+  // Preserve line breaks
+  processedContent = processedContent.replace(/\n/g, "<br/>");
+
+  return `    <div class="content-block">${processedContent}</div>\n\n`;
 }
 
-function generateiXBRLTag(tag: any, value: string): string {
+function generateiXBRLTagWithTooltip(
+  tag: any,
+  value: string,
+  tagNumber: number
+): string {
   const concept = tag.concept;
   const isNumeric = isNumericConcept(concept);
   const unitRef = determineUnitRef(concept);
-  const cssClass = getCSSClass(concept);
-
-  // Convert concept ID to proper namespace:element format
   const conceptName = parseConceptName(concept.id);
+  const label = generateLabelFromConcept(concept.id);
+
+  const tooltipInfo = `Tag ${tagNumber}: ${label} (${conceptName})${
+    unitRef ? ` - Unit: ${unitRef}` : ""
+  }`;
 
   if (isNumeric) {
     const attributes = [
@@ -279,7 +346,7 @@ function generateiXBRLTag(tag: any, value: string): string {
       `contextRef="${tag.context.id}"`,
       unitRef ? `unitRef="${unitRef}"` : null,
       `decimals="${getDecimals(concept)}"`,
-      cssClass ? `class="${cssClass}"` : null,
+      `title="${escapeHTML(tooltipInfo)}"`,
     ]
       .filter(Boolean)
       .join(" ");
@@ -291,7 +358,40 @@ function generateiXBRLTag(tag: any, value: string): string {
     const attributes = [
       `name="${conceptName}"`,
       `contextRef="${tag.context.id}"`,
-      cssClass ? `class="${cssClass}"` : null,
+      `title="${escapeHTML(tooltipInfo)}"`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return `<ix:nonNumeric ${attributes}>${escapeHTML(value)}</ix:nonNumeric>`;
+  }
+}
+
+function generateiXBRLTag(tag: any, value: string): string {
+  const concept = tag.concept;
+  const isNumeric = isNumericConcept(concept);
+  const unitRef = determineUnitRef(concept);
+
+  // Convert concept ID to proper namespace:element format
+  const conceptName = parseConceptName(concept.id);
+
+  if (isNumeric) {
+    const attributes = [
+      `name="${conceptName}"`,
+      `contextRef="${tag.context.id}"`,
+      unitRef ? `unitRef="${unitRef}"` : null,
+      `decimals="${getDecimals(concept)}"`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return `<ix:nonFraction ${attributes}>${escapeHTML(
+      value
+    )}</ix:nonFraction>`;
+  } else {
+    const attributes = [
+      `name="${conceptName}"`,
+      `contextRef="${tag.context.id}"`,
     ]
       .filter(Boolean)
       .join(" ");
@@ -306,11 +406,28 @@ function parseConceptName(conceptId: string): string {
     return conceptId; // Already in correct format
   }
 
-  // Convert underscore format to colon format
+  // Handle ESRS taxonomy concepts properly
+  if (conceptId.startsWith("esrs_")) {
+    // Extract the proper namespace and local name
+    const withoutPrefix = conceptId.substring(5); // Remove "esrs_"
+
+    // Check if it has a subnamespace like e1, g1, s1
+    const parts = withoutPrefix.split("_");
+    if (parts.length >= 1 && ["e1", "g1", "s1"].includes(parts[0])) {
+      const namespace = `esrs_${parts[0]}`;
+      const localName = parts.slice(1).join("");
+      return `${namespace}:${localName}`;
+    } else {
+      // General ESRS concept
+      return `esrs:${withoutPrefix}`;
+    }
+  }
+
+  // Convert underscore format to colon format for other cases
   if (conceptId.includes("_")) {
     const parts = conceptId.split("_");
     if (parts.length >= 2) {
-      return `${parts[0]}_${parts[1]}:${parts.slice(2).join("")}`;
+      return `${parts[0]}:${parts.slice(1).join("")}`;
     }
   }
 
@@ -404,18 +521,6 @@ function getDecimals(concept: any): string {
   }
 
   return "2";
-}
-
-function getCSSClass(concept: any): string | null {
-  const dataType = concept.dataType?.toLowerCase();
-
-  if (dataType === "monetary") {
-    return "tagged-value monetary";
-  } else if (dataType === "percentage") {
-    return "tagged-value percentage";
-  }
-
-  return "tagged-value";
 }
 
 function cleanFactValue(text: string, dataType: string): string {
