@@ -27,4 +27,5 @@ ALLOWED_ORIGINS = [
     "https://esrs-xbrl-platform.vercel.app/ ",
     "https://esrs-xbrl-platform.vercel.app",
     "https://briskbold.vercel.app",
+    "https://xbrl.briskbold.ai" 
 ]
