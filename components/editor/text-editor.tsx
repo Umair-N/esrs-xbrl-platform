@@ -268,7 +268,7 @@ export function TextEditor({
   };
 
   return (
-    <div className="space-y-4 max-h-[600px] overflow-y-auto p-2">
+    <div className="space-y-4 max-h-[600px] overflow-y-auto p-2 border ">
       {report.blocks.map((block) => (
         <div
           // key={block.id}
@@ -286,7 +286,7 @@ export function TextEditor({
           }
         >
           {editingBlockId === block.id ? (
-            <div className="space-y-2">
+            <div className="space-y-2 ">
               <div className="bg-muted p-1 rounded-md flex flex-wrap gap-1 mb-2">
                 <TooltipProvider delayDuration={300}>
                   <Tooltip>
@@ -416,13 +416,15 @@ export function TextEditor({
                 </TooltipProvider>
               </div>
 
-              <Textarea
-                ref={textAreaRef}
-                value={editedContent}
-                onChange={(e) => setEditedContent(e.target.value)}
-                className="min-h-[100px] w-full"
-                autoFocus
-              />
+              <div className="h-[40rem]">
+                <Textarea
+                  ref={textAreaRef}
+                  value={editedContent}
+                  onChange={(e) => setEditedContent(e.target.value)}
+                  className="h-full w-full"
+                  autoFocus
+                />
+              </div>
               <div className="flex justify-end space-x-2">
                 <Button size="sm" variant="outline" onClick={cancelEditing}>
                   <X className="h-4 w-4 mr-1" /> Cancel
