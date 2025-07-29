@@ -2,6 +2,7 @@ import { useState, FormEvent, ChangeEvent } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { UserRegistration } from "../types/auth";
 import { useRouter } from "next/navigation";
+import { Button } from "./ui/button";
 
 interface RegisterFormData extends UserRegistration {
   confirmPassword: string;
@@ -68,7 +69,7 @@ const RegisterForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-md w-[40rem] mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
 
       {error && (
@@ -167,13 +168,9 @@ const RegisterForm: React.FC = () => {
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Registering..." : "Register"}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-4 text-center text-sm text-gray-600">

@@ -6,7 +6,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { useAuth } from "../hooks/useAuth";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +20,9 @@ import { MailIcon, LockIcon, AlertTriangle } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
 });
 
 type LoginSchema = z.infer<typeof loginSchema>;
@@ -37,24 +44,23 @@ const LoginForm = () => {
   });
 
   const onSubmit = async (values: LoginSchema) => {
-    console.log('Login attempt started');
+    console.log("Login attempt started");
     setError(null);
     setFormLoading(true);
-    
+
     try {
       await login(values);
-      console.log('Login successful, redirecting immediately');
-      
+      console.log("Login successful, redirecting immediately");
+
       // Show loading state briefly, then redirect
       setIsRedirecting(true);
-      
+
       // Immediate redirect to avoid hot reload interference
       setTimeout(() => {
         window.location.href = "/";
       }, 500);
-      
     } catch (err) {
-      console.error('Login failed:', err);
+      console.error("Login failed:", err);
       setError((err as Error).message || "Login failed");
       setIsRedirecting(false);
     } finally {
@@ -64,11 +70,11 @@ const LoginForm = () => {
 
   // Debug logging
   useEffect(() => {
-    console.log('Auth state:', { isAuthenticated, authLoading, isRedirecting });
+    console.log("Auth state:", { isAuthenticated, authLoading, isRedirecting });
   }, [isAuthenticated, authLoading, isRedirecting]);
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 rounded-lg shadow-sm border bg-white relative">
+    <div className="w-96 mx-auto mt-10 p-6 rounded-lg shadow-sm border bg-white relative">
       <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
 
       {/* Redirecting loader overlay - less intrusive */}
@@ -137,8 +143,16 @@ const LoginForm = () => {
             )}
           />
 
-          <Button type="submit" className="w-full" disabled={formLoading || authLoading || isRedirecting}>
-            {isRedirecting ? "Redirecting..." : formLoading ? "Logging in..." : "Login"}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={formLoading || authLoading || isRedirecting}
+          >
+            {isRedirecting
+              ? "Redirecting..."
+              : formLoading
+              ? "Logging in..."
+              : "Login"}
           </Button>
         </form>
       </Form>
