@@ -1,31 +1,53 @@
-# File: config.py
 import os
+from typing import List, Set
 
-from passlib.context import CryptContext
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
-# Database configuration
-DATABASE_URL = "auth.db"
 
-# Security configuration
-SECRET_KEY = "your-secret-key-change-in-production"  # Change this in production
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+class Settings(BaseSettings):
+    # Project & API Info
+    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "FastAPI Authentication Backend"
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    # Security
+    SECRET_KEY: str = "your-secret-key-change-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    DATABASE_URL: str = ""
 
-# File upload configuration
-UPLOAD_DIRECTORY = "uploads"
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
+    # Neon DB (PostgreSQL)
+    NEON_HOST: str
+    NEON_DATABASE: str
+    NEON_USER: str
+    NEON_PASSWORD: str
+    NEON_PORT: int = 5432
+    PGSSLMODE: str = "require"
+    PGCHANNELBINDING: str = "require"
 
-os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
+    # CORS
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://esrs-xbrl-platform.vercel.app",
+        "https://briskbold.vercel.app",
+        "https://xbrl.briskbold.ai",
+    ]
 
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "https://esrs-xbrl-platform.vercel.app/ ",
-    "https://esrs-xbrl-platform.vercel.app",
-    "https://briskbold.vercel.app",
-    "https://xbrl.briskbold.ai" 
-]
+    # File Upload
+    UPLOAD_DIRECTORY: str = "uploads"  # ✅ Rename here
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024
+    ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".doc"}
+    ALLOWED_FILE_TYPES: List[str] = [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"]
+
+    class Config:
+        env_file = "config.env"  # ✅ Make sure your env file is named correctly
+        extra = "forbid"  # recommended to catch typos
+
+
+# Ensure upload directory exists
+os.makedirs(Settings().UPLOAD_DIRECTORY, exist_ok=True)
+
+# Instantiate settings
+settings = Settings()
