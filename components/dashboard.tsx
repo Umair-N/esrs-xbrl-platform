@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import AuthService from "../lib/auth";
 import { User, ProtectedResponse } from "../types/auth";
+import Spinner from "@/components/spinner";
+
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,13 +15,25 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
+  // Fix: Use user?.id as dependency instead of the entire user object
+  // This prevents unnecessary re-renders when user object is recreated
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user?.id && !loading) {
+      fetchData();
+    }
+  }, [user?.id]); // Only depend on user ID, not the entire user object
+
+  // Alternative fix: Use useCallback to memoize fetchData and remove loading dependency
+  // useEffect(() => {
+  //   if (user?.id) {
+  //     fetchData();
+  //   }
+  // }, [user?.id]);
 
   const fetchData = async (): Promise<void> => {
     try {
       setLoading(true);
+      setError(""); // Clear any previous errors
 
       // Fetch protected data
       const protectedResponse = await AuthService.getProtectedData();
@@ -51,10 +65,11 @@ const Dashboard: React.FC = () => {
     await logout();
   };
 
-  if (loading) {
+  // Show loading only for data fetching, not auth state
+  if (loading && !protectedData) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <Spinner/>
       </div>
     );
   }

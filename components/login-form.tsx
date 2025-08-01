@@ -55,9 +55,9 @@ const LoginForm = () => {
       // Show loading state briefly, then redirect
       setIsRedirecting(true);
 
-      // Immediate redirect to avoid hot reload interference
+      // Use Next.js router for client-side navigation to avoid page reload
       setTimeout(() => {
-        window.location.href = "/";
+        router.push("/");
       }, 500);
     } catch (err) {
       console.error("Login failed:", err);
@@ -78,14 +78,14 @@ const LoginForm = () => {
       <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
 
       {/* Redirecting loader overlay - less intrusive */}
-      {isRedirecting && (
+      {/* {isRedirecting && (
         <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-40 rounded-lg">
           <div className="text-center bg-white p-4 rounded-lg shadow-lg border">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
             <p className="text-sm text-gray-700 font-medium">Redirecting...</p>
           </div>
         </div>
-      )}
+      )} */}
 
       {error && (
         <Alert variant="destructive" className="mb-4">
