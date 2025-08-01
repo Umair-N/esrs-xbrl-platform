@@ -1,3 +1,4 @@
+import psycopg2
 from crud.user import user_crud
 from database.session import get_db
 from fastapi import Depends, HTTPException, status
@@ -10,7 +11,8 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), db=Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db=Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -18,22 +20,45 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Verify token
-    email = auth_service.verify_token(credentials.credentials)
-    if email is None:
+    print(f"Attempting to verify token...")  # Debug
+
+    try:
+        email = auth_service.verify_token(credentials.credentials)
+        print(f"Token verification result - email: {email}")  # Debug
+
+        if email is None:
+            print("Token verification returned None")  # Debug
+            raise credentials_exception
+    except Exception as e:
+        print(f"Token verification exception: {e}")  # Debug
         raise credentials_exception
 
-    # Get user
-    user = user_crud.get_user_by_email(email=email, db=db)
-    if user is None:
-        raise credentials_exception
+    print(f"Querying database for user: {email}")  # Debug
 
-    if not user.is_active:
+    # Get user - this is where psycopg2 error might occur
+    try:
+        user = user_crud.get_user_by_email(email=email, db=db)
+        print(f"Database query result - user found: {user is not None}")  # Debug
+
+        if user is None:
+            print("User not found in database")  # Debug
+            raise credentials_exception
+
+        print(f"User active status: {user.is_active}")  # Debug
+        if not user.is_active:
+            print("User is inactive")  # Debug
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
+            )
+
+        print("User authentication successful")  # Debug
+        return user
+
+    except psycopg2.Error as e:
+        print(f"Database error: {e}")  # Debug
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error"
         )
-
-    return user
 
 
 def require_role(required_role: str):
