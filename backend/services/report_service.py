@@ -24,7 +24,7 @@ class ReportService:
         upload_id = str(uuid.uuid4())
         ext = os.path.splitext(filename)[1]
         safe_filename = f"{upload_id}{ext}"
-        file_path = os.path.join(settings.UPLOAD_DIR, safe_filename)
+        file_path = os.path.join(settings.UPLOAD_DIRECTORY, safe_filename)
         with open(file_path, "wb") as f:
             f.write(file_content)
 

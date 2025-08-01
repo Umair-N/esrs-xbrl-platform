@@ -2,6 +2,8 @@
 
 import type React from "react";
 import { useState } from "react";
+import axios from "axios";
+import { toast } from "sonner";
 import { Upload, FileText, Clipboard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ReportDocument } from "@/types/report";
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -27,10 +28,7 @@ interface FileUploaderProps {
 export function FileUploader({ onReportLoaded }: FileUploaderProps) {
   const [rawText, setRawText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
-  // Get auth token from localStorage or your auth context
   const getAuthToken = () => {
     return localStorage.getItem("access_token") || "";
   };
@@ -41,54 +39,48 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = [
       "application/pdf",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/msword",
     ];
     if (!allowedTypes.includes(file.type)) {
-      setUploadError("Please upload a PDF or DOCX file");
+      toast.error("Please upload a PDF or DOCX file");
       return;
     }
 
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setUploadError("File size must be less than 10MB");
+      toast.error("File size must be less than 10MB");
       return;
     }
 
     setIsUploading(true);
-    setUploadError(null);
-    setUploadSuccess(null);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE_URL}/api/files/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${getAuthToken()}`,
-        },
-        body: formData,
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/reports/upload`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload failed");
-      }
-
-      const reportData: ReportDocument = await response.json();
-      setUploadSuccess(`Successfully processed "${file.name}"`);
+      const reportData: ReportDocument = response.data;
+      toast.success(`Successfully processed "${file.name}"`);
       onReportLoaded(reportData);
-
-      // Reset file input
       event.target.value = "";
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
-      setUploadError(error instanceof Error ? error.message : "Upload failed");
+      const message =
+        error.response?.data?.detail || error.message || "Upload failed";
+      toast.error(message);
     } finally {
       setIsUploading(false);
     }
@@ -96,43 +88,36 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
 
   const handleTextSubmit = async () => {
     if (!rawText.trim()) {
-      setUploadError("Please enter some text");
+      toast.error("Please enter some text");
       return;
     }
 
     setIsUploading(true);
-    setUploadError(null);
-    setUploadSuccess(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/reports/text`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`,
-        },
-        body: JSON.stringify({
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/reports/text`,
+        {
           text: rawText,
           title: "Pasted Report",
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Processing failed");
-      }
-
-      const reportData: ReportDocument = await response.json();
-      setUploadSuccess("Successfully processed pasted text");
-      onReportLoaded(reportData);
-
-      // Clear textarea
-      setRawText("");
-    } catch (error) {
-      console.error("Text processing error:", error);
-      setUploadError(
-        error instanceof Error ? error.message : "Processing failed"
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getAuthToken()}`,
+          },
+        }
       );
+
+      const reportData: ReportDocument = response.data;
+      toast.success("Successfully processed pasted text");
+      onReportLoaded(reportData);
+      setRawText("");
+    } catch (error: any) {
+      console.error("Text processing error:", error);
+      const message =
+        error.response?.data?.detail || error.message || "Processing failed";
+      toast.error(message);
     } finally {
       setIsUploading(false);
     }
@@ -140,22 +125,6 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {uploadError && (
-        <Alert className="mb-4 border-red-200 bg-red-50">
-          <AlertDescription className="text-red-700">
-            {uploadError}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {uploadSuccess && (
-        <Alert className="mb-4 border-green-200 bg-green-50">
-          <AlertDescription className="text-green-700">
-            {uploadSuccess}
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Tabs defaultValue="upload" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="upload">Upload File</TabsTrigger>

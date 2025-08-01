@@ -3,8 +3,7 @@ from typing import List
 from api.dep import get_current_user
 from database.session import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from schemas.report import (ReportBlockResponse, ReportCreate, ReportResponse,
-                            TextUpload)
+from schemas.report import ReportBlockResponse, ReportCreate, ReportResponse, TextUpload
 from services.report_service import report_service
 from utils.file_utils import validate_file_size, validate_file_type
 
@@ -147,7 +146,7 @@ async def delete_report(
     report_id: str, current_user=Depends(get_current_user), db=Depends(get_db)
 ):
     file_path = report_service.delete_report(report_id, current_user.id, db)
-    from app.utils.file_utils import cleanup_file
+    from utils.file_utils import cleanup_file
 
     cleanup_file(file_path)
     return {"message": "Report deleted successfully"}
