@@ -1,334 +1,110 @@
-// File: lib/auth.ts
+import axiosInstance from "./axios";
 import {
   User,
   UserRegistration,
   LoginCredentials,
-  AuthTokens,
-  RefreshTokenRequest,
   AuthResponse,
   ProtectedResponse,
-  AuthServiceTokens,
-  ApiError,
+  AuthTokens,
 } from "../types/auth";
 
-// const API_BASE_URL = "http://localhost:8000";
-const API_BASE_URL = "https://esrs-xbrl-platform.onrender.com";
+let accessToken: string | null = null;
 
 class AuthService {
-  private baseURL: string;
-
   constructor() {
-    this.baseURL = API_BASE_URL;
-  }
-
-  // Get tokens from localStorage
-  getTokens(): AuthServiceTokens {
-    if (typeof window === "undefined") {
-      return { accessToken: null, refreshToken: null };
+    // Load token from storage on initialization
+    if (typeof window !== "undefined") {
+      const storedToken = localStorage.getItem("access_token");
+      if (storedToken) {
+        accessToken = storedToken;
+      }
     }
-
-    const accessToken = localStorage.getItem("access_token");
-    const refreshToken = localStorage.getItem("refresh_token");
-
-    return { accessToken, refreshToken };
   }
 
-  // Save tokens to localStorage
-  setTokens(accessToken: string, refreshToken: string): void {
-    if (typeof window === "undefined") return;
-
-    localStorage.setItem("access_token", accessToken);
-    localStorage.setItem("refresh_token", refreshToken);
+  getAccessToken(): string | null {
+    return accessToken;
   }
 
-  // Remove tokens from localStorage
-  removeTokens(): void {
-    if (typeof window === "undefined") return;
-
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-  }
-
-  // Check if user is authenticated
-  isAuthenticated(): boolean {
-    const { accessToken } = this.getTokens();
-    return !!accessToken;
-  }
-
-  // Helper method to parse response with better error handling
-  private async parseResponse<T>(response: Response): Promise<T> {
-    const contentType = response.headers.get("content-type");
-    
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      console.error("Non-JSON response received:", {
-        status: response.status,
-        statusText: response.statusText,
-        url: response.url,
-        contentType,
-        body: text.substring(0, 200) // Log first 200 chars
-      });
-      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+  setAccessToken(token: string): void {
+    accessToken = token;
+    // Persist token
+    if (typeof window !== "undefined") {
+      localStorage.setItem("access_token", token);
     }
+  }
 
+  clearAccessToken(): void {
+    accessToken = null;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
     try {
-      return await response.json() as T;
-    } catch (jsonError) {
-      console.error("Failed to parse JSON response:", jsonError);
-      throw new Error("Invalid JSON response from server");
+      await this.getCurrentUser();
+      return true;
+    } catch (error) {
+      // Clear invalid token
+      this.clearAccessToken();
+      return false;
     }
   }
 
-  // Register new user
   async register(userData: UserRegistration): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${this.baseURL}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-      });
-
-      const data = await this.parseResponse<AuthResponse | ApiError>(response);
-
-      if (!response.ok) {
-        const error = data as ApiError;
-        throw new Error(error.detail || "Registration failed");
-      }
-
-      return data as AuthResponse;
-    } catch (error) {
-      console.error("Registration error:", error);
-      throw error;
-    }
+    const response = await axiosInstance.post(
+      "/api/v1/auth/register",
+      userData
+    );
+    return response.data;
   }
 
-  // Login user
   async login(credentials: LoginCredentials): Promise<AuthTokens> {
-    try {
-      const response = await fetch(`${this.baseURL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
+    const response = await axiosInstance.post(
+      "/api/v1/auth/login",
+      credentials
+    );
 
-      const data = await this.parseResponse<AuthTokens | ApiError>(response);
-
-      if (!response.ok) {
-        const error = data as ApiError;
-        throw new Error(error.detail || "Login failed");
-      }
-
-      const tokens = data as AuthTokens;
-
-      // Save tokens
-      this.setTokens(tokens.access_token, tokens.refresh_token);
-
-      return tokens;
-    } catch (error) {
-      console.error("Login error:", error);
-      throw error;
-    }
+    const tokens = response.data;
+    this.setAccessToken(tokens.access_token);
+    return tokens;
   }
 
-  // Logout user
   async logout(): Promise<void> {
     try {
-      const { refreshToken } = this.getTokens();
-
-      if (refreshToken) {
-        const logoutData: RefreshTokenRequest = { refresh_token: refreshToken };
-
-        await fetch(`${this.baseURL}/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(logoutData),
-        });
-      }
+      await axiosInstance.post("/api/v1/auth/logout");
     } catch (error) {
-      console.error("Logout error:", error);
+      console.warn("Logout request failed:", error);
     } finally {
-      this.removeTokens();
+      this.clearAccessToken();
     }
   }
 
-  // Refresh access token
   async refreshToken(): Promise<string> {
-    try {
-      const { refreshToken } = this.getTokens();
-
-      if (!refreshToken) {
-        throw new Error("No refresh token available");
-      }
-
-      const refreshData: RefreshTokenRequest = { refresh_token: refreshToken };
-
-      const response = await fetch(`${this.baseURL}/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(refreshData),
-      });
-
-      const data = await this.parseResponse<{ access_token: string } | ApiError>(response);
-
-      if (!response.ok) {
-        const error = data as ApiError;
-        throw new Error(error.detail || "Token refresh failed");
-      }
-
-      // Update access token
-      const { refreshToken: currentRefreshToken } = this.getTokens();
-      if (currentRefreshToken) {
-        const tokenData = data as { access_token: string };
-        this.setTokens(tokenData.access_token, currentRefreshToken);
-        return tokenData.access_token;
-      }
-
-      throw new Error("Failed to update tokens");
-    } catch (error) {
-      console.error("Token refresh error:", error);
-      // If refresh fails, remove tokens
-      this.removeTokens();
-      throw error;
-    }
+    const response = await axiosInstance.post("/api/v1/auth/refresh");
+    const newAccessToken = response.data.access_token;
+    this.setAccessToken(newAccessToken);
+    return newAccessToken;
   }
 
-  // Make authenticated API request with improved error handling
-  async makeAuthenticatedRequest(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    const { accessToken } = this.getTokens();
-
-    if (!accessToken) {
-      throw new Error("No access token available");
-    }
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      // If token is expired, try to refresh
-      if (response.status === 401) {
-        console.log("Access token expired, attempting to refresh...");
-        try {
-          const newAccessToken = await this.refreshToken();
-
-          // Retry the original request with new token
-          return await fetch(url, {
-            ...options,
-            headers: {
-              ...options.headers,
-              Authorization: `Bearer ${newAccessToken}`,
-            },
-          });
-        } catch (refreshError) {
-          console.error("Token refresh failed:", refreshError);
-          throw new Error("Authentication failed - please login again");
-        }
-      }
-
-      return response;
-    } catch (error) {
-      console.error("Authenticated request failed:", {
-        url,
-        error: error instanceof Error ? error.message : error
-      });
-      throw error;
-    }
-  }
-
-  // Get current user info
   async getCurrentUser(): Promise<User> {
-    try {
-      console.log("Fetching current user from:", `${this.baseURL}/me`);
-      
-      const response = await this.makeAuthenticatedRequest(
-        `${this.baseURL}/me`
-      );
-
-      if (!response.ok) {
-        console.error("getCurrentUser failed:", {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.url
-        });
-        throw new Error(`Failed to get user info: ${response.status} ${response.statusText}`);
-      }
-
-      const user = await this.parseResponse<User>(response);
-      console.log("User fetched successfully:", { id: user.id, username: user.username });
-      return user;
-    } catch (error) {
-      console.error("getCurrentUser error:", error);
-      throw error;
-    }
+    const response = await axiosInstance.get("/api/v1/users/me");
+    return response.data as User;
   }
 
-  // Access protected route
   async getProtectedData(): Promise<ProtectedResponse> {
-    try {
-      const response = await this.makeAuthenticatedRequest(
-        `${this.baseURL}/protected`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to access protected route: ${response.status} ${response.statusText}`);
-      }
-
-      return await this.parseResponse<ProtectedResponse>(response);
-    } catch (error) {
-      console.error("getProtectedData error:", error);
-      throw error;
-    }
+    const response = await axiosInstance.get("/protected");
+    return response.data as ProtectedResponse;
   }
 
-  // Access admin-only route
   async getAdminData(): Promise<ProtectedResponse> {
-    try {
-      const response = await this.makeAuthenticatedRequest(
-        `${this.baseURL}/admin-only`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to access admin route: ${response.status} ${response.statusText}`);
-      }
-
-      return await this.parseResponse<ProtectedResponse>(response);
-    } catch (error) {
-      console.error("getAdminData error:", error);
-      throw error;
-    }
+    const response = await axiosInstance.get("/admin-only");
+    return response.data as ProtectedResponse;
   }
 
-  // Get all users (admin only)
   async getAllUsers(): Promise<User[]> {
-    try {
-      const response = await this.makeAuthenticatedRequest(
-        `${this.baseURL}/users`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to get users: ${response.status} ${response.statusText}`);
-      }
-
-      return await this.parseResponse<User[]>(response);
-    } catch (error) {
-      console.error("getAllUsers error:", error);
-      throw error;
-    }
+    const response = await axiosInstance.get("/users");
+    return response.data as User[];
   }
 
   // Health check method to test API connectivity
@@ -340,7 +116,7 @@ class AuthService {
           "Content-Type": "application/json",
         },
       });
-      
+
       return response.ok;
     } catch (error) {
       console.error("Health check failed:", error);
@@ -349,4 +125,5 @@ class AuthService {
   }
 }
 
-export default new AuthService();
+const authService = new AuthService();
+export default authService;

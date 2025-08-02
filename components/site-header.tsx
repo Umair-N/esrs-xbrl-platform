@@ -25,7 +25,6 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center  ">
         <Sheet open={open} onOpenChange={setOpen}>
-         
           <SheetContent side="left" className="pr-0">
             <MobileNav pathname={pathname} setOpen={setOpen} />
           </SheetContent>
@@ -54,9 +53,7 @@ export function SiteHeader() {
               </Link>
             ))}
           </div>
-         
         </nav>
-       
       </div>
     </header>
   );
