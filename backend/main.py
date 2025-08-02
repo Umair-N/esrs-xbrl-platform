@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 # App init
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="FastAPI Backend with Authentication and File Management",
+    description="XBRL BACKEND",
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,

@@ -1,14 +1,13 @@
 import os
 from typing import List, Set
 
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Project & API Info
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "FastAPI Authentication Backend"
+    PROJECT_NAME: str = "XBRL Backend "
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
