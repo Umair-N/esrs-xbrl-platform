@@ -17,9 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { ReportDocument } from "@/types/report";
-
-const API_BASE_URL = "https://esrs-xbrl-platform.onrender.com";
-// const API_BASE_URL = "http://localhost:8000";
+import axiosInstance from "@/lib/axios";
 
 interface FileUploaderProps {
   onReportLoaded: (report: ReportDocument) => void;
@@ -44,6 +42,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/msword",
     ];
+
     if (!allowedTypes.includes(file.type)) {
       toast.error("Please upload a PDF or DOCX file");
       return;
@@ -61,8 +60,8 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v1/reports/upload`,
+      const response = await axiosInstance.post(
+        "/api/v1/reports/upload",
         formData,
         {
           headers: {
@@ -75,7 +74,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       const reportData: ReportDocument = response.data;
       toast.success(`Successfully processed "${file.name}"`);
       onReportLoaded(reportData);
-      event.target.value = "";
+      event.target.value = ""; // Clear the input after upload
     } catch (error: any) {
       console.error("Upload error:", error);
       const message =
@@ -95,8 +94,8 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     setIsUploading(true);
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/v1/reports/text`,
+      const response = await axiosInstance.post(
+        "/api/v1/reports/text",
         {
           text: rawText,
           title: "Pasted Report",

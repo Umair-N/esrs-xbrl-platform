@@ -106,17 +106,6 @@ class AuthService {
     const response = await axiosInstance.get("/users");
     return response.data as User[];
   }
-
-  // Health check method to test API connectivity
-  async healthCheck(): Promise<boolean> {
-    try {
-      const response = await axiosInstance.get("/api/v1/health");
-      return response.status === 200;
-    } catch (error) {
-      console.error("Health check failed:", error);
-      return false;
-    }
-  }
 }
 
 const authService = new AuthService();
