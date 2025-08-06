@@ -126,11 +126,20 @@ class UserCRUD:
                 update_fields.append("role = %(role)s")
                 params["role"] = user_data.role
 
+            if user_data.last_accessed_at is not None: 
+                update_fields.append("last_accessed_at = %(last_accessed_at)s")
+                params["last_accessed_at"] = user_data.last_accessed_at
+
+            if user_data.last_login is not None: 
+                update_fields.append("last_login = %(last_login)s")
+                params["last_login"] = user_data.last_login
+
             if not update_fields:
                 return self.get_user_by_id(user_id, db)
 
             update_fields.append("updated_at = CURRENT_TIMESTAMP")
 
+            
             # trunk-ignore(bandit/B608)
             query = f"""
                 UPDATE users 
