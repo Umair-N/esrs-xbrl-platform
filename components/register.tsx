@@ -6,6 +6,8 @@ import { Button } from "./ui/button";
 
 interface RegisterFormData extends UserRegistration {
   confirmPassword: string;
+  company: string;
+  designation: string;
 }
 
 const RegisterForm: React.FC = () => {
@@ -15,6 +17,8 @@ const RegisterForm: React.FC = () => {
     password: "",
     confirmPassword: "",
     full_name: "",
+    company: "",
+    designation: "",
   });
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -162,6 +166,41 @@ const RegisterForm: React.FC = () => {
             id="confirmPassword"
             name="confirmPassword"
             value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label
+            htmlFor="company"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Company
+          </label>
+          <input
+            type="text"
+            id="company"
+            name="company"
+            value={formData.company}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="designation"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Designation
+          </label>
+          <input
+            type="text"
+            id="designation"
+            name="designation"
+            value={formData.designation}
             onChange={handleChange}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

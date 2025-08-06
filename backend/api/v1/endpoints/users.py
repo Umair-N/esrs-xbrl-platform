@@ -21,6 +21,13 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
         is_verified=current_user.is_verified,
         role=current_user.role,
         created_at=current_user.created_at,
+        company=current_user.company,
+        designation=current_user.designation,
+        last_accessed_at=current_user.last_accessed_at,
+        last_login=current_user.last_login,
+        platform_access=current_user.platform_access,
+        status=current_user.status,
+        updated_at=current_user.updated_at,
     )
 
 

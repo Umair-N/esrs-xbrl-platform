@@ -1,12 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from core.config import settings
 from core.security import (create_access_token, create_refresh_token,
                            verify_token)
 from database.session import get_db
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from schemas.auth import RefreshTokenRequest, Token
 from schemas.user import UserCreate, UserLogin
 from services.auth_service import auth_service
 from services.user_service import user_service

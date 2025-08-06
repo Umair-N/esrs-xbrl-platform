@@ -6,9 +6,21 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from schemas.report import ReportBlockResponse, ReportCreate, ReportResponse, TextUpload
 from services.report_service import report_service
 from utils.file_utils import validate_file_size, validate_file_type
-
+from datetime import datetime
+import json
 router = APIRouter()
 
+def parse_tags(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return []
 
 @router.post("/upload", response_model=ReportResponse)
 async def upload_file(
@@ -19,7 +31,9 @@ async def upload_file(
     # Validate extension and size
     if not validate_file_type(file.filename):
         raise HTTPException(status_code=400, detail="File type not allowed")
+
     content = await file.read()
+
     if not validate_file_size(len(content)):
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
@@ -31,8 +45,9 @@ async def upload_file(
             user_id=current_user.id,
             db=db,
         )
+
         return ReportResponse(
-            id=report.id,
+            id=str(report.id),
             title=report.title,
             file_path=report.file_path,
             file_size=report.file_size,
@@ -41,16 +56,17 @@ async def upload_file(
             updated_at=report.updated_at,
             blocks=[
                 ReportBlockResponse(
-                    id=blk.id,
+                    id=str(blk.id),
                     content=blk.content,
                     type=blk.type,
-                    tags=blk.tags or [],
+                    tags=parse_tags(blk.tags),
                     order_index=blk.order_index,
-                    created_at=blk.created_at,
+                    created_at=blk.created_at or datetime.utcnow(),
                 )
                 for blk in (report.blocks or [])
             ],
         )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {e}")
 
