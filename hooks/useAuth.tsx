@@ -1,4 +1,4 @@
-// File: hooks/useAuth.tsx
+// File: hooks/useAuth.tsx (Updated to work with React Query)
 "use client";
 import {
   useState,
@@ -8,7 +8,7 @@ import {
   ReactNode,
   FC,
 } from "react";
-import AuthService from "../lib/auth";
+import { useCurrentUser, useIsAuthenticated } from "./useAuthQueries";
 import {
   User,
   LoginCredentials,
@@ -33,77 +33,31 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async (): Promise<void> => {
-    try {
-      if (AuthService.isAuthenticated()) {
-        const userData = await AuthService.getCurrentUser();
-        setUser(userData);
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-      setUser(null);
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Use React Query hooks for auth state
+  const { user, isAuthenticated, isLoading } = useIsAuthenticated();
+  
+  // Legacy methods for backward compatibility
+  // These are now handled by React Query mutations in useAuthQueries
   const login = async (credentials: LoginCredentials): Promise<AuthTokens> => {
-    try {
-      setLoading(true);
-      const response = await AuthService.login(credentials);
-      const userData = await AuthService.getCurrentUser();
-      setUser(userData);
-      setIsAuthenticated(true);
-      return response;
-    } catch (error) {
-      setUser(null);
-      setIsAuthenticated(false);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+    throw new Error("Use useLogin mutation from useAuthQueries instead");
   };
 
-  const register = async (
-    userData: UserRegistration
-  ): Promise<AuthResponse> => {
-    try {
-      setLoading(true);
-      const response = await AuthService.register(userData);
-      return response;
-    } catch (error) {
-      throw error;
-    } finally {
-      setLoading(false);
-    }
+  const register = async (userData: UserRegistration): Promise<AuthResponse> => {
+    throw new Error("Use useRegister mutation from useAuthQueries instead");
   };
 
   const logout = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      await AuthService.logout();
-      setUser(null);
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      setLoading(false);
-    }
+    throw new Error("Use useLogout mutation from useAuthQueries instead");
+  };
+
+  const checkAuth = async (): Promise<void> => {
+    // This is now handled automatically by React Query
+    console.log("Auth check is handled automatically by React Query");
   };
 
   const value: AuthContextType = {
     user,
-    loading,
+    loading: isLoading,
     isAuthenticated,
     login,
     register,
@@ -113,3 +67,4 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+

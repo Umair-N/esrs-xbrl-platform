@@ -1,8 +1,9 @@
+// File: lib/axios.ts (Updated interceptors for React Query)
 import axios from "axios";
 
 const axiosInstance = axios.create({
   baseURL:
-    process.env.NEXT_PUBLIC_API_URL || "https://xbrl-backend.onrender.com",
+    process.env.NEXT_PUBLIC_API_URL ||"http://localhost:8000" || "https://xbrl-backend.onrender.com/api/v1",
   withCredentials: true,
   timeout: 10000,
 });
@@ -27,8 +28,9 @@ const processQueue = (error: any, token: string | null = null) => {
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    const authService = require("./auth").default;
-    const token = authService.getAccessToken();
+    // Import AuthService dynamically to avoid circular dependencies
+    const AuthService = require("./auth").default;
+    const token = AuthService.getAccessToken();
 
     if (token && config.headers) {
       config.headers["Authorization"] = `Bearer ${token}`;
@@ -66,8 +68,8 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const authService = require("./auth").default;
-        const newToken = await authService.refreshToken();
+        const AuthService = require("./auth").default;
+        const newToken = await AuthService.refreshToken();
 
         // Process queued requests
         processQueue(null, newToken);
@@ -77,11 +79,16 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
 
-        // Handle refresh failure
-        const authService = require("./auth").default;
-        await authService.logout();
-
+        // Handle refresh failure - clear React Query cache
         if (typeof window !== "undefined") {
+          const { queryClient } = require("./react-query");
+          const { authKeys } = require("../hooks/useAuthQueries");
+          
+          // Clear auth-related queries
+          queryClient.removeQueries({ queryKey: authKeys.all });
+          queryClient.setQueryData(authKeys.currentUser(), null);
+          
+          // Redirect to login
           window.location.href = "/login";
         }
 

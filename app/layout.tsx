@@ -1,8 +1,12 @@
+"use client";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/react-query';
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,11 +24,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <Toaster richColors position="top-right" />
-          <div className="relative flex min-h-screen flex-col">{children}</div>
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Toaster richColors position="top-right" />
+            <div className="relative flex min-h-screen flex-col">{children}</div>
+          </AuthProvider>
+          {/* Add React Query DevTools for development */}
+       
+        </QueryClientProvider>
       </body>
     </html>
   );
 }
+

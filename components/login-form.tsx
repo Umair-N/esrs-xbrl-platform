@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+"use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { useAuth } from "../hooks/useAuth";
+import { useLogin } from "../hooks/useAuthQueries";
 import {
   Form,
   FormControl,
@@ -28,12 +29,8 @@ const loginSchema = z.object({
 type LoginSchema = z.infer<typeof loginSchema>;
 
 const LoginForm = () => {
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
-
   const [error, setError] = useState<string | null>(null);
-  const [formLoading, setFormLoading] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -43,49 +40,27 @@ const LoginForm = () => {
     },
   });
 
+  const loginMutation = useLogin({
+    onSuccess: () => {
+      console.log("Login successful, redirecting...");
+      // Redirect to dashboard or home page
+      router.push("/dashboard");
+    },
+    onError: (err) => {
+      console.error("Login failed:", err);
+      setError((err as Error).message || "Login failed");
+    },
+  });
+
   const onSubmit = async (values: LoginSchema) => {
     console.log("Login attempt started");
     setError(null);
-    setFormLoading(true);
-
-    try {
-      await login(values);
-      console.log("Login successful, redirecting immediately");
-
-      // Show loading state briefly, then redirect
-      setIsRedirecting(true);
-
-      // Use Next.js router for client-side navigation to avoid page reload
-      setTimeout(() => {
-        router.push("/");
-      }, 500);
-    } catch (err) {
-      console.error("Login failed:", err);
-      setError((err as Error).message || "Login failed");
-      setIsRedirecting(false);
-    } finally {
-      setFormLoading(false);
-    }
+    loginMutation.mutate(values);
   };
-
-  // Debug logging
-  useEffect(() => {
-    console.log("Auth state:", { isAuthenticated, authLoading, isRedirecting });
-  }, [isAuthenticated, authLoading, isRedirecting]);
 
   return (
     <div className="w-96 mx-auto mt-10 p-6 rounded-lg shadow-sm border bg-white relative">
       <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-
-      {/* Redirecting loader overlay - less intrusive */}
-      {/* {isRedirecting && (
-        <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-40 rounded-lg">
-          <div className="text-center bg-white p-4 rounded-lg shadow-lg border">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p className="text-sm text-gray-700 font-medium">Redirecting...</p>
-          </div>
-        </div>
-      )} */}
 
       {error && (
         <Alert variant="destructive" className="mb-4">
@@ -146,13 +121,9 @@ const LoginForm = () => {
           <Button
             type="submit"
             className="w-full"
-            disabled={formLoading || authLoading || isRedirecting}
+            disabled={loginMutation.isPending}
           >
-            {isRedirecting
-              ? "Redirecting..."
-              : formLoading
-              ? "Logging in..."
-              : "Login"}
+            {loginMutation.isPending ? "Logging in..." : "Login"}
           </Button>
         </form>
       </Form>
@@ -168,3 +139,4 @@ const LoginForm = () => {
 };
 
 export default LoginForm;
+

@@ -1,6 +1,6 @@
 "use client"
 import Spinner from "@/components/spinner";
-import { useAuth } from "@/hooks/useAuth";
+import { useIsAuthenticated } from "@/hooks/useAuthQueries";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -9,18 +9,18 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isLoading } = useIsAuthenticated();
   const router = useRouter();
 
   useEffect(() => {
     // Only redirect if we're certain the user is authenticated
-    if (!loading && isAuthenticated) {
+    if (!isLoading && isAuthenticated) {
       router.replace("/dashboard"); // or wherever you want to redirect after login
     }
-  }, [loading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router]);
 
   // Show loading while auth state is being determined
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center flex-col gap-2">
         <Spinner />
@@ -47,3 +47,4 @@ export default function AuthLayout({
     </div>
   );
 }
+
