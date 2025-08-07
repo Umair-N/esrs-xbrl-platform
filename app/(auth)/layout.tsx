@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import Spinner from "@/components/spinner";
 import { useIsAuthenticated } from "@/hooks/useAuthQueries";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ export default function AuthLayout({
   useEffect(() => {
     // Only redirect if we're certain the user is authenticated
     if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard"); // or wherever you want to redirect after login
+      router.replace("/"); // or wherever you want to redirect after login
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -47,4 +47,3 @@ export default function AuthLayout({
     </div>
   );
 }
-

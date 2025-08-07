@@ -6,12 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from models.user import User
 from schemas.user import UserResponse, UserUpdate
 from services.user_service import user_service
+from datetime import datetime, timezone
 
 router = APIRouter()
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+async def get_current_user_profile(current_user: User = Depends(get_current_user), db=Depends(get_db)):
+
+    now_utc = datetime.now(timezone.utc)
+
+    user_service.update_user(user_id=current_user.id, user_data=UserUpdate(last_accessed_at=now_utc), db=db)
+
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -21,6 +27,13 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
         is_verified=current_user.is_verified,
         role=current_user.role,
         created_at=current_user.created_at,
+        company=current_user.company,
+        designation=current_user.designation,
+        last_accessed_at=current_user.last_accessed_at,
+        last_login=current_user.last_login,
+        platform_access=current_user.platform_access,
+        status=current_user.status,
+        updated_at=current_user.updated_at,
     )
 
 
@@ -30,7 +43,6 @@ async def update_current_user(
     current_user: User = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    # Users can only update their full_name
     limited_update = UserUpdate(full_name=user_update.full_name)
 
     updated_user = user_service.update_user(current_user.id, limited_update, db)
@@ -38,7 +50,7 @@ async def update_current_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
+    
     return UserResponse(
         id=updated_user.id,
         email=updated_user.email,

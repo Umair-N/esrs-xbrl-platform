@@ -1,16 +1,17 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from core.config import settings
 from core.security import (create_access_token, create_refresh_token,
                            verify_token)
 from database.session import get_db
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException
 from fastapi.responses import JSONResponse
-from schemas.auth import RefreshTokenRequest, Token
 from schemas.user import UserCreate, UserLogin
 from services.auth_service import auth_service
 from services.user_service import user_service
 from utils.validators import validate_user_input
+from datetime import datetime, timezone
+from schemas.user import UserUpdate
 
 router = APIRouter()
 
@@ -39,8 +40,10 @@ async def register(user: UserCreate, db=Depends(get_db)):
     }
 
 
-@router.post("/login")  # Removed response_model=Token
+@router.post("/login")  
 async def login(user_credentials: UserLogin, db=Depends(get_db)):
+
+    now_utc = datetime.now(timezone.utc)
     user = auth_service.authenticate_user(
         user_credentials.email, user_credentials.password, db
     )
@@ -49,6 +52,9 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    
+
+    user_service.update_user(user_id=user.id, user_data=UserUpdate(last_accessed_at=now_utc, last_login=now_utc), db=db)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
@@ -64,11 +70,10 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         content={
             "access_token": access_token,
             "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Added expires_in
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
         }
     )
 
-    # Set secure=True in production, False for development
     is_production = (
         getattr(settings, "ENVIRONMENT", "development").lower() == "production"
     )
@@ -78,14 +83,14 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         value=refresh_token,
         httponly=True,
         samesite="strict",
-        secure=is_production,  # Dynamic based on environment
+        secure=is_production,  
         max_age=int(refresh_token_expires.total_seconds()),
-        path="/",  # Explicitly set path
+        path="/",  
     )
     return response
 
 
-@router.post("/refresh")  # Removed response_model=Token
+@router.post("/refresh")  
 async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Missing refresh token")

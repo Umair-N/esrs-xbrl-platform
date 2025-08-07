@@ -12,46 +12,75 @@ from utils.file_utils import extract_text_from_file
 
 class ReportService:
     def create_report_from_file(
-        self, *, filename, file_content, file_type, user_id, db
-    ) -> Optional[Report]:
-        # Extract text
-        extracted_text = extract_text_from_file(file_content, filename)
+        self, 
+        filename: str, 
+        file_content: bytes, 
+        file_type: str, 
+        user_id: int, 
+        db
+    ) -> Report:
+        """Create report from uploaded file"""
+        # Extract text from file
+        try:
+            extracted_text = extract_text_from_file(file_content, filename)
+        except Exception as e:
+            raise ValueError(f"Could not extract text from file: {str(e)}")
+            
         if not extracted_text.strip():
             raise ValueError("No text could be extracted from the file")
+        
+        # Split into paragraphs
         paragraphs = [p.strip() for p in extracted_text.split("\n\n") if p.strip()]
+        
+        if not paragraphs:
+            raise ValueError("No content found in file")
 
-        # Save the uploaded file
-        upload_id = str(uuid.uuid4())
-        ext = os.path.splitext(filename)[1]
-        safe_filename = f"{upload_id}{ext}"
+        # Save file to disk
+        file_id = str(uuid.uuid4())
+        report_id = str(uuid.uuid4())
+        ext = os.path.splitext(filename)[1].lower()
+        safe_filename = f"{file_id}{ext}"
         file_path = os.path.join(settings.UPLOAD_DIRECTORY, safe_filename)
-        with open(file_path, "wb") as f:
-            f.write(file_content)
-
-        # Call CRUD to persist report+blocks
+        
+        # Ensure directory exists
+        os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
+        
+        try:
+            with open(file_path, "wb") as f:
+                f.write(file_content)
+        except Exception as e:
+            raise ValueError(f"Could not save file: {str(e)}")
+        # Create report with blocks
         return report_crud.create_report_with_blocks(
-            report_id=upload_id,
-            title=os.path.splitext(filename)[0],
+            title=os.path.splitext(filename)[0] or "Uploaded Report",
             user_id=user_id,
+            paragraphs=paragraphs,
             file_path=file_path,
             file_type=file_type,
             file_size=len(file_content),
-            paragraphs=paragraphs,
             db=db,
+            report_id=report_id
         )
 
     def create_report_from_text(
-        self, *, text_data: TextUpload, user_id: int, db
-    ) -> Optional[Report]:
+        self, 
+        text_data: TextUpload, 
+        user_id: int, 
+        db
+    ) -> Report:
+        """Create report from text input"""
+        if not text_data.text.strip():
+            raise ValueError("Text content cannot be empty")
+            
+        # Split into paragraphs
         paragraphs = [p.strip() for p in text_data.text.split("\n\n") if p.strip()]
-        report_id = str(uuid.uuid4())
+        
+        if not paragraphs:
+            raise ValueError("No content found in text")
+        
         return report_crud.create_report_with_blocks(
-            report_id=report_id,
-            title=text_data.title or "Pasted Report",
+            title=text_data.title or "Text Report",
             user_id=user_id,
-            file_path=None,
-            file_type=None,
-            file_size=None,
             paragraphs=paragraphs,
             db=db,
         )

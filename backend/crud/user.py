@@ -4,6 +4,7 @@ from core.security import get_password_hash
 from models.user import User
 from psycopg2.extras import RealDictCursor
 from schemas.user import UserCreate, UserUpdate
+from datetime import datetime, timezone
 
 
 class UserCRUD:
@@ -21,11 +22,26 @@ class UserCRUD:
             # Hash password
             hashed_password = get_password_hash(user.password)
 
+            # Get current UTC time
+            now_utc = datetime.now(timezone.utc)
+
             # Insert new user
             query = """
-                INSERT INTO users (email, username, hashed_password, full_name, is_active, is_verified, role)
-                VALUES (%(email)s, %(username)s, %(hashed_password)s, %(full_name)s, %(is_active)s, %(is_verified)s, %(role)s)
-                RETURNING id, email, username, hashed_password, full_name, is_active, is_verified, role, created_at, updated_at
+                INSERT INTO users (
+                    email, username, hashed_password, full_name,
+                    is_active, is_verified, role, company, designation,
+                    status, last_login, last_accessed_at,
+                    created_at, updated_at, platform_access
+                )
+                VALUES (
+                    %(email)s, %(username)s, %(hashed_password)s, %(full_name)s,
+                    %(is_active)s, %(is_verified)s, %(role)s, %(company)s, %(designation)s,
+                    %(status)s, %(last_login)s, %(last_accessed_at)s,
+                    %(created_at)s, %(updated_at)s, %(platform_access)s
+                )
+                RETURNING id, email, username, hashed_password, full_name,
+                        is_active, is_verified, role, created_at, updated_at,
+                        company, designation, status, last_login, last_accessed_at, platform_access
             """
             cursor.execute(
                 query,
@@ -37,6 +53,14 @@ class UserCRUD:
                     "is_active": True,
                     "is_verified": False,
                     "role": "user",
+                    "company": user.company,
+                    "designation": user.designation,
+                    "status": "pending",
+                    "last_login": now_utc,
+                    "last_accessed_at": now_utc,
+                    "created_at": now_utc,
+                    "updated_at": now_utc,
+                    "platform_access": False,  # or user.platform_access if included in schema
                 },
             )
 
@@ -49,7 +73,6 @@ class UserCRUD:
             raise error
         finally:
             cursor.close()
-
     def get_user_by_email(self, email: str, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
@@ -103,11 +126,20 @@ class UserCRUD:
                 update_fields.append("role = %(role)s")
                 params["role"] = user_data.role
 
+            if user_data.last_accessed_at is not None: 
+                update_fields.append("last_accessed_at = %(last_accessed_at)s")
+                params["last_accessed_at"] = user_data.last_accessed_at
+
+            if user_data.last_login is not None: 
+                update_fields.append("last_login = %(last_login)s")
+                params["last_login"] = user_data.last_login
+
             if not update_fields:
                 return self.get_user_by_id(user_id, db)
 
             update_fields.append("updated_at = CURRENT_TIMESTAMP")
 
+            
             # trunk-ignore(bandit/B608)
             query = f"""
                 UPDATE users 
