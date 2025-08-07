@@ -33,20 +33,14 @@ export interface AuthResponse {
 // Updated AuthContextType for React Query integration
 export interface AuthContextType {
   // User data and auth state
-  user: User | null;
+  user: User | null | undefined;
   loading: boolean;
   isAuthenticated: boolean;
   
-  // React Query mutations (exposed for advanced usage)
-  loginMutation: any; // ReturnType<typeof useLogin> - you can import the actual type
-  registerMutation: any; // ReturnType<typeof useRegister>
-  logoutMutation: any; // ReturnType<typeof useLogout>
-  
-  // Convenience methods (these call the mutations internally)
   login: (credentials: LoginCredentials) => Promise<AuthTokens>;
   register: (userData: UserRegistration) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   
   // Utility
-  refetchUser: () => void;
+  // refetchUser: () => void;
 }

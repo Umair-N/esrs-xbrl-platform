@@ -61,7 +61,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       formData.append("file", file);
 
       const response = await axiosInstance.post(
-        "/api/v1/reports/upload",
+        "/reports/upload",
         formData,
         {
           headers: {
@@ -95,7 +95,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
 
     try {
       const response = await axiosInstance.post(
-        "/api/v1/reports/text",
+        "/reports/text",
         {
           text: rawText,
           title: "Pasted Report",

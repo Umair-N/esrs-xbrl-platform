@@ -1,7 +1,7 @@
 "use client";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
-import type { Metadata } from "next";
+// import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -10,11 +10,11 @@ import { queryClient } from '@/lib/react-query';
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "ESRS XBRL Tagging Platform",
-  description:
-    "A comprehensive solution for tagging financial reports with ESRS XBRL concepts",
-};
+// export const metadata: Metadata = {
+//   title: "ESRS XBRL Tagging Platform",
+//   description:
+//     "A comprehensive solution for tagging financial reports with ESRS XBRL concepts",
+// };
 
 export default function RootLayout({
   children,

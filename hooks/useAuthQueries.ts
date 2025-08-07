@@ -17,9 +17,9 @@ export const useCurrentUser = () => {
   return useQuery({
     queryKey: authKeys.currentUser(),
     queryFn: () => AuthService.getCurrentUser(),
-    enabled: AuthService.hasValidToken(), // Only run if we have a token
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes (previously cacheTime)
+    enabled: AuthService.hasValidToken(), 
+    staleTime: 1000 * 60 * 5, 
+    gcTime: 1000 * 60 * 10, 
     retry: false,
   });
 };

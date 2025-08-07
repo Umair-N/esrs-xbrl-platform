@@ -8,7 +8,7 @@ import {
   ReactNode,
   FC,
 } from "react";
-import { useCurrentUser, useIsAuthenticated } from "./useAuthQueries";
+import { useCurrentUser, useIsAuthenticated, useLogin } from "./useAuthQueries";
 import {
   User,
   LoginCredentials,
@@ -38,7 +38,9 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   
   // Legacy methods for backward compatibility
   // These are now handled by React Query mutations in useAuthQueries
+
   const login = async (credentials: LoginCredentials): Promise<AuthTokens> => {
+   
     throw new Error("Use useLogin mutation from useAuthQueries instead");
   };
 
@@ -50,10 +52,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     throw new Error("Use useLogout mutation from useAuthQueries instead");
   };
 
-  const checkAuth = async (): Promise<void> => {
-    // This is now handled automatically by React Query
-    console.log("Auth check is handled automatically by React Query");
-  };
+
 
   const value: AuthContextType = {
     user,
@@ -62,7 +61,6 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
-    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
