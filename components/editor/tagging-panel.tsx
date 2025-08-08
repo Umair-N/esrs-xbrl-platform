@@ -1,18 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import {
-  Search,
-  Tag,
-  Plus,
-  AlertCircle,
-  ChevronRight,
-  ChevronDown,
-  Folder,
-  FolderOpen,
-  FileText,
-  Calculator,
-} from "lucide-react"
+import React, { useState, useEffect, useMemo } from "react"
+import { Search, Tag, Plus, AlertCircle, ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Calculator, Sparkles, Target, Info } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,6 +28,11 @@ interface TaggingPanelProps {
   onReportChange: (report: ReportDocument) => void
 }
 
+// First, you'll need to update your type definition in @/types/report.ts:
+// Change: context: XbrlContext
+// To: context?: XbrlContext
+// This makes context optional in XbrlTag interface
+
 // Tree Node Component for Taxonomy Browser
 const TaxonomyTreeNode = ({
   node,
@@ -53,7 +47,6 @@ const TaxonomyTreeNode = ({
   selectedId?: string
   searchQuery: string
 }) => {
-  // Keep all nodes initially collapsed
   const [isExpanded, setIsExpanded] = useState(false)
   const hasChildren = node.children && node.children.length > 0
   const hasCalculations = node.calculations && node.calculations.length > 0
@@ -153,7 +146,7 @@ const TaxonomyTreeNode = ({
   )
 }
 
-export function TaggingPanel({ report, selectedBlockId, highlightedText, onReportChange }: TaggingPanelProps) {
+const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, highlightedText, onReportChange }) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedConcept, setSelectedConcept] = useState<TaxonomyNode | null>(null)
   const [selectedContextId, setSelectedContextId] = useState<string | null>(null)
@@ -191,10 +184,12 @@ export function TaggingPanel({ report, selectedBlockId, highlightedText, onRepor
   }, [searchQuery])
 
   const handleAddTag = () => {
-    if (!selectedBlockId || !selectedConcept || !selectedContextId) return
+    if (!selectedBlockId || !selectedConcept) return
 
-    const selectedContext = sampleContexts.find((c) => c.id === selectedContextId)
-    if (!selectedContext) return
+    // Only use context if one is explicitly selected
+    const contextToUse = selectedContextId 
+      ? sampleContexts.find((c) => c.id === selectedContextId) 
+      : undefined
 
     const newTag: XbrlTag = {
       id: generateUniqueId(),
@@ -210,7 +205,7 @@ export function TaggingPanel({ report, selectedBlockId, highlightedText, onRepor
         labels: selectedConcept.originalLabel ? [{ value: selectedConcept.originalLabel, role: "label" }] : undefined,
         references: undefined,
       },
-      context: selectedContext,
+      ...(contextToUse && { context: contextToUse }), // Only add context if it exists
       createdAt: new Date().toISOString(),
       startIndex: highlightedText?.startIndex || 0,
       endIndex: highlightedText?.endIndex || 0,
@@ -226,14 +221,14 @@ export function TaggingPanel({ report, selectedBlockId, highlightedText, onRepor
 
     onReportChange(updatedReport)
     setSelectedConcept(null)
-    setSelectedContextId(null)
+    // Don't reset context selection to allow reuse
     setSearchQuery("")
   }
 
   if (!taxonomyData) {
     return (
       <div className="space-y-4">
-        <Card>
+        <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
             <Alert variant="destructive" className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -249,276 +244,354 @@ export function TaggingPanel({ report, selectedBlockId, highlightedText, onRepor
   }
 
   return (
-    <div className="space-y-4 w-full">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Tag className="h-4 w-4 flex-shrink-0" />
-            Taxonomy
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 w-full">
-          {!selectedBlock ? (
-            <div className="text-center py-6">
-              <Tag className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Select a block of text to tag</p>
+    <div className="space-y-6 w-full">
+      {!selectedBlock ? (
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <Target className="h-8 w-8 text-primary" />
             </div>
-          ) : (
-            <>
-              {/* Selected Text Display */}
-              <div className="space-y-2 w-full">
-                <label className="text-sm font-medium">Selected Text:</label>
-                <div className="p-2 border rounded-md bg-muted/50 text-sm break-words w-full">
-                  {highlightedText && highlightedText.text ? (
-                    <span className="bg-primary/20 px-1 rounded">{highlightedText.text}</span>
-                  ) : (
-                    <span>
-                      {selectedBlock.content.length > 100
-                        ? `${selectedBlock.content.substring(0, 100)}...`
+            <h3 className="text-lg font-semibold mb-2">Select Text to Tag</h3>
+            <p className="text-sm text-muted-foreground">
+              Choose a block of text from the document to start adding ESRS tags
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Selected Text Display */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4 text-blue-600" />
+                Selected Text
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="p-3 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
+                {highlightedText && highlightedText.text ? (
+                  <div className="space-y-2">
+                    <Badge variant="secondary" className="text-xs">
+                      Highlighted Selection
+                    </Badge>
+                    <p className="text-sm bg-primary/20 px-2 py-1 rounded break-words">
+                      {highlightedText.text}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="text-xs">
+                      Full Block
+                    </Badge>
+                    <p className="text-sm break-words">
+                      {selectedBlock.content.length > 150
+                        ? `${selectedBlock.content.substring(0, 150)}...`
                         : selectedBlock.content}
-                    </span>
-                  )}
-                </div>
-                {!highlightedText?.text && (
-                  <Alert variant="default" className="bg-muted/50 border-primary/30 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <div>
-                      <AlertTitle>Highlight text to tag</AlertTitle>
-                      <AlertDescription>
-                        Select specific text within this block to create a more precise tag.
-                      </AlertDescription>
-                    </div>
-                  </Alert>
+                    </p>
+                  </div>
                 )}
               </div>
+              
+              {!highlightedText?.text && (
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    <strong>Tip:</strong> Highlight specific text within this block for more precise tagging
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
 
-              <Separator />
+          {/* ESRS Taxonomy Concept Section */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Tag className="h-4 w-4 text-emerald-600" />
+                ESRS Taxonomy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search ESRS concepts..."
+                  className="pl-10 h-10 border-2 focus:border-emerald-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-              {/* ESRS Taxonomy Concept Section */}
-              <div className="space-y-2 w-full">
-                <label className="text-sm font-medium">ESRS Taxonomy Concept:</label>
-
-                {/* Search Input */}
-                <div className="relative w-full">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    placeholder="Search ESRS concepts..."
-                    className="pl-8 w-full"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-
-                {/* Selected Concept Display */}
-                {selectedConcept && (
-                  <div className="p-2 bg-primary/10 rounded-md border border-primary/30 w-full">
-                    <div className="font-medium text-sm break-words w-full" title={selectedConcept.label ?? ""}>
-                      {selectedConcept.label}
-                    </div>
-                    <div
-                      className="text-xs text-muted-foreground font-mono break-all w-full mt-1"
-                      title={selectedConcept.id ?? ""}
-                    >
-                      {selectedConcept.id}
+              {/* Selected Concept Display */}
+              {selectedConcept && (
+                <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-lg border-2 border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-sm text-emerald-900 dark:text-emerald-100 break-words">
+                        {selectedConcept.label}
+                      </h4>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300 font-mono break-all mt-1">
+                        {selectedConcept.id}
+                      </p>
                     </div>
                     {selectedConcept.labelType && (
-                      <Badge variant="outline" className="text-xs mt-1 flex-shrink-0">
+                      <Badge variant="outline" className="text-xs bg-white dark:bg-slate-800 flex-shrink-0">
                         {selectedConcept.labelType}
                       </Badge>
                     )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Taxonomy Browser & Search Results Container */}
-                <div className="border rounded-md w-full">
-                  <div className="p-2 bg-muted/50 border-b">
-                    <div
-                      className="text-xs font-medium break-words w-full"
-                      title={
-                        viewMode === "search"
-                          ? `${filteredConcepts.length} search results`
-                          : `${taxonomyData.label || "ESRS Taxonomy"} - ${allNodes.length} concepts`
-                      }
-                    >
+              {/* Taxonomy Browser Container */}
+              <Card className="border-2">
+                <CardHeader className="py-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">
                       {viewMode === "search"
                         ? `${filteredConcepts.length} search results`
                         : `${taxonomyData.label || "ESRS Taxonomy"} - ${allNodes.length} concepts`}
-                    </div>
+                    </h4>
+                    <Badge variant="secondary" className="text-xs">
+                      {viewMode === "search" ? "Search" : "Browse"}
+                    </Badge>
                   </div>
-                  <ScrollArea className="h-[300px] w-full">
-                    <div className="p-2 w-full">
-                      {viewMode === "search" ? (
-                        filteredConcepts.length === 0 ? (
-                          <div className="text-center py-4 text-muted-foreground text-sm">
-                            <Search className="h-6 w-6 mx-auto mb-2" />
-                            <p>No results found for "{searchQuery}"</p>
-                          </div>
-                        ) : (
-                          filteredConcepts.map((concept, index) => (
+                </CardHeader>
+                <ScrollArea className="h-[300px]">
+                  <div className="p-3">
+                    {viewMode === "search" ? (
+                      filteredConcepts.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Search className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                          <p className="text-sm">No results found for "{searchQuery}"</p>
+                          <p className="text-xs mt-1">Try different keywords or browse the taxonomy</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {filteredConcepts.map((concept, index) => (
                             <div
                               key={`${concept.id}-${index}`}
-                              className={`p-2 cursor-pointer hover:bg-muted rounded-sm transition-colors ${
-                                selectedConcept?.id === concept.id ? "bg-primary/10 border-l-2 border-primary" : ""
+                              className={`p-3 cursor-pointer hover:bg-muted rounded-md transition-colors border ${
+                                selectedConcept?.id === concept.id 
+                                  ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" 
+                                  : "border-transparent hover:border-muted-foreground/20"
                               }`}
                               onClick={() => setSelectedConcept(concept)}
                             >
-                              <div className="font-medium text-sm flex items-start gap-1 min-w-0">
-                                <span className="break-words leading-tight" title={concept.label ?? ""}>
-                                  {concept.label}
-                                </span>
-                                {concept.calculations && concept.calculations.length > 0 && (
-                                  <Calculator className="h-3 w-3 text-blue-500 flex-shrink-0 mt-0.5" />
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1 flex items-start gap-2 min-w-0 flex-wrap">
-                                <span className="font-mono break-all leading-tight" title={concept.id ?? ""}>
-                                  {concept.id}
-                                </span>
-                                {concept.labelType && (
-                                  <Badge variant="outline" className="text-xs h-4 px-1 flex-shrink-0">
-                                    {concept.labelType}
-                                  </Badge>
-                                )}
+                              <div className="flex items-start gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm flex items-start gap-2">
+                                    <span className="break-words leading-tight" title={concept.label ?? ""}>
+                                      {concept.label}
+                                    </span>
+                                    {concept.calculations && concept.calculations.length > 0 && (
+                                      <Calculator className="h-3 w-3 text-blue-500 flex-shrink-0 mt-0.5" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-muted-foreground font-mono break-all" title={concept.id ?? ""}>
+                                      {concept.id}
+                                    </span>
+                                    {concept.labelType && (
+                                      <Badge variant="outline" className="text-xs h-4 px-1">
+                                        {concept.labelType}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          ))
-                        )
-                      ) : (
-                        <div className="w-full">
-                          {taxonomyData.children.map((child, index) => (
-                            <TaxonomyTreeNode
-                              key={`${child.id}-${index}`}
-                              node={child}
-                              onSelect={setSelectedConcept}
-                              selectedId={selectedConcept?.id}
-                              searchQuery=""
-                            />
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Context Selection */}
-              <div className="space-y-2 w-full">
-                <label className="text-sm font-medium">Context:</label>
-                <Select value={selectedContextId || ""} onValueChange={setSelectedContextId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a context" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sampleContexts.map((context) => (
-                      <SelectItem key={context.id} value={context.id}>
-                        {context.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Selected Concept Details */}
-              {selectedConcept && (
-                <div className="space-y-2 w-full">
-                  <label className="text-sm font-medium">Concept Details:</label>
-                  <Tabs defaultValue="basic" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                      <TabsTrigger value="properties">Properties</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="basic" className="space-y-2 mt-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="font-medium">Type:</span>
-                          <div
-                            className="text-muted-foreground break-words w-full"
-                            title={selectedConcept.type || "N/A"}
-                          >
-                            {selectedConcept.type || "N/A"}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Period:</span>
-                          <div
-                            className="text-muted-foreground break-words w-full"
-                            title={selectedConcept.periodType || "N/A"}
-                          >
-                            {selectedConcept.periodType || "N/A"}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Abstract:</span>
-                          <div className="text-muted-foreground">
-                            {selectedConcept.abstract === "true" ? "Yes" : "No"}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Order:</span>
-                          <div
-                            className="text-muted-foreground break-words w-full"
-                            title={selectedConcept.order || "N/A"}
-                          >
-                            {selectedConcept.order || "N/A"}
-                          </div>
-                        </div>
+                      )
+                    ) : (
+                      <div>
+                        {taxonomyData.children.map((child, index) => (
+                          <TaxonomyTreeNode
+                            key={`${child.id}-${index}`}
+                            node={child}
+                            onSelect={setSelectedConcept}
+                            selectedId={selectedConcept?.id}
+                            searchQuery=""
+                          />
+                        ))}
                       </div>
-                      {selectedConcept.originalLabel && (
-                        <div className="mt-2 w-full">
-                          <span className="font-medium text-xs">Original Label:</span>
-                          <div
-                            className="text-xs text-muted-foreground bg-muted p-2 rounded mt-1 break-words w-full"
-                            title={selectedConcept.originalLabel}
-                          >
-                            {selectedConcept.originalLabel}
-                          </div>
-                        </div>
-                      )}
-                    </TabsContent>
-                    <TabsContent value="properties" className="mt-3">
-                      <ScrollArea className="h-32 w-full">
-                        <div className="space-y-1 text-xs w-full">
-                          {Object.entries(selectedConcept).map(([key, value]) => {
-                            if (key === "children" || !value) return null
-                            return (
-                              <div
-                                key={key}
-                                className="flex flex-col sm:flex-row sm:justify-between p-1 bg-muted rounded w-full gap-1"
-                              >
-                                <span className="font-medium font-mono break-words" title={key}>
-                                  {key}:
-                                </span>
-                                <span
-                                  className="text-muted-foreground break-words"
-                                  title={Array.isArray(value) ? value.join(", ") : String(value)}
-                                >
-                                  {Array.isArray(value) ? value.join(", ") : String(value)}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-                  </Tabs>
+                    )}
+                  </div>
+                </ScrollArea>
+              </Card>
+            </CardContent>
+          </Card>
+
+          {/* Context Selection - Now Optional */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                Context Selection
+                <Badge variant="secondary" className="text-xs">Optional</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={selectedContextId || ""} onValueChange={setSelectedContextId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select a reporting context (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleContexts.map((context) => (
+                    <SelectItem key={context.id} value={context.id}>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{context.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {context.entityName} • {context.periodType}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {!selectedContextId && (
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    No context selected. Tag will be created without context information.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {selectedContextId && (
+                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100">
+                        {sampleContexts.find(c => c.id === selectedContextId)?.label}
+                      </h4>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        {sampleContexts.find(c => c.id === selectedContextId)?.entityName} • 
+                        {sampleContexts.find(c => c.id === selectedContextId)?.periodType}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-blue-600"
+                      onClick={() => setSelectedContextId(null)}
+                    >
+                      ×
+                    </Button>
+                  </div>
                 </div>
               )}
-            </>
+            </CardContent>
+          </Card>
+
+          {/* Selected Concept Details */}
+          {selectedConcept && (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Concept Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="basic" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                    <TabsTrigger value="properties">Properties</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="basic" className="space-y-3 mt-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Type</label>
+                        <div className="text-sm p-2 bg-muted/50 rounded">
+                          {selectedConcept.type || "N/A"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Period</label>
+                        <div className="text-sm p-2 bg-muted/50 rounded">
+                          {selectedConcept.periodType || "N/A"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Abstract</label>
+                        <div className="text-sm p-2 bg-muted/50 rounded">
+                          {selectedConcept.abstract === "true" ? "Yes" : "No"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Order</label>
+                        <div className="text-sm p-2 bg-muted/50 rounded">
+                          {selectedConcept.order || "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                    {selectedConcept.originalLabel && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Original Label</label>
+                        <div className="text-sm p-3 bg-muted/50 rounded break-words">
+                          {selectedConcept.originalLabel}
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="properties" className="mt-4">
+                    <ScrollArea className="h-32">
+                      <div className="space-y-2">
+                        {Object.entries(selectedConcept).map(([key, value]) => {
+                          if (key === "children" || !value) return null
+                          return (
+                            <div key={key} className="flex justify-between items-start gap-2 p-2 bg-muted/30 rounded text-xs">
+                              <span className="font-medium font-mono text-left shrink-0">{key}:</span>
+                              <span className="text-muted-foreground break-words text-right">
+                                {Array.isArray(value) ? value.join(", ") : String(value)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-        <CardFooter>
-          <Button
-            className="w-full"
-            disabled={!selectedBlockId || !selectedConcept || !selectedContextId}
-            onClick={handleAddTag}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Tag 
-          </Button>
-        </CardFooter>
-      </Card>
+
+          {/* Add Tag Button - Now only requires concept */}
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+            <CardContent className="p-4">
+              <Button
+                className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                disabled={!selectedBlockId || !selectedConcept}
+                onClick={handleAddTag}
+                size="lg"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Add ESRS Tag
+              </Button>
+              {!selectedConcept && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Select a concept to add a tag
+                </p>
+              )}
+              {selectedConcept && !selectedContextId && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 text-center mt-2">
+                  Ready to tag without context
+                </p>
+              )}
+              {selectedConcept && selectedContextId && (
+                <p className="text-xs text-green-600 dark:text-green-400 text-center mt-2">
+                  Ready to tag with selected context
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }
+
+// Export both named and default exports for flexibility
+export { TaggingPanel };
+export default TaggingPanel;

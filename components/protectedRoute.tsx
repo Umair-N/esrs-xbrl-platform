@@ -1,5 +1,5 @@
-export default function ProtectedRoute ({ children }:{children: React.ReactNode})  {
-  console.log('protected route');
+export default function Dashboard ({ children }:{children: React.ReactNode})  {
+ 
   
   return <>{children}</>;
 };
