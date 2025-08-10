@@ -17,7 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MailIcon, LockIcon, AlertTriangle } from 'lucide-react';
+import { MailIcon, LockIcon, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -32,7 +33,7 @@ const LoginForm = () => {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated, isLoading: authLoading } = useIsAuthenticated();
-  
+
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -41,57 +42,19 @@ const LoginForm = () => {
     },
   });
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      console.log("User is authenticated, redirecting to home...");
-      router.replace("/");
-    }
-  }, [isAuthenticated, authLoading, router]);
-
   const loginMutation = useLogin({
     onSuccess: async () => {
-      console.log("Login successful, waiting for auth state update...");
-      setError(null);
-      
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        console.log("Redirecting to home page...");
-        router.replace("/");
-      }, 100);
+      router.push("/");
+      toast.success("Login successful");
     },
     onError: (err) => {
-      console.error("Login failed:", err);
-      setError((err as Error).message || "Login failed");
+      toast.error((err as Error).message || "Login failed");
     },
   });
 
   const onSubmit = async (values: LoginSchema) => {
-    console.log("Login attempt started");
-    setError(null);
     loginMutation.mutate(values);
   };
-
-  // Show loading if checking authentication status
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // Don't render form if already authenticated
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Redirecting...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">

@@ -9,18 +9,18 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading } = useIsAuthenticated();
+  const { isAuthenticated, isLoading: authLoading } = useIsAuthenticated();
   const router = useRouter();
 
   useEffect(() => {
-    // Only redirect if we're certain the user is authenticated
-    if (!isLoading && isAuthenticated) {
-      router.replace("/"); // or wherever you want to redirect after login
+    if (isAuthenticated && !authLoading) {
+      console.log("User is authenticated, redirecting to home...");
+      router.replace("/");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   // Show loading while auth state is being determined
-  if (isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center flex-col gap-2">
         <Spinner />
@@ -29,21 +29,16 @@ export default function AuthLayout({
     );
   }
 
-  // If authenticated after loading, don't render auth forms
-  // The useEffect will handle the redirect
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-2">
-        <Spinner />
-        <p className="text-sm text-gray-500">Redirecting...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirecting...</p>
+        </div>
       </div>
     );
   }
-
   // Only render auth forms when not authenticated
-  return (
-    <div >
-      {children}
-    </div>
-  );
+  return <div>{children}</div>;
 }
