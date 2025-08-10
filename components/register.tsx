@@ -8,6 +8,8 @@ interface RegisterFormData extends UserRegistration {
   confirmPassword: string;
   company: string;
   designation: string;
+  username: string;
+  full_name: string;
 }
 
 const RegisterForm: React.FC = () => {

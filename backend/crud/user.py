@@ -92,13 +92,27 @@ class UserCRUD:
             return User(**result) if result else None
         finally:
             cursor.close()
-    def count_users(db, search: Optional[str] = None) -> int:
-        query = db.query(User)
-        if search:
-            query = query.filter(User.username.ilike(f"%{search}%"))
-        return query.count()
+    def count_users(self, db, search: Optional[str] = None) -> int:
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            if search:
+                query = """
+                    SELECT COUNT(*) AS count
+                    FROM users
+                    WHERE username ILIKE %(search)s
+                """
+                cursor.execute(query, {"search": f"%{search}%"})
+            else:
+                query = "SELECT COUNT(*) AS count FROM users"
+                cursor.execute(query)
+
+            result = cursor.fetchone()
+            return result["count"] if result else 0
+        finally:
+            cursor.close()
 
     def get_all_users(
+        self,
         db,
         skip: int = 0,
         limit: int = 10,
@@ -106,17 +120,37 @@ class UserCRUD:
         sort_order: str = "desc",
         search: Optional[str] = None
     ) -> List[User]:
-        query = db.query(User)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            # Validate sort_by to prevent SQL injection
+            valid_sort_columns = {"created_at", "username", "email", "full_name"}
+            if sort_by not in valid_sort_columns:
+                sort_by = "created_at"
 
-        if search:
-            query = query.filter(User.username.ilike(f"%{search}%"))
+            # Validate sort_order
+            sort_order = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-        sort_column = getattr(User, sort_by, User.created_at)
-        if sort_order.lower() == "desc":
-            sort_column = sort_column.desc()
-        query = query.order_by(sort_column)
+            base_query = f"""
+                SELECT *
+                FROM users
+            """
 
-        return query.offset(skip).limit(limit).all()
+            params = {}
+            if search:
+                base_query += " WHERE username ILIKE %(search)s"
+                params["search"] = f"%{search}%"
+
+            base_query += f" ORDER BY {sort_by} {sort_order} OFFSET %(skip)s LIMIT %(limit)s"
+            params["skip"] = skip
+            params["limit"] = limit
+
+            cursor.execute(base_query, params)
+            rows = cursor.fetchall()
+
+            # Convert dict rows to User models
+            return [User(**row) for row in rows]
+        finally:
+            cursor.close()
 
     def update_user(self, user_id: int, user_data: UserUpdate, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)

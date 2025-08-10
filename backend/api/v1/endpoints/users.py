@@ -100,6 +100,13 @@ async def get_all_users(
                 is_verified=user.is_verified,
                 role=user.role,
                 created_at=user.created_at,
+                company=user.company,
+                platform_access=user.platform_access,
+                designation=user.designation,
+                status=user.status,
+                updated_at=user.updated_at,
+                last_login=user.last_login,
+                last_accessed_at=user.last_accessed_at,
             )
             for user in users
         ]

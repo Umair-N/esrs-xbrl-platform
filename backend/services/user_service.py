@@ -34,7 +34,7 @@ class UserService:
         )
 
     def count_users(self, db, search: Optional[str] = None) -> int:
-        return user_crud.count_users(db, search=search)
+        return user_crud.count_users(db, search)
 
     def update_user(self, user_id: int, user_data: UserUpdate, db) -> Optional[User]:
         return user_crud.update_user(user_id, user_data, db)

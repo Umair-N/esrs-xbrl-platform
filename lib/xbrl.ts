@@ -128,8 +128,8 @@ function getUniqueContexts(report: ReportDocument) {
 
   report.blocks.forEach((block) => {
     block.tags.forEach((tag) => {
-      if (!contextMap.has(tag.context.id)) {
-        contextMap.set(tag.context.id, tag.context);
+      if (!contextMap.has(tag?.context?.id)) {
+        contextMap.set(tag?.context?.id, tag.context);
       }
     });
   });
@@ -173,23 +173,23 @@ function generateContextsXML(contexts: any[]): string {
         return "2024-12-31";
       };
 
-      const entityScheme = context.entityScheme || "http://www.sec.gov/CIK";
-      const entityId = context.entity || "12345654321";
+      const entityScheme = context?.entityScheme || "http://www.sec.gov/CIK";
+      const entityId = context?.entity || "12345654321";
 
-      return `      <xbrli:context id="${context.id}">
+      return `      <xbrli:context id="${context?.id}">
         <xbrli:entity>
           <xbrli:identifier scheme="${entityScheme}">${entityId}</xbrli:identifier>
         </xbrli:entity>
         <xbrli:period>
           ${
-            context.periodType === "instant"
+            context?.periodType === "instant"
               ? `<xbrli:instant>${formatDate(
-                  context.period || context.instantDate
+                  context?.period || context.instantDate
                 )}</xbrli:instant>`
               : `<xbrli:startDate>${formatDate(
-                  context.startDate
+                  context?.startDate
                 )}</xbrli:startDate>
-          <xbrli:endDate>${formatDate(context.endDate)}</xbrli:endDate>`
+          <xbrli:endDate>${formatDate(context?.endDate)}</xbrli:endDate>`
           }
         </xbrli:period>
       </xbrli:context>`;
@@ -357,7 +357,7 @@ function generateiXBRLTagWithTooltip(
   } else {
     const attributes = [
       `name="${conceptName}"`,
-      `contextRef="${tag.context.id}"`,
+      `contextRef="${tag?.context?.id}"`,
       `title="${escapeHTML(tooltipInfo)}"`,
     ]
       .filter(Boolean)

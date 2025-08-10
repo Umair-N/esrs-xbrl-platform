@@ -30,7 +30,6 @@ class AuthService {
     this.setTokens = this.setTokens.bind(this);
     this.clearTokens = this.clearTokens.bind(this);
     this.getAccessToken = this.getAccessToken.bind(this);
-    this.getRefreshToken = this.getRefreshToken.bind(this);
     this.isAuthenticated = this.isAuthenticated.bind(this);
     this.hasValidToken = this.hasValidToken.bind(this);
   }
@@ -61,11 +60,6 @@ class AuthService {
     return this.accessToken || localStorage.getItem(this.accessTokenKey);
   }
 
-  getRefreshToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(this.refreshTokenKey);
-  }
-
   setTokens(tokens: AuthTokens): void {
     if (typeof window === "undefined") {
       console.log("[AuthService] setTokens skipped: window undefined");
@@ -74,10 +68,6 @@ class AuthService {
 
     this.accessToken = tokens.accessToken;
     localStorage.setItem(this.accessTokenKey, tokens.accessToken);
-    console.log(
-      "[AuthService] setTokens: accessToken stored",
-      tokens.accessToken
-    );
 
     if (tokens.refreshToken) {
       localStorage.setItem(this.refreshTokenKey, tokens.refreshToken);
@@ -106,7 +96,6 @@ class AuthService {
       };
 
       this.setTokens(tokens);
-      console.log("[AuthService] login: Tokens set", tokens);
 
       return { ...tokens };
     } catch (error: any) {
@@ -137,26 +126,35 @@ class AuthService {
 
   async refreshToken(): Promise<string> {
     try {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) {
-        throw new Error("No refresh token available");
-      }
-
-      const response = await axiosInstance.post("/auth/refresh", {
-        refreshToken,
+      const response = await axiosInstance.post("/auth/refresh", null, {
+        withCredentials: true,
       });
 
-      const newTokens: AuthTokens = {
-        accessToken: response.data.accessToken || response.data.access_token,
-        refreshToken: response.data.refreshToken || response.data.refresh_token,
-      };
+      const newAccessToken =
+        response.data.accessToken || response.data.access_token;
 
-      this.setTokens(newTokens);
-      return newTokens.accessToken;
+      this.setTokens({
+        accessToken: newAccessToken,
+      });
+
+      return newAccessToken;
     } catch (error: any) {
       this.clearTokens();
       throw new Error(error.response?.data?.message || "Token refresh failed");
     }
+  }
+
+  async ensureAccessToken(): Promise<string | null> {
+    if (!this.hasValidToken()) {
+      try {
+        const newToken = await this.refreshToken();
+        return newToken;
+      } catch {
+        this.clearTokens();
+        return null;
+      }
+    }
+    return this.getAccessToken();
   }
 
   async logout(): Promise<void> {

@@ -27,7 +27,6 @@ const processQueue = (error: any, token: string | null = null) => {
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Import AuthService dynamically to avoid circular dependencies
     const AuthService = require("./auth").default;
     const token = AuthService.getAccessToken();
 
@@ -48,19 +47,16 @@ axiosInstance.interceptors.response.use(
       error.response?.status === 401 &&
       !originalRequest._retry &&
       !originalRequest.url?.includes("/auth/login") &&
-      !originalRequest.url?.includes("/auth/register")
+      !originalRequest.url?.includes("/auth/register") &&
+      !originalRequest.url?.includes("/auth/refresh")
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = `Bearer ${token}`;
-            return axiosInstance(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+        }).then((token) => {
+          originalRequest.headers["Authorization"] = `Bearer ${token}`;
+          return axiosInstance(originalRequest);
+        });
       }
 
       originalRequest._retry = true;
@@ -68,9 +64,8 @@ axiosInstance.interceptors.response.use(
 
       try {
         const AuthService = require("./auth").default;
-        const newToken = await AuthService.refreshToken();
+        const newToken = await AuthService.refreshToken(); // only needs access token
 
-        // Process queued requests
         processQueue(null, newToken);
 
         originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
@@ -78,16 +73,11 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
 
-        // Handle refresh failure - clear React Query cache
         if (typeof window !== "undefined") {
           const { queryClient } = require("./react-query");
           const { authKeys } = require("../hooks/useAuthQueries");
-          
-          // Clear auth-related queries
           queryClient.removeQueries({ queryKey: authKeys.all });
           queryClient.setQueryData(authKeys.currentUser(), null);
-          
-          // Redirect to login
           window.location.href = "/login";
         }
 
@@ -96,8 +86,6 @@ axiosInstance.interceptors.response.use(
         isRefreshing = false;
       }
     }
-
-    return Promise.reject(error);
   }
 );
 

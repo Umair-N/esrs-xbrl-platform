@@ -99,9 +99,11 @@ async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
+    payload = verify_token(refresh_token, token_type="refresh")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
     email = payload.get("sub")
-    if not email:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
 
     # Verify user still exists and is active
     user = user_service.get_user_by_email(email, db)
@@ -115,7 +117,6 @@ async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
         data={"sub": email}, expires_delta=access_token_expires
     )
 
-    # Optional: Rotate refresh token for better security
     new_refresh_token = create_refresh_token(
         data={"sub": email}, expires_delta=refresh_token_expires
     )

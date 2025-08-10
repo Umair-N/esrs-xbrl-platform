@@ -20,7 +20,6 @@ export interface LoginCredentials {
 export interface UserRegistration {
   email: string;
   password: string;
-  name?: string;
   // Add other registration fields as needed
 }
 
@@ -49,11 +48,11 @@ export interface AuthContextType {
   user: User | null | undefined;
   loading: boolean;
   isAuthenticated: boolean;
-  
+
   login: (credentials: LoginCredentials) => Promise<AuthTokens>;
   register: (userData: UserRegistration) => Promise<AuthResponse>;
   logout: () => Promise<void>;
-  
+
   // Utility
   // refetchUser: () => void;
 }
