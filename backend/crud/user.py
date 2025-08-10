@@ -123,7 +123,7 @@ class UserCRUD:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
             # Validate sort_by to prevent SQL injection
-            valid_sort_columns = {"created_at", "username", "email", "full_name"}
+            valid_sort_columns = {"created_at", "username", "email", "full_name", "last_login", "last_accessed_at"}
             if sort_by not in valid_sort_columns:
                 sort_by = "created_at"
 

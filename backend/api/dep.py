@@ -1,7 +1,7 @@
 import psycopg2
 from crud.user import user_crud
 from database.session import get_db
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from models.user import User
 from services.auth_service import auth_service
@@ -11,7 +11,7 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,  # <-- we'll read the cookie from here
     db=Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -20,34 +20,38 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
-        email = auth_service.verify_token(credentials.credentials)
-
-        if email is None:
-            raise credentials_exception
-    except Exception as e:
+    # 1. Get access_token from cookies
+    token = request.cookies.get("access_token")
+    if not token:
         raise credentials_exception
 
-    # Get user - this is where psycopg2 error might occur
+    # 2. Verify token
+    try:
+        email = auth_service.verify_token(token)
+        if email is None:
+            raise credentials_exception
+    except Exception:
+        raise credentials_exception
+
+    # 3. Retrieve user
     try:
         user = user_crud.get_user_by_email(email=email, db=db)
-
         if user is None:
             raise credentials_exception
 
         if not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Inactive user",
             )
 
         return user
 
-    except psycopg2.Error as e:
+    except psycopg2.Error:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error",
         )
-
-
 def require_role(required_role: str):
     def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "admin":

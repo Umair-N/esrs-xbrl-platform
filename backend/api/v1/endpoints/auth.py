@@ -68,9 +68,10 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
 
     response = JSONResponse(
         content={
-            "access_token": access_token,
-            "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
+            "message": "Login successful",
+            # "access_token": access_token,
+            # "token_type": "bearer",
+            # "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
         }
     )
 
@@ -85,6 +86,15 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         samesite="strict",
         secure=is_production,  
         max_age=int(refresh_token_expires.total_seconds()),
+        path="/",  
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="strict",
+        secure=is_production,  
+        max_age=int(access_token_expires.total_seconds()),
         path="/",  
     )
     return response
