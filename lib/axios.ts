@@ -3,7 +3,8 @@ import axios from "axios";
 
 const axiosInstance = axios.create({
   baseURL:
-    process.env.NEXT_PUBLIC_API_URL || "https://xbrl-backend.onrender.com",
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://xbrl-backend.onrender.com/api/v1",
   withCredentials: true,
   timeout: 10000,
 });
