@@ -1,261 +1,257 @@
-"use client"
-import Link from "next/link"
-import { useAuth } from "@/hooks/useAuth"
-import { ArrowRight, FileText, Tag, Calendar, BookOpen, FileCode, Users, LogOut } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import ProtectedRoute from "@/components/protectedRoute"
+"use client";
+
+import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  ArrowRight,
+  FileText,
+  Tag,
+  Calendar,
+  BookOpen,
+  FileCode,
+  Users,
+  Zap,
+  TrendingUp,
+  Award,
+  CheckCircle,
+  Globe,
+  Lock,
+  BarChart3,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import ProtectedRoute from "@/components/protectedRoute";
+import { useState, useEffect } from "react";
 
 export default function Home() {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { isAuthenticated } = useAuth();
+  const [isVisible, setIsVisible] = useState(false);
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      // Optionally redirect or trigger a toast
-    } catch (error) {
-      console.error("Logout failed:", error)
-    }
-  }
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  const features = [
+    {
+      icon: FileText,
+      title: "Smart Document Processing",
+      description: "AI-powered document analysis and parsing",
+      content:
+        "Advanced OCR and NLP technology automatically extracts and structures data from your financial reports, reducing manual work by 90%.",
+      href: "/editor",
+      buttonText: "Try Smart Editor",
+      gradient: "from-blue-500 to-cyan-500",
+      delay: "delay-100",
+      stats: "90% faster processing",
+    },
+    {
+      icon: Calendar,
+      title: "Dynamic Context Engine",
+      description: "Intelligent context management with auto-suggestions",
+      content:
+        "Our AI suggests optimal contexts based on your data patterns and regulatory requirements, ensuring compliance accuracy.",
+      href: "/contexts",
+      buttonText: "Explore Contexts",
+      gradient: "from-purple-500 to-pink-500",
+      delay: "delay-200",
+      stats: "99.9% accuracy rate",
+    },
+    {
+      icon: BookOpen,
+      title: "Interactive Taxonomy Explorer",
+      description: "Visual taxonomy navigation with semantic search",
+      content:
+        "Navigate complex ESRS taxonomy with our interactive visual interface. Find concepts instantly with semantic AI search.",
+      href: "/taxonomy",
+      buttonText: "Explore Taxonomy",
+      gradient: "from-green-500 to-emerald-500",
+      delay: "delay-300",
+      stats: "10,000+ concepts indexed",
+    },
+    {
+      icon: Tag,
+      title: "Intelligent Auto-Tagging",
+      description: "ML-powered automatic concept detection",
+      content:
+        "Machine learning algorithms automatically suggest and apply XBRL tags based on content analysis and historical patterns.",
+      href: "/editor",
+      buttonText: "Start Auto-Tagging",
+      gradient: "from-orange-500 to-red-500",
+      delay: "delay-400",
+      stats: "85% auto-tag accuracy",
+    },
+    {
+      icon: FileCode,
+      title: "Real-time XBRL Validation",
+      description: "Live validation with instant feedback",
+      content:
+        "Real-time validation engine checks compliance as you work, with detailed error reporting and suggested fixes.",
+      href: "/xbrl-preview",
+      buttonText: "Validate Now",
+      gradient: "from-indigo-500 to-purple-500",
+      delay: "delay-500",
+      stats: "Real-time validation",
+    },
+    {
+      icon: Users,
+      title: "Enterprise Collaboration",
+      description: "Team workflows with advanced permissions",
+      content:
+        "Sophisticated role-based access control, audit trails, and collaborative workflows for enterprise teams.",
+      href: "/users",
+      buttonText: "Manage Teams",
+      gradient: "from-teal-500 to-cyan-500",
+      delay: "delay-600",
+      stats: "Enterprise-grade security",
+    },
+  ];
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto py-10 space-y-8">
-        {/* Header Section */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight animate-in fade-in-0 duration-1000">
-            XBRL Tagging Platform
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto animate-in fade-in-0 duration-1000 delay-200">
-            A comprehensive solution for tagging ESG reports with ESRS Taxonomy
-          </p>
-          {/* Auth Buttons */}
-          <div className="flex justify-center items-center gap-4 pt-4 flex-wrap animate-in fade-in-0 duration-1000 delay-300">
-            {isAuthenticated ? (
-              <>
-                <p className="text-muted-foreground">Welcome back, {user?.full_name || user?.username}!</p>
-                <Button
-                  onClick={handleLogout}
-                  variant="destructive"
-                  size="lg"
-                  className="flex items-center gap-2 hover:scale-105 transition-all duration-200 hover:shadow-lg"
-                >
-                  <LogOut className="w-4 h-4 transition-transform group-hover:rotate-12" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild size="lg" className="hover:scale-105 transition-all duration-200 hover:shadow-lg">
-                  <Link href="/login">Login</Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="lg"
-                  className="hover:scale-105 transition-all duration-200 hover:shadow-lg hover:bg-primary hover:text-primary-foreground bg-transparent"
-                >
-                  <Link href="/register">Register</Link>
-                </Button>
-              </>
-            )}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
+        {/* Features Section - Fixed Layout */}
+        <div className="container mx-auto px-6 py-16">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4">
+              Everything you need for{" "}
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                perfect compliance
+              </span>
+            </h2>
+            <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+              Advanced AI-powered tools designed to simplify your ESRS reporting
+              workflow
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            {features.map((feature) => (
+              <Card
+                key={feature.title}
+                className={`group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 hover:border-blue-200 dark:hover:border-blue-700 transition-all duration-100 hover:shadow-lg animate-in fade-in-0  ${feature.delay} flex flex-col h-full`}
+              >
+                <CardHeader className="pb-4 flex-shrink-0">
+                  <div
+                    className={`inline-flex p-3 rounded-lg bg-gradient-to-r ${feature.gradient} mb-4 w-fit`}
+                  >
+                    <feature.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {feature.title}
+                    </CardTitle>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      {feature.description}
+                    </CardDescription>
+                    <Badge variant="secondary" className="text-xs w-fit">
+                      {feature.stats}
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pb-6 flex-grow">
+                  <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-sm">
+                    {feature.content}
+                  </p>
+                </CardContent>
+
+                <CardFooter className="pt-0 mt-auto flex-shrink-0">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full group/btn hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    <Link
+                      href={feature.href}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      {feature.buttonText}
+                      <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform duration-200" />
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-8">
-          {/* Upload & Editor */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-100">
-            <CardHeader>
-              <FileText className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">
-                Report Upload & Editor
-              </CardTitle>
-              <CardDescription>Upload PDF/DOCX or paste raw report text for tagging</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Upload, parse, and edit your financial reports in a structured format. Our rich text editor allows you
-                to modify content while maintaining structure.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/editor" className="flex items-center justify-center gap-2">
-                  Open Editor
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
+        {/* CTA Section - Simplified */}
+        <div className="container mx-auto px-6 py-16">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12 text-center text-white max-w-4xl mx-auto">
+            <div className="space-y-6">
+              <h2 className="text-3xl md:text-4xl font-bold">
+                Ready to streamline your XBRL reporting?
+              </h2>
 
-          {/* Context Management */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-200">
-            <CardHeader>
-              <Calendar className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">
-                Context Management
-              </CardTitle>
-              <CardDescription>Create and manage XBRL contexts for your reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Define reporting contexts with entity information, time periods, and scenarios. Apply these contexts
-                when tagging financial data.
+              <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+                Join 500+ enterprises who've reduced XBRL preparation time by
+                90% while achieving 99.9% accuracy.
               </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/contexts" className="flex items-center justify-center gap-2">
-                  Manage Contexts
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
 
-          {/* Taxonomy Browser */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-300">
-            <CardHeader>
-              <BookOpen className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">
-                Taxonomy Browser
-              </CardTitle>
-              <CardDescription>Browse and search the ESRS XBRL taxonomy</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Explore the complete ESRS taxonomy with detailed information about concepts, labels, definitions, and
-                relationships.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/taxonomy" className="flex items-center justify-center gap-2">
-                  Browse Taxonomy
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                <Button
+                  size="lg"
+                  asChild
+                  className="bg-white text-blue-600 hover:bg-blue-50 hover:text-blue-700 font-semibold"
+                >
+                  <Link
+                    href={isAuthenticated ? "/editor" : "/register"}
+                    className="flex items-center gap-2"
+                  >
+                    {isAuthenticated ? (
+                      <>
+                        <BarChart3 className="w-5 h-5" />
+                        Start Tagging Now
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5" />
+                        Start Free Trial
+                      </>
+                    )}
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </Button>
 
-          {/* Tagging Interface */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-400">
-            <CardHeader>
-              <Tag className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">
-                Tagging Interface
-              </CardTitle>
-              <CardDescription>Tag report sections with XBRL concepts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Intuitive interface for selecting report sections and assigning appropriate XBRL concepts and contexts.
-                View and manage all tagged facts.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/editor" className="flex items-center justify-center gap-2">
-                  Start Tagging
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  asChild
+                  className="border-white/30 text-white hover:bg-white/10 hover:border-white/50"
+                >
+                  <Link href="/taxonomy" className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5" />
+                    Explore Features
+                  </Link>
+                </Button>
+              </div>
 
-          {/* XBRL Preview */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-500">
-            <CardHeader>
-              <FileCode className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">
-                XBRL Preview & Export
-              </CardTitle>
-              <CardDescription>Generate and download valid XBRL documents</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Preview your tagged data as XML or JSON and export valid XBRL instance documents that comply with
-                regulatory standards.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/xbrl-preview" className="flex items-center justify-center gap-2">
-                  Preview XBRL
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* User Management */}
-          <Card className="group hover:scale-105 hover:shadow-xl transition-all duration-300 hover:border-primary/50 cursor-pointer animate-in fade-in-0 duration-700 delay-600">
-            <CardHeader>
-              <Users className="h-8 w-8 text-primary mb-2 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300">User Management</CardTitle>
-              <CardDescription>Manage users and permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="group-hover:text-foreground transition-colors duration-300">
-                Create and manage user accounts with different permission levels. Control access to reports and tagging
-                functionality.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="outline"
-                asChild
-                className="w-full group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-300 bg-transparent"
-              >
-                <Link href="/users" className="flex items-center justify-center gap-2">
-                  Manage Users
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        {/* CTA Footer */}
-        <div className="bg-muted p-8 rounded-lg mt-12 hover:bg-muted/80 transition-all duration-300 hover:shadow-lg animate-in fade-in-0 duration-1000 delay-700 group">
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold group-hover:text-primary transition-colors duration-300">
-              Ready to streamline your XBRL reporting?
-            </h2>
-            <p className="text-muted-foreground group-hover:text-foreground transition-colors duration-300">
-              Our platform simplifies the complex process of XBRL tagging for ESRS compliance, saving you time and
-              reducing errors.
-            </p>
-            <Button size="lg" asChild className="hover:scale-105 transition-all duration-300 hover:shadow-xl">
-              <Link href={isAuthenticated ? "/editor" : "/register"} className="flex items-center gap-2">
-                {isAuthenticated ? "Start Tagging" : "Get Started Now"}
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-              </Link>
-            </Button>
+              <div className="flex justify-center items-center gap-6 pt-6 text-blue-100 text-sm">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  <span>Enterprise Security</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>99.9% Uptime</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4" />
+                  <span>SOC 2 Compliant</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </ProtectedRoute>
-  )
+  );
 }

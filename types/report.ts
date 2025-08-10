@@ -18,7 +18,7 @@ export interface ReportBlock {
 export interface XbrlTag {
   id: string
   concept: TaxonomyConcept
-  context: XbrlContext
+  context?: XbrlContext
   createdAt: string
   // Add start and end indices for highlighting
   startIndex?: number

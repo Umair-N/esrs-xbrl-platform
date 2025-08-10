@@ -92,14 +92,63 @@ class UserCRUD:
             return User(**result) if result else None
         finally:
             cursor.close()
-
-    def get_all_users(self, db) -> List[User]:
+    def count_users(self, db, search: Optional[str] = None) -> int:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
-            query = "SELECT * FROM users ORDER BY created_at DESC"
-            cursor.execute(query)
-            results = cursor.fetchall()
-            return [User(**row) for row in results]
+            if search:
+                query = """
+                    SELECT COUNT(*) AS count
+                    FROM users
+                    WHERE username ILIKE %(search)s
+                """
+                cursor.execute(query, {"search": f"%{search}%"})
+            else:
+                query = "SELECT COUNT(*) AS count FROM users"
+                cursor.execute(query)
+
+            result = cursor.fetchone()
+            return result["count"] if result else 0
+        finally:
+            cursor.close()
+
+    def get_all_users(
+        self,
+        db,
+        skip: int = 0,
+        limit: int = 10,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        search: Optional[str] = None
+    ) -> List[User]:
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            # Validate sort_by to prevent SQL injection
+            valid_sort_columns = {"created_at", "username", "email", "full_name"}
+            if sort_by not in valid_sort_columns:
+                sort_by = "created_at"
+
+            # Validate sort_order
+            sort_order = "DESC" if sort_order.lower() == "desc" else "ASC"
+
+            base_query = f"""
+                SELECT *
+                FROM users
+            """
+
+            params = {}
+            if search:
+                base_query += " WHERE username ILIKE %(search)s"
+                params["search"] = f"%{search}%"
+
+            base_query += f" ORDER BY {sort_by} {sort_order} OFFSET %(skip)s LIMIT %(limit)s"
+            params["skip"] = skip
+            params["limit"] = limit
+
+            cursor.execute(base_query, params)
+            rows = cursor.fetchall()
+
+            # Convert dict rows to User models
+            return [User(**row) for row in rows]
         finally:
             cursor.close()
 
