@@ -1,4 +1,5 @@
-from typing import List
+from typing import Optional
+from fastapi import Query
 
 from api.dep import get_current_user, require_admin
 from database.session import get_db
@@ -7,7 +8,7 @@ from models.user import User
 from schemas.user import UserResponse, UserUpdate
 from services.user_service import user_service
 from datetime import datetime, timezone
-
+from math import ceil
 router = APIRouter()
 
 
@@ -63,22 +64,46 @@ async def update_current_user(
     )
 
 
-@router.get("/", response_model=List[UserResponse])
-async def get_all_users(admin_user: User = Depends(require_admin), db=Depends(get_db)):
-    users = user_service.get_all_users(db)
-    return [
-        UserResponse(
-            id=user.id,
-            email=user.email,
-            username=user.username,
-            full_name=user.full_name,
-            is_active=user.is_active,
-            is_verified=user.is_verified,
-            role=user.role,
-            created_at=user.created_at,
-        )
-        for user in users
-    ]
+@router.get("/", response_model=dict)
+async def get_all_users(
+    admin_user: User = Depends(require_admin),
+    db = Depends(get_db),
+    skip: int = Query(0, ge=0),                       
+    limit: int = Query(10, gt=0, le=100),            
+    sort_by: str = Query("created_at"),               
+    sort_order: str = Query("desc", regex="^(asc|desc)$"), 
+    search: Optional[str] = None                      
+):
+    total_users = user_service.count_users(db, search=search)
+
+    users = user_service.get_all_users(
+        db=db,
+        skip=skip,
+        limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        search=search
+    )
+
+    return {
+        "total": total_users,
+        "page": skip // limit + 1,
+        "pages": ceil(total_users / limit) if total_users > 0 else 0,
+        "limit": limit,
+        "users": [
+            UserResponse(
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                full_name=user.full_name,
+                is_active=user.is_active,
+                is_verified=user.is_verified,
+                role=user.role,
+                created_at=user.created_at,
+            )
+            for user in users
+        ]
+    }
 
 
 @router.get("/{user_id}", response_model=UserResponse)

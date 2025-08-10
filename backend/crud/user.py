@@ -92,16 +92,31 @@ class UserCRUD:
             return User(**result) if result else None
         finally:
             cursor.close()
+    def count_users(db, search: Optional[str] = None) -> int:
+        query = db.query(User)
+        if search:
+            query = query.filter(User.username.ilike(f"%{search}%"))
+        return query.count()
 
-    def get_all_users(self, db) -> List[User]:
-        cursor = db.cursor(cursor_factory=RealDictCursor)
-        try:
-            query = "SELECT * FROM users ORDER BY created_at DESC"
-            cursor.execute(query)
-            results = cursor.fetchall()
-            return [User(**row) for row in results]
-        finally:
-            cursor.close()
+    def get_all_users(
+        db,
+        skip: int = 0,
+        limit: int = 10,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        search: Optional[str] = None
+    ) -> List[User]:
+        query = db.query(User)
+
+        if search:
+            query = query.filter(User.username.ilike(f"%{search}%"))
+
+        sort_column = getattr(User, sort_by, User.created_at)
+        if sort_order.lower() == "desc":
+            sort_column = sort_column.desc()
+        query = query.order_by(sort_column)
+
+        return query.offset(skip).limit(limit).all()
 
     def update_user(self, user_id: int, user_data: UserUpdate, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)

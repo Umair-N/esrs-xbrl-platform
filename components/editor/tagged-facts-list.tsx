@@ -1,55 +1,68 @@
-"use client"
+"use client";
 
-import type { ReportDocument } from "@/types/report"
-import { Button } from "@/components/ui/button"
-import { Trash2, Eye, ExternalLink, CheckCircle, Tag, Hash, FileText } from 'lucide-react'
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import type { ReportDocument } from "@/types/report";
+import { Button } from "@/components/ui/button";
+import {
+  Trash2,
+  Eye,
+  ExternalLink,
+  CheckCircle,
+  Tag,
+  Hash,
+  FileText,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface TaggedFactsListProps {
-  report: ReportDocument
-  onBlockSelect: (blockId: string) => void
-  onReportChange?: (report: ReportDocument) => void
+  report: ReportDocument;
+  onBlockSelect: (blockId: string) => void;
+  onReportChange?: (report: ReportDocument) => void;
 }
 
-export function TaggedFactsList({ report, onBlockSelect, onReportChange }: TaggedFactsListProps) {
-  const [deletingTags, setDeletingTags] = useState<Set<string>>(new Set())
-  const router = useRouter()
+export function TaggedFactsList({
+  report,
+  onBlockSelect,
+  onReportChange,
+}: TaggedFactsListProps) {
+  const [deletingTags, setDeletingTags] = useState<Set<string>>(new Set());
+  const router = useRouter();
 
   // Get all tags from all blocks
-  const allTags = report.blocks.flatMap(block => 
-    block.tags.map(tag => ({
+  const allTags = report.blocks.flatMap((block) =>
+    block.tags.map((tag) => ({
       ...tag,
       blockId: block.id,
       blockContent: block.content,
-      taggedText: tag.startIndex !== undefined && tag.endIndex !== undefined 
-        ? block.content.substring(tag.startIndex, tag.endIndex)
-        : block.content
+      taggedText:
+        tag.startIndex !== undefined && tag.endIndex !== undefined
+          ? block.content.substring(tag.startIndex, tag.endIndex)
+          : block.content,
     }))
-  )
+  );
 
   const handleDeleteTag = async (blockId: string, tagId: string) => {
     if (!onReportChange) {
       toast.error("Cannot delete tag", {
         description: "Missing update handler",
-      })
-      return
+      });
+      return;
     }
 
-    setDeletingTags((prev) => new Set(prev).add(tagId))
+    setDeletingTags((prev) => new Set(prev).add(tagId));
 
     try {
-      const block = report.blocks.find((b) => b.id === blockId)
-      const tag = block?.tags.find((t) => t.id === tagId)
+      const block = report.blocks.find((b) => b.id === blockId);
+      const tag = block?.tags.find((t) => t.id === tagId);
 
       if (!block || !tag) {
         toast.error("Cannot delete tag", {
           description: "Tag not found",
-        })
-        return
+        });
+        return;
       }
 
       const updatedReport = {
@@ -58,31 +71,33 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
           currentBlock.id === blockId
             ? {
                 ...currentBlock,
-                tags: currentBlock.tags.filter((currentTag) => currentTag.id !== tagId),
+                tags: currentBlock.tags.filter(
+                  (currentTag) => currentTag.id !== tagId
+                ),
               }
-            : currentBlock,
+            : currentBlock
         ),
         updatedAt: new Date().toISOString(),
-      }
+      };
 
-      onReportChange(updatedReport)
+      onReportChange(updatedReport);
 
       toast.success("Tag deleted", {
         description: `Removed "${tag.concept.label}"`,
         icon: <CheckCircle className="h-4 w-4" />,
         duration: 2000,
-      })
+      });
     } catch (error) {
-      console.error("Error deleting tag:", error)
-      toast.error("Failed to delete tag")
+      console.error("Error deleting tag:", error);
+      toast.error("Failed to delete tag");
     } finally {
       setDeletingTags((prev) => {
-        const newSet = new Set(prev)
-        newSet.delete(tagId)
-        return newSet
-      })
+        const newSet = new Set(prev);
+        newSet.delete(tagId);
+        return newSet;
+      });
     }
-  }
+  };
 
   const handleViewInTaxonomy = (tag: any) => {
     const queryParams = new URLSearchParams({
@@ -90,18 +105,16 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
       conceptLabel: tag.concept.label || "",
       conceptType: tag.concept.type || "",
       periodType: tag.concept.periodType || "",
-    })
-    router.push(`/taxonomy?${queryParams.toString()}`)
-  }
+    });
+    router.push(`/taxonomy?${queryParams.toString()}`);
+  };
 
   const handleViewInDocument = (blockId: string) => {
-    onBlockSelect(blockId)
+    onBlockSelect(blockId);
     toast.success("Navigated to document", {
       duration: 1500,
-    })
-  }
-
-  console.log("TaggedFactsList rendering with", allTags.length, "tags")
+    });
+  };
 
   if (allTags.length === 0) {
     return (
@@ -114,29 +127,27 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
           Start by selecting text in the document and adding ESRS tags.
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-3">
       <div className="text-sm text-muted-foreground mb-3">
-        {allTags.length} tagged fact{allTags.length !== 1 ? 's' : ''}
+        {allTags.length} tagged fact{allTags.length !== 1 ? "s" : ""}
       </div>
-      
+
       {allTags.map((tag, index) => {
-        const isDeleting = deletingTags.has(tag.id)
-        const isESRS = tag.concept.id.toLowerCase().includes("esrs")
-        
+        const isDeleting = deletingTags.has(tag.id);
+        const isESRS = tag.concept.id.toLowerCase().includes("esrs");
+
         return (
           <Card
             key={tag.id}
             className={`transition-all duration-200 border-l-4 ${
-              isESRS 
-                ? "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/10" 
+              isESRS
+                ? "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/10"
                 : "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/10"
-            } ${
-              isDeleting ? "opacity-50 scale-95" : "hover:shadow-md"
-            }`}
+            } ${isDeleting ? "opacity-50 scale-95" : "hover:shadow-md"}`}
           >
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
@@ -145,11 +156,11 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
                     {tag.concept.label}
                   </CardTitle>
                   <div className="flex items-center gap-1 mt-1">
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={`text-xs ${
-                        isESRS 
-                          ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-300" 
+                        isESRS
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-300"
                           : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300"
                       }`}
                     >
@@ -171,12 +182,16 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
 
             <CardContent className="space-y-3 pt-0 pb-3">
               {/* Tagged Text - Compact */}
-              <div className={`p-2 rounded border text-xs break-words leading-relaxed ${
-                isESRS 
-                  ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" 
-                  : "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
-              }`}>
-                {tag.taggedText.length > 100 ? `${tag.taggedText.substring(0, 100)}...` : tag.taggedText}
+              <div
+                className={`p-2 rounded border text-xs break-words leading-relaxed ${
+                  isESRS
+                    ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800"
+                    : "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
+                }`}
+              >
+                {tag.taggedText.length > 100
+                  ? `${tag.taggedText.substring(0, 100)}...`
+                  : tag.taggedText}
               </div>
 
               {/* Action Buttons - Compact */}
@@ -202,8 +217,8 @@ export function TaggedFactsList({ report, onBlockSelect, onReportChange }: Tagge
               </div>
             </CardContent>
           </Card>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

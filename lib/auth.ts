@@ -1,4 +1,4 @@
-// File: lib/auth.ts (Fixed AuthService)
+// File: lib/auth.ts
 import axiosInstance from "./axios";
 import {
   LoginCredentials,
@@ -9,12 +9,11 @@ import {
 } from "../types/auth";
 
 class AuthService {
-  private accessTokenKey = "access_token"; // Using old version's key for compatibility
-  private refreshTokenKey = "refreshToken";
+  private accessTokenKey = "access_token";
+  private refreshTokenKey = "refresh_token";
   private accessToken: string | null = null;
 
   constructor() {
-    // Load token from storage on initialization (from old version)
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem(this.accessTokenKey);
       if (storedToken) {
@@ -36,14 +35,12 @@ class AuthService {
     this.hasValidToken = this.hasValidToken.bind(this);
   }
 
-  // Synchronous token check for React Query enabled condition (from new version)
   hasValidToken(): boolean {
     if (typeof window === "undefined") return false;
     const token = localStorage.getItem(this.accessTokenKey);
     return !!token;
   }
 
-  // Keep the async version for compatibility (merged approach)
   async isAuthenticated(): Promise<boolean> {
     if (typeof window === "undefined") return false;
 
@@ -51,11 +48,9 @@ class AuthService {
     if (!token) return false;
 
     try {
-      // Verify token with server
       await this.getCurrentUser();
       return true;
     } catch (error) {
-      // Token might be invalid - clear it
       this.clearTokens();
       return false;
     }
@@ -63,7 +58,6 @@ class AuthService {
 
   getAccessToken(): string | null {
     if (typeof window === "undefined") return null;
-    // Return in-memory token first, fallback to localStorage
     return this.accessToken || localStorage.getItem(this.accessTokenKey);
   }
 
@@ -72,29 +66,28 @@ class AuthService {
     return localStorage.getItem(this.refreshTokenKey);
   }
 
-  // New version's method for setting both tokens
   setTokens(tokens: AuthTokens): void {
-    console.log(tokens,'tokens');
-    
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      console.log("[AuthService] setTokens skipped: window undefined");
+      return;
+    }
 
     this.accessToken = tokens.accessToken;
     localStorage.setItem(this.accessTokenKey, tokens.accessToken);
+    console.log(
+      "[AuthService] setTokens: accessToken stored",
+      tokens.accessToken
+    );
 
     if (tokens.refreshToken) {
       localStorage.setItem(this.refreshTokenKey, tokens.refreshToken);
+      console.log(
+        "[AuthService] setTokens: refreshToken stored",
+        tokens.refreshToken
+      );
     }
   }
 
-  // Old version's method for backward compatibility
-  setAccessToken(token: string): void {
-    this.accessToken = token;
-    if (typeof window !== "undefined") {
-      localStorage.setItem(this.accessTokenKey, token);
-    }
-  }
-
-  // New version's method
   clearTokens(): void {
     if (typeof window === "undefined") return;
     this.accessToken = null;
@@ -102,61 +95,29 @@ class AuthService {
     localStorage.removeItem(this.refreshTokenKey);
   }
 
-  // Old version's method for backward compatibility
-  clearAccessToken(): void {
-    this.clearTokens(); // Delegate to the more comprehensive method
-  }
-
   async login(credentials: LoginCredentials): Promise<AuthTokens> {
     try {
-      // Try new version's endpoint first, fallback to old version's
-      let response;
+      const response = await axiosInstance.post("/auth/login", credentials);
 
-      try {
-        response = await axiosInstance.post("/auth/login", credentials);
-        console.log(response,'response here');
-        
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          // Optional: Handle 404 if even this fallback fails
-          console.error("Login endpoint not found.");
-        }
-        throw error;
-      }
-
-      // Handle both response formats
+      // Adjust if your backend uses snake_case or camelCase here:
       const tokens: AuthTokens = {
-        accessToken: response.data.access_token,
-        // refreshToken: response.data.refreshToken,
+        accessToken: response.data.accessToken || response.data.access_token,
+        refreshToken: response.data.refreshToken || response.data.refresh_token,
       };
-      console.log(tokens,'hbahjqbwcqwb');
-      
+
       this.setTokens(tokens);
-      return { ...tokens};
+      console.log("[AuthService] login: Tokens set", tokens);
+
+      return { ...tokens };
     } catch (error: any) {
-      console.log(error,'error');
-      
-      throw new Error(error.response || "Login failed");
+      console.error("[AuthService] login error", error);
+      throw new Error(error.response?.data?.message || "Login failed");
     }
   }
 
   async register(userData: UserRegistration): Promise<AuthResponse> {
     try {
-      // Try new version's endpoint first, fallback to old version's
-      let response;
-      try {
-        response = await axiosInstance.post("/auth/register", userData);
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          // Fallback to old version's endpoint
-          response = await axiosInstance.post(
-            "/auth/register",
-            userData
-          );
-        } else {
-          throw error;
-        }
-      }
+      const response = await axiosInstance.post("/auth/register", userData);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || "Registration failed");
@@ -164,12 +125,10 @@ class AuthService {
   }
 
   async getCurrentUser(): Promise<User> {
-      try {
-
-        const response = await axiosInstance.get("/users/me");
-        return response.data;
-      } 
-    catch (error: any) {
+    try {
+      const response = await axiosInstance.get("/users/me");
+      return response.data;
+    } catch (error: any) {
       throw new Error(
         error.response?.data?.message || "Failed to get user data"
       );
@@ -179,29 +138,17 @@ class AuthService {
   async refreshToken(): Promise<string> {
     try {
       const refreshToken = this.getRefreshToken();
-
-      let response;
-      if (refreshToken) {
-        // New version approach with refresh token
-        response = await axiosInstance.post("/auth/refresh", {
-          refreshToken,
-        });
-      } else {
-        // Old version approach (might use cookies or session)
-        try {
-          response = await axiosInstance.post("/auth/refresh");
-        } catch (error: any) {
-          if (error.response?.status === 404) {
-            response = await axiosInstance.post("/auth/refresh");
-          } else {
-            throw error;
-          }
-        }
+      if (!refreshToken) {
+        throw new Error("No refresh token available");
       }
+
+      const response = await axiosInstance.post("/auth/refresh", {
+        refreshToken,
+      });
 
       const newTokens: AuthTokens = {
         accessToken: response.data.accessToken || response.data.access_token,
-        refreshToken: response.data.refreshToken || refreshToken,
+        refreshToken: response.data.refreshToken || response.data.refresh_token,
       };
 
       this.setTokens(newTokens);
@@ -214,38 +161,12 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      // Try new version's endpoint first, fallback to old version's
-      try {
-        await axiosInstance.post("/auth/logout");
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          await axiosInstance.post("/auth/logout");
-        } else {
-          throw error;
-        }
-      }
+      await axiosInstance.post("/auth/logout");
     } catch (error) {
-      // Continue with logout even if server call fails
       console.error("Logout API call failed:", error);
     } finally {
       this.clearTokens();
     }
-  }
-
-  // Additional methods from old version for backward compatibility
-  async getProtectedData(): Promise<any> {
-    const response = await axiosInstance.get("/protected");
-    return response.data;
-  }
-
-  async getAdminData(): Promise<any> {
-    const response = await axiosInstance.get("/admin-only");
-    return response.data;
-  }
-
-  async getAllUsers(): Promise<User[]> {
-    const response = await axiosInstance.get("/users");
-    return response.data as User[];
   }
 }
 
