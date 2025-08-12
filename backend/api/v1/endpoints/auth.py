@@ -163,4 +163,5 @@ async def logout():
 
     # Match cookie deletion parameters with set_cookie parameters
     response.delete_cookie(key="refresh_token", path="/", samesite="strict")
+    response.delete_cookie(key="access_token", path="/", samesite="strict")
     return response

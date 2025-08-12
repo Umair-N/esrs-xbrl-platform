@@ -1,15 +1,16 @@
-"use client";
-import { AuthProvider } from "@/hooks/useAuth";
-import "./globals.css";
+'use client';
+import { AuthProvider } from '@/hooks/useAuth';
+import './globals.css';
 // import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/react-query";
-import { useEffect } from "react";
-import AuthService from "@/lib/auth";
+import { Inter } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/react-query';
+import { useEffect } from 'react';
+import { useUser } from '@/lib/auth';
+// import AuthService from '@/lib/auth';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 // export const metadata: Metadata = {
 //   title: "ESRS XBRL Tagging Platform",
@@ -22,19 +23,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    AuthService.ensureAccessToken();
-  }, []);
   return (
-    <html lang="en">
+    <html lang='en'>
       <body className={inter.className}>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Toaster richColors position="top-right" />
-            <div className="relative flex min-h-screen flex-col">
-              {children}
-            </div>
-          </AuthProvider>
+          {/* <AuthProvider> */}
+          <Toaster richColors position='top-right' />
+          <div className='relative flex min-h-screen flex-col'>{children}</div>
+          {/* </AuthProvider> */}
           {/* Add React Query DevTools for development */}
         </QueryClientProvider>
       </body>
