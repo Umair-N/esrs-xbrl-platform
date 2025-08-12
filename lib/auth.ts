@@ -10,8 +10,8 @@ import { AuthResponse, User } from '@/types/api';
 
 import { api } from './api-client';
 
-export const getUser = async (): Promise<{ data: User }> => {
-  const response = (await api.get('/users/me')) as { data: User };
+export const getUser = async (): Promise<User> => {
+  const response = (await api.get('/users/me')) as User;
 
   return response;
 };

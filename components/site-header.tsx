@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   FileText,
   BookOpen,
@@ -17,31 +17,47 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useLogout } from '@/lib/auth';
+import { useLogout, useUser } from '@/lib/auth';
 // import { useLogout } from '@/hooks/useAuthQueries';
 
 const navigation = [
   { name: 'Dashboard', href: '/', exact: true },
-  { name: 'Editor', href: '/editor', icon: FileText },
-  { name: 'Contexts', href: '/contexts', icon: Calendar },
-  { name: 'Taxonomy', href: '/taxonomy', icon: BookOpen },
-  { name: 'XBRL Preview', href: '/xbrl-preview', icon: FileCode },
+  {
+    name: 'Editor',
+    href: '/editor',
+    icon: FileText,
+    platform_access_needed: true,
+  },
+  {
+    name: 'Contexts',
+    href: '/contexts',
+    icon: Calendar,
+    platform_access_needed: true,
+  },
+  {
+    name: 'Taxonomy',
+    href: '/taxonomy',
+    icon: BookOpen,
+    platform_access_needed: true,
+  },
+  {
+    name: 'XBRL Preview',
+    href: '/xbrl-preview',
+    icon: FileCode,
+    platform_access_needed: true,
+  },
 ];
 
 export function SiteHeader() {
+  const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  // const { user, isAuthenticated } = useAuth()
-  const logoutMutation = useLogout({});
-
-  const handleLogout = async () => {
-    try {
-      await logoutMutation.mutateAsync(undefined);
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
+  const logoutMutation = useLogout({
+    onSuccess: () => {
+      router.push('/login');
+    },
+  });
+  const { data: user } = useUser();
 
   const getInitials = (fullName?: string, username?: string): string => {
     if (fullName) {
@@ -75,7 +91,13 @@ export function SiteHeader() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2 text-sm font-medium transition-colors hover:text-blue-600 dark:hover:text-blue-400',
+                  `flex items-center gap-2 text-sm font-medium transition-colors hover:text-blue-600 dark:hover:text-blue-400 ${
+                    item.platform_access_needed
+                      ? item.platform_access_needed === user?.platform_access
+                        ? ''
+                        : 'hidden'
+                      : ''
+                  }`,
                   (
                     item.exact
                       ? pathname === item.href
@@ -97,16 +119,18 @@ export function SiteHeader() {
             {true ? (
               <div className='flex items-center gap-3'>
                 <Avatar className='h-8 w-8'>
-                  {/* <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.username}`} /> */}
-                  {/* <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                    {getInitials(user?.full_name, user?.username)}
-                  </AvatarFallback> */}
+                  <AvatarImage
+                    src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.username}`}
+                  />
+                  <AvatarFallback className='text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white'>
+                    {getInitials(user?.username)}
+                  </AvatarFallback>
                 </Avatar>
                 <span className='hidden sm:block text-sm font-medium text-slate-700 dark:text-slate-300'>
                   {/* {user?.full_name || user?.username} */}
                 </span>
                 <Button
-                  onClick={handleLogout}
+                  onClick={() => logoutMutation.mutate()}
                   variant='ghost'
                   size='sm'
                   disabled={logoutMutation.isPending}
@@ -214,7 +238,7 @@ function MobileNav({
               href={item.href}
               onClick={() => setOpen(false)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800',
+                `flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800`,
                 (
                   item.exact
                     ? pathname === item.href
