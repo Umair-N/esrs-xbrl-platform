@@ -5,53 +5,78 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from models.user import User
 from services.auth_service import auth_service
+from jose import JWTError, ExpiredSignatureError
+from datetime import timedelta
+from core.config import settings
+from services.user_service import user_service
+from core.security import (create_access_token, create_refresh_token)
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
 
 
 async def get_current_user(
-    request: Request,  # <-- we'll read the cookie from here
+    request: Request,
     db=Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # 1. Get access_token from cookies
-    token = request.cookies.get("access_token")
-    if not token:
+    access_token = request.cookies.get("access_token")
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not access_token and not refresh_token:
         raise credentials_exception
 
-    # 2. Verify token
+    email = None
     try:
-        email = auth_service.verify_token(token)
-        if email is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
-
-    # 3. Retrieve user
-    try:
-        user = user_crud.get_user_by_email(email=email, db=db)
-        if user is None:
+        # Try to verify access token first
+        if access_token:
+            email = auth_service.verify_token(access_token)
+        else:
+            raise ExpiredSignatureError  # Force refresh check if access token missing
+    except ExpiredSignatureError:
+        if not refresh_token:
             raise credentials_exception
 
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Inactive user",
-            )
+        try:
+            refresh_email = auth_service.verify_token(refresh_token, token_type="refresh")
+        except JWTError:
+            raise credentials_exception
 
-        return user
+        if not refresh_email:
+            raise credentials_exception
 
-    except psycopg2.Error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error",
+        # Issue new tokens
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        new_access_token = create_access_token(
+            data={"sub": refresh_email},
+            expires_delta=access_token_expires
         )
+        new_refresh_token = create_refresh_token(
+            data={"sub": refresh_email},
+            expires_delta=refresh_token_expires
+        )
+
+        request.state.new_tokens = {
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token
+        }
+
+        email = refresh_email
+    except JWTError:
+        raise credentials_exception
+
+    # Get user from DB
+    user = user_service.get_user_by_email(email=email, db=db)
+    if not user or not user.is_active:
+        raise credentials_exception
+
+    return user
 def require_role(required_role: str):
     def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "admin":
