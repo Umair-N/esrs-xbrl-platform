@@ -16,9 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MailIcon, LockIcon, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
 import { useLogin } from '@/lib/auth';
 import Link from 'next/link';
+import { showError, showSuccess } from '@/components/heads-up';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -43,10 +43,10 @@ const LoginForm = () => {
   const loginMutation = useLogin({
     onSuccess: async () => {
       router.push('/');
-      toast.success('Login successful');
+      showSuccess({ title: 'Login successful' });
     },
     onError: (err) => {
-      toast.error((err as Error).message || 'Login failed');
+      showError({ title: (err as Error).message || 'Login failed' });
     },
   });
 

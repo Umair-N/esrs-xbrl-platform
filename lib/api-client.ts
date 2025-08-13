@@ -1,3 +1,4 @@
+import { showError, showNotification } from '@/components/heads-up';
 import { toast } from 'sonner'
 // import { env } from '@/config/env';
 
@@ -87,9 +88,17 @@ async function fetchApi<T>(
     if (!response.ok) {
         const message = (await response.json()).message || response.statusText;
         if (typeof window !== 'undefined') {
-            toast.error('Error', {
-                description: message,
-            });
+            // toast.error('Error', {
+            //     description: message,
+            // });
+            if (response.status === 401) {
+                throw new Error(message);
+            }
+            showError({
+                title: "Error!",
+                message: message,
+                duration: 2000,
+            })
         }
         throw new Error(message);
     }

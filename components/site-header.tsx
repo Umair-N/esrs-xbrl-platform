@@ -12,12 +12,13 @@ import {
   Sparkles,
   LogOut,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useLogout, useUser } from '@/lib/auth';
+import { AdminAccess } from '@/utils/admin-access';
 // import { useLogout } from '@/hooks/useAuthQueries';
 
 const navigation = [
@@ -116,6 +117,17 @@ export function SiteHeader() {
           {/* Right Side - Auth & Theme */}
           <div className='flex items-center gap-4'>
             {/* Auth Section */}
+            <AdminAccess>
+              <Link
+                href='/admin'
+                className={`${buttonVariants({
+                  variant: 'secondary',
+                })} flex items-center gap-2 text-sm font-medium transition-colors hover:text-blue-600 dark:hover:text-blue-400`}
+              >
+                <Sparkles className='h-4 w-4' />
+                Admin
+              </Link>
+            </AdminAccess>
             {true ? (
               <div className='flex items-center gap-3'>
                 <Avatar className='h-8 w-8'>

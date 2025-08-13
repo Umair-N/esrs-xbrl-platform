@@ -5,6 +5,10 @@ import { Toaster } from '@/components/ui/sonner';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/react-query';
 import { Metadata } from 'next';
+import {
+  NotificationContainer,
+  NotificationProvider,
+} from '@/components/heads-up';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,10 +26,15 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body className={inter.className}>
-        <QueryClientProvider client={queryClient}>
-          <Toaster richColors position='top-right' />
-          <div className='relative flex min-h-screen flex-col'>{children}</div>
-        </QueryClientProvider>
+        <NotificationProvider>
+          <NotificationContainer />
+          <QueryClientProvider client={queryClient}>
+            <Toaster richColors position='top-right' closeButton />
+            <div className='relative flex min-h-screen flex-col'>
+              {children}
+            </div>
+          </QueryClientProvider>
+        </NotificationProvider>
       </body>
     </html>
   );
