@@ -1,177 +1,163 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MailIcon, LockIcon, AlertTriangle } from 'lucide-react';
-import { useLogin } from '@/lib/auth';
+
+import { loginInputSchema, registerInputSchema } from '@/lib/auth';
+import { RegisterForm } from '@/components/auth/register-form';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { showError, showSuccess } from '@/components/heads-up';
+import { X } from 'lucide-react';
+import LoginForm from './auth/login-form';
 
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z
-    .string()
-    .min(6, { message: 'Password must be at least 6 characters' }),
-});
+type LoginSchema = z.infer<typeof loginInputSchema>;
+type RegisterSchema = z.infer<typeof registerInputSchema>;
 
-type LoginSchema = z.infer<typeof loginSchema>;
+interface AuthFormProps {
+  onClose?: () => void;
+}
 
-const LoginForm = () => {
-  const router = useRouter();
+const AuthForm = ({ onClose }: AuthFormProps) => {
+  const searchParams = useSearchParams();
+  const isSignUp = searchParams.get('page') === 'register';
+  searchParams.get('page');
 
-  const form = useForm<LoginSchema>({
-    resolver: zodResolver(loginSchema),
+  // Login form
+  const loginForm = useForm<LoginSchema>({
+    resolver: zodResolver(loginInputSchema),
     defaultValues: {
       email: '',
       password: '',
     },
   });
 
-  const loginMutation = useLogin({
-    onSuccess: async () => {
-      router.push('/');
-      showSuccess({ title: 'Login successful' });
-    },
-    onError: (err) => {
-      showError({ title: (err as Error).message || 'Login failed' });
+  // Register form
+  const registerForm = useForm<RegisterSchema>({
+    resolver: zodResolver(registerInputSchema),
+    defaultValues: {
+      email: '',
+      username: '',
+      full_name: '',
+      password: '',
+      confirmPassword: '',
+      company: '',
+      designation: '',
     },
   });
 
-  const onSubmit = async (values: LoginSchema) => {
-    loginMutation.mutate(values);
+  // Reset forms when switching modes
+  useEffect(() => {
+    if (isSignUp) {
+      loginForm.reset();
+    } else {
+      registerForm.reset();
+    }
+  }, [isSignUp, loginForm, registerForm]);
+
+  const handleModeSwitch = () => {
+    loginForm.clearErrors();
+    registerForm.clearErrors();
   };
 
   return (
-    <div className='min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8'>
-      <div className='w-full max-w-md space-y-8'>
-        <div className='bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8'>
-          <div className='text-center mb-8'>
-            <h2 className='text-3xl font-bold text-gray-900 dark:text-white'>
-              Welcome back
-            </h2>
-            <p className='mt-2 text-sm text-gray-600 dark:text-gray-400'>
-              Sign in to your account
-            </p>
+    <div className='min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-black via-gray-900 to-purple-900 relative overflow-hidden'>
+      {/* Background Pattern */}
+      <div className='absolute inset-0 bg-gradient-to-br from-black/50 via-transparent to-purple-900/50' />
+
+      {/* Auth Card */}
+      <div className='relative w-full max-w-md'>
+        <div className='bg-gray-900/40 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 shadow-2xl'>
+          {/* Close Button */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className='absolute top-4 right-4 text-gray-400 hover:text-white transition-colors'
+            >
+              <X className='w-5 h-5' />
+            </button>
+          )}
+
+          {/* Toggle Buttons */}
+          <div className='flex bg-gray-800/50 rounded-xl p-1 mb-8'>
+            <Link
+              href={`?page=register`}
+              onClick={() => handleModeSwitch()}
+              className={`flex-1 text-center py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                isSignUp
+                  ? 'bg-white text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Sign up
+            </Link>
+            <Link
+              href={`?page=login`}
+              onClick={() => handleModeSwitch()}
+              className={`flex-1 text-center py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                !isSignUp
+                  ? 'bg-white text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Sign in
+            </Link>
           </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-              {/* Email */}
-              <FormField
-                control={form.control}
-                name='email'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className='text-gray-700 dark:text-gray-300'>
-                      Email address
-                    </FormLabel>
-                    <FormControl>
-                      <div className='relative'>
-                        <MailIcon className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
-                        <Input
-                          type='email'
-                          placeholder='you@example.com'
-                          {...field}
-                          className='pl-11 h-12 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <h2 className='text-2xl font-bold text-white mb-8 text-center'>
+            {isSignUp ? 'Create an account' : 'Welcome back'}
+          </h2>
 
-              {/* Password */}
-              <FormField
-                control={form.control}
-                name='password'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className='text-gray-700 dark:text-gray-300'>
-                      Password
-                    </FormLabel>
-                    <FormControl>
-                      <div className='relative'>
-                        <LockIcon className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
-                        <Input
-                          type='password'
-                          placeholder='••••••••'
-                          {...field}
-                          className='pl-11 h-12 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {isSignUp ? (
+            /* Sign Up Form */
+            <RegisterForm registerForm={registerForm} />
+          ) : (
+            /* Sign In Form */
+            <LoginForm loginForm={loginForm} />
+          )}
 
-              <div className='flex items-center justify-between'>
-                <div className='text-sm'>
-                  <a
-                    href='/forgot-password'
-                    className='font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300'
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
-              </div>
-
-              <Button
-                type='submit'
-                className='w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200'
-                disabled={loginMutation.isPending}
-              >
-                {loginMutation.isPending ? (
-                  <div className='flex items-center justify-center'>
-                    <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2'></div>
-                    Signing in...
-                  </div>
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
-            </form>
-          </Form>
-
-          <div className='mt-6'>
+          {/* Social Login */}
+          {/* <div className='mt-6'>
             <div className='relative'>
               <div className='absolute inset-0 flex items-center'>
-                <div className='w-full border-t border-gray-300 dark:border-gray-600' />
+                <div className='w-full border-t border-gray-600/50' />
               </div>
               <div className='relative flex justify-center text-sm'>
-                <span className='px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400'>
-                  New to our platform?
+                <span className='px-4 bg-gray-900/40 text-gray-400 uppercase tracking-wider text-xs'>
+                  OR SIGN IN WITH
                 </span>
               </div>
             </div>
 
-            <div className='mt-6 text-center'>
-              <Link
-                href='/register'
-                className='font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300'
+            <div className='mt-6 grid grid-cols-2 gap-3'>
+              <Button
+                variant='outline'
+                className='h-12 bg-gray-800/30 border-gray-600/50 text-white hover:bg-gray-700/50 rounded-xl'
               >
-                Create your account
-              </Link>
+                <Chrome className='w-5 h-5' />
+              </Button>
+              <Button
+                variant='outline'
+                className='h-12 bg-gray-800/30 border-gray-600/50 text-white hover:bg-gray-700/50 rounded-xl'
+              >
+                <Apple className='w-5 h-5' />
+              </Button>
             </div>
-          </div>
+          </div> */}
+
+          {/* Terms */}
+          <p className='mt-6 text-center text-xs text-gray-400'>
+            By {isSignUp ? 'creating an account' : 'signing in'}, you agree to
+            our{' '}
+            <a href='#' className='text-purple-400 hover:text-purple-300'>
+              Terms & Service
+            </a>
+          </p>
         </div>
       </div>
     </div>
   );
 };
 
-export default LoginForm;
+export default AuthForm;

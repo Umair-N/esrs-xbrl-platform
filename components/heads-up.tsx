@@ -82,7 +82,7 @@ export function HeadsUpNotification({
   return (
     <div
       className={cn(
-        'fixed top-4 left-4 right-4 z-50 mx-auto max-w-sm',
+        'fixed top-4 left-4 right-4 z-[100] mx-auto max-w-sm',
         'transform transition-all duration-300 ease-out',
         isVisible && !isLeaving
           ? 'translate-y-0 opacity-100'
