@@ -1,7 +1,7 @@
 'use client';
 
-import InfinityLoader from '@/components/infinity-loader';
 import Navigate from '@/components/navigate';
+import PageSwitcherLoader from '@/components/page-switcher-loader';
 import { useUser } from '@/lib/auth';
 
 export default function AuthLayout({
@@ -10,7 +10,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { status, data: user, isLoading } = useUser();
-  if (isLoading) return <InfinityLoader />;
+  if (isLoading) return <PageSwitcherLoader />;
 
   return status === 'success' ? <Navigate to='/' /> : children;
 }

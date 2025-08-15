@@ -1,13 +1,9 @@
 'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { useAuth } from '@/hooks/useAuth';
-import Spinner from '@/components/spinner';
 import { useUser } from '@/lib/auth';
 import Navigate from '@/components/navigate';
-import InfinityLoader from '@/components/infinity-loader';
+import PageSwitcherLoader from '@/components/page-switcher-loader';
 
 export default function MainLayout({
   children,
@@ -27,9 +23,8 @@ export default function MainLayout({
   // Only render the main layout when authenticated
 
   const { status, data: user, isLoading } = useUser();
-  if (isLoading) return <InfinityLoader />;
+  if (isLoading) return <PageSwitcherLoader />;
 
-  console.log('🚀 ~ MainLayout ~ user:', user);
   //FIXME: from backend fix responses
   //   if (error) {
   //     if ((error as AxiosErrorResponse)?.response?.status === 401) {
