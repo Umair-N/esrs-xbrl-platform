@@ -23,12 +23,15 @@ class StatsCRUD:
                 
                 COUNT(*) FILTER (
                     WHERE DATE_TRUNC('day', last_accessed_at) = DATE_TRUNC('day', CURRENT_DATE - INTERVAL '1 day')
-                ) AS last_accessed_yesterday
+                ) AS last_accessed_yesterday,
+                
+                COUNT(*) AS total
             FROM users;
             """
             cursor.execute(query)
             result = cursor.fetchone()
 
+            total = result["total"]
             this_month = result["users_added_this_month"] or 0
             last_month = result["users_added_last_month"] or 0
             platform_access_true = result["platform_access_true"] or 0
@@ -49,6 +52,7 @@ class StatsCRUD:
                 access_change_percentage = ((last_accessed_today - last_accessed_yesterday) / last_accessed_yesterday) * 100
 
             return {
+                "total": total,
                 "this_month": this_month,
                 "last_month": last_month,
                 "change_percentage": round(change_percentage, 2),

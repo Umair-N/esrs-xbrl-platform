@@ -42,4 +42,16 @@ export type AuthResponse = {
     jwt: string;
     user: User;
 };
+export type UserStats = {
+    total: number;
+    this_month: number;
+    last_month: number;
+    change_percentage: number;
+    platform_access_true: number;
+    platform_access_false: number;
+    last_accessed_today: number;
+    last_accessed_yesterday: number;
+    access_change_percentage: number;
+
+}
 export type UsersAPIResponse = APIResponse<User[]>;
