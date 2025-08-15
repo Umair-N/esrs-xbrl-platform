@@ -13,10 +13,10 @@ import { showError, showSuccess } from '@/components/heads-up';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import * as z from 'zod';
+import Link from 'next/link';
 
 export default function LoginForm({ loginForm }: any) {
   const router = useRouter();
-  const params = useSearchParams();
 
   const loginMutation = useLogin({
     onSuccess: async () => {
@@ -36,22 +36,22 @@ export default function LoginForm({ loginForm }: any) {
     <Form {...loginForm}>
       <form
         onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-        className='space-y-4'
-        key='signin-form' // Add key to force re-render
+        className="space-y-4"
+        key="signin-form" // Add key to force re-render
       >
         <FormField
           control={loginForm.control}
-          name='email'
+          name="email"
           render={({ field }) => (
             <FormItem>
               <FormControl>
-                <div className='relative'>
-                  <MailIcon className='absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+                <div className="relative">
+                  <MailIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
-                    type='email'
-                    placeholder='Enter your email'
+                    type="email"
+                    placeholder="Enter your email"
                     {...field}
-                    className='bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12'
+                    className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                   />
                 </div>
               </FormControl>
@@ -59,20 +59,19 @@ export default function LoginForm({ loginForm }: any) {
             </FormItem>
           )}
         />
-
         <FormField
           control={loginForm.control}
-          name='password'
+          name="password"
           render={({ field }) => (
             <FormItem>
               <FormControl>
-                <div className='relative'>
-                  <LockIcon className='absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+                <div className="relative">
+                  <LockIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
-                    type='password'
-                    placeholder='Enter your password'
+                    type="password"
+                    placeholder="Enter your password"
                     {...field}
-                    className='bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12'
+                    className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                   />
                 </div>
               </FormControl>
@@ -80,15 +79,22 @@ export default function LoginForm({ loginForm }: any) {
             </FormItem>
           )}
         />
-
+        <div className="text-right">
+          <Link
+            href="?page=forgot-password"
+            className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>{' '}
         <Button
-          type='submit'
-          className='w-full h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-purple-500/25 transition-all duration-200 mt-6'
+          type="submit"
+          className="w-full h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-purple-500/25 transition-all duration-200 mt-6"
           disabled={loginMutation.isPending}
         >
           {loginMutation.isPending ? (
-            <div className='flex items-center justify-center'>
-              <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2' />
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
               Signing in...
             </div>
           ) : (

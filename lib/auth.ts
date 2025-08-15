@@ -112,6 +112,11 @@ const registerUser = (
   return api.post('/auth/register', data);
 };
 
+export const forgotPasswordInputSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+})
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>
 // // File: lib/auth.ts
 // import axiosInstance from "./axios";
 // import {
