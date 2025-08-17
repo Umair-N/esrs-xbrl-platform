@@ -20,7 +20,7 @@ COPY backend/ /app/
 #     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Expose ports
-EXPOSE 80
+EXPOSE 8000
 
 # Start both Nginx and Uvicorn using a process manager
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "uvicorn main:app --host 127.0.0.1 --port 8000"]
