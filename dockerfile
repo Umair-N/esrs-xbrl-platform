@@ -13,14 +13,14 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY backend/ /app/
 
 # Optional: If you want Nginx
-COPY nginx.conf /etc/nginx/nginx.conf
+# COPY nginx.conf /etc/nginx/nginx.conf
 
 # Install Nginx
-RUN apt-get update && apt-get install -y nginx && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y nginx && \
+#     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Expose ports
 EXPOSE 80
 
 # Start both Nginx and Uvicorn using a process manager
-CMD ["sh", "-c", "uvicorn main:app --host 127.0.0.1 --port 8000 & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "uvicorn main:app --host 127.0.0.1 --port 8000 -g 'daemon off;'"]
