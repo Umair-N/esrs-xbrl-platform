@@ -23,4 +23,4 @@ COPY backend/ /app/
 EXPOSE 80
 
 # Start both Nginx and Uvicorn using a process manager
-CMD ["sh", "-c", "uvicorn main:app --host 127.0.0.1 --port 8000 -g 'daemon off;'"]
+CMD ["sh", "-c", "uvicorn main:app --host 127.0.0.1 --port 8000"]
