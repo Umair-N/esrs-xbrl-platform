@@ -10,12 +10,12 @@ import {
   registerInputSchema,
   forgotPasswordInputSchema,
 } from '@/lib/auth';
-import { RegisterForm } from '@/components/auth/register-form';
-import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
+import { RegisterForm } from '@/features/auth/components/register-form';
+import { ForgotPasswordForm } from '@/features/auth/components/forgot-password-form';
+import { LoginForm } from '@/features/auth/components/login-form';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import LoginForm from './auth/login-form';
 
 type LoginSchema = z.infer<typeof loginInputSchema>;
 type RegisterSchema = z.infer<typeof registerInputSchema>;

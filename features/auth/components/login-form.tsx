@@ -15,7 +15,7 @@ import { useSearchParams } from 'next/navigation';
 import * as z from 'zod';
 import Link from 'next/link';
 
-export default function LoginForm({ loginForm }: any) {
+export function LoginForm({ loginForm }: any) {
   const router = useRouter();
 
   const loginMutation = useLogin({
@@ -46,7 +46,7 @@ export default function LoginForm({ loginForm }: any) {
             <FormItem>
               <FormControl>
                 <div className="relative">
-                  <MailIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <MailIcon className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     type="email"
                     placeholder="Enter your email"
@@ -66,7 +66,7 @@ export default function LoginForm({ loginForm }: any) {
             <FormItem>
               <FormControl>
                 <div className="relative">
-                  <LockIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <LockIcon className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     type="password"
                     placeholder="Enter your password"

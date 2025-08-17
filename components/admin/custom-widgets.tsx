@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -10,132 +9,162 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  RefreshCw,
-  TrendingUp,
-  Users,
-  Shield,
-  Clock,
-  CheckCircle,
-} from 'lucide-react';
+import { Clock } from 'lucide-react';
+
+import { useUsers } from '@/features/users/get-users';
+import { useGrantAccess } from '@/features/users/api/grant-acess';
+import { useState } from 'react';
+import { showSuccess } from '@/components/heads-up';
+import { User } from '@/types/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePagination } from '@/hooks/use-paginated';
+import { Pagination } from '../pagination';
+import { Skeleton } from '../ui/skeleton';
+import { format } from 'date-fns';
 
 export function CustomWidgets() {
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const queryClient = useQueryClient();
+  const pagination = usePagination({ initialPage: 1, initialLimit: 5 });
 
-  const refreshData = () => {
-    setLastUpdated(new Date());
+  const { data, error, isLoading } = useUsers({
+    params: {
+      skip: pagination.currentPage,
+      limit: pagination.limit,
+      sort_by: 'platform_access',
+      sort_order: 'asc',
+    },
+  });
+  const users = data?.users;
+  const [activeUser, setActiveUser] = useState<User>();
+
+  const { mutate, isPending } = useGrantAccess({
+    mutationConfig: {
+      onSuccess: () => {
+        showSuccess({
+          title: `Access granted !`,
+          message: `Platform access granted to ${activeUser?.full_name}`,
+        });
+      },
+      onSettled: () => {
+        setActiveUser(undefined);
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+      },
+    },
+  });
+
+  const handleGrantAccess = (user: User) => {
+    setActiveUser(user);
+    if (user?.id) {
+      mutate(user?.id);
+    }
+  };
+  const handlePageChange = (page: number) => {
+    pagination.setPage(page);
   };
 
-  const pendingApprovals = [
-    {
-      id: 1,
-      name: 'Sarah Connor',
-      email: 'sarah.connor@example.com',
-      type: 'Access Request',
-      time: '2 hours ago',
-    },
-    {
-      id: 2,
-      name: 'Mike Johnson',
-      email: 'mike.johnson@example.com',
-      type: 'Role Change',
-      time: '4 hours ago',
-    },
-    {
-      id: 3,
-      name: 'Lisa Wang',
-      email: 'lisa.wang@example.com',
-      type: 'Account Recovery',
-      time: '6 hours ago',
-    },
-  ];
+  const handleItemsPerPageChange = (itemsPerPage: number) => {
+    pagination.setLimit(itemsPerPage);
+    pagination.goToFirstPage();
+  };
 
-  // const quickStats = [
-  //   { label: "Online Users", value: "234", icon: Users, color: "text-green-600" },
-  //   { label: "Pending Requests", value: "12", icon: Clock, color: "text-orange-600" },
-  //   { label: "Active Sessions", value: "1,234", icon: Shield, color: "text-blue-600" },
-  //   { label: "Completed Today", value: "89", icon: CheckCircle, color: "text-purple-600" },
-  // ]
+  if (error) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">
+              Error loading users: {error.message}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className='space-y-4'>
-      {/* <Card className="border-0 shadow-lg">
+    <div className="space-y-4">
+      <Card className="border-0 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Quick Stats
-              </CardTitle>
-              <CardDescription>Last updated: {lastUpdated.toLocaleTimeString()}</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={refreshData} className="hover:bg-muted/50 bg-transparent">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-2 gap-4">
-            {quickStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-background shadow-sm">
-                  <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                  <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card> */}
-
-      <Card className='border-0 shadow-lg'>
-        <CardHeader className='bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900'>
-          <CardTitle className='flex items-center gap-2'>
-            <Clock className='h-5 w-5 text-primary' />
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
             Pending Approvals
           </CardTitle>
           <CardDescription>Items requiring your attention</CardDescription>
         </CardHeader>
-        <CardContent className='p-0'>
-          <div className='divide-y divide-border'>
-            {pendingApprovals.map((item) => (
-              <div
-                key={item.id}
-                className='p-4 hover:bg-muted/30 transition-colors'
-              >
-                <div className='flex items-center justify-between'>
-                  <div className='space-y-1'>
-                    <p className='font-medium'>{item.name}</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {item.email}
-                    </p>
-                  </div>
-                  <div className='text-right space-y-1'>
-                    <Badge className='bg-orange-100 text-orange-800 border-orange-200'>
-                      {item.type}
-                    </Badge>
-                    <p className='text-xs text-muted-foreground'>{item.time}</p>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="space-y-4 p-4">
+              {Array.from({ length: pagination.limit }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-4 w-[160px]" />
                   </div>
                 </div>
-                <div className='flex gap-2 mt-3'>
-                  <Button size='sm' className='bg-green-600 hover:bg-green-700'>
-                    Approve
-                  </Button>
-                  <Button size='sm' variant='outline'>
+              ))}
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {users?.map((user) => {
+                const isUserPending = activeUser?.id === user?.id && isPending;
+                return (
+                  <div
+                    key={user?.id}
+                    className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium">
+                        {user?.full_name || user?.username}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right space-y-1">
+                        <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                          Access Request
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(user?.created_at), 'PPP h:mm a')}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleGrantAccess(user)}
+                        disabled={isUserPending || user?.platform_access}
+                      >
+                        {isUserPending
+                          ? 'Approving...'
+                          : user?.platform_access
+                            ? 'Approved'
+                            : 'Approve'}
+                      </Button>
+                    </div>
+                    {/* <div className="flex gap-2 mt-3">
+                      <Button size="sm" variant="outline">
                     Review
                   </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+                    </div> */}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
+      <Pagination
+        currentPage={data?.page}
+        totalPages={data?.pages}
+        totalItems={data?.total}
+        itemsPerPage={data?.limit}
+        onPageChange={handlePageChange}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        showItemsPerPage={true}
+        showInfo={true}
+      />
     </div>
   );
 }

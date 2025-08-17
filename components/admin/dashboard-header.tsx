@@ -1,8 +1,8 @@
-"use client"
+'use client';
 
-import { Bell, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Bell, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,10 +10,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function DashboardHeader() {
   return (
@@ -31,7 +31,11 @@ export function DashboardHeader() {
         <div className="flex items-center gap-2 ml-auto">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative hover:bg-muted/50">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-muted/50"
+              >
                 <Bell className="h-4 w-4" />
                 <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-gradient-to-r from-red-500 to-red-600">
                   3
@@ -44,45 +48,31 @@ export function DashboardHeader() {
               <DropdownMenuItem className="p-3">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">New user registration</p>
-                  <p className="text-xs text-muted-foreground">John Doe registered 5 minutes ago</p>
+                  <p className="text-xs text-muted-foreground">
+                    John Doe registered 5 minutes ago
+                  </p>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem className="p-3">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">Access request pending</p>
-                  <p className="text-xs text-muted-foreground">Jane Smith requested system access</p>
+                  <p className="text-xs text-muted-foreground">
+                    Jane Smith requested system access
+                  </p>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem className="p-3">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">User access revoked</p>
-                  <p className="text-xs text-muted-foreground">Access removed for inactive user</p>
+                  <p className="text-xs text-muted-foreground">
+                    Access removed for inactive user
+                  </p>
                 </div>
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Admin" />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                    AD
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Admin Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Sign out</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
     </header>
-  )
+  );
 }

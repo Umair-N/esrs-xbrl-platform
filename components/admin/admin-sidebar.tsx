@@ -24,69 +24,72 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 const navigationItems = [
   {
     title: 'Overview',
     icon: Home,
-    id: 'overview',
+    href: 'overview',
   },
   {
     title: 'User Management',
     icon: Users,
-    id: 'users',
+    href: '/admin/users',
   },
-  {
-    title: 'Analytics',
-    icon: BarChart3,
-    id: 'analytics',
-  },
-  {
-    title: 'Activity Monitor',
-    icon: Activity,
-    id: 'activity',
-  },
-  {
-    title: 'Data Management',
-    icon: Database,
-    id: 'data',
-  },
+  // {
+  //   title: 'Analytics',
+  //   icon: BarChart3,
+  //   href: '/admin/analytics',
+  // },
+  // {
+  //   title: 'Activity Monitor',
+  //   icon: Activity,
+  //   href: '/admin/activity',
+  // },
+  // {
+  //   title: 'Data Management',
+  //   icon: Database,
+  //   href: '/admin/data',
+  // },
 ];
 
 const adminItems = [
-  {
-    title: 'Security',
-    icon: Shield,
-    id: 'security',
-  },
+  // {
+  //   title: 'Security',
+  //   icon: Shield,
+  //   href: '/admin/security',
+  // },
   {
     title: 'Settings',
     icon: Settings,
-    id: 'settings',
+    href: '/admin/settings',
   },
-  {
-    title: 'Notifications',
-    icon: Bell,
-    id: 'notifications',
-  },
+  // {
+  //   title: 'Notifications',
+  //   icon: Bell,
+  //   href: '/admin/notifications',
+  // },
 ];
 
-interface AdminSidebarProps {
-  activeView: string;
-  setActiveView: (view: string) => void;
-}
+export function AdminSidebar() {
+  const pathname = usePathname();
 
-export function AdminSidebar({ activeView, setActiveView }: AdminSidebarProps) {
+  const isActive = (href: string) => {
+    return pathname === href || pathname.startsWith(href + '/');
+  };
+
   return (
-    <Sidebar variant='inset'>
+    <Sidebar variant="inset">
       <SidebarHeader>
-        <div className='flex items-center gap-2 px-4 py-2'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
-            <BarChart3 className='h-4 w-4' />
+        <div className="flex items-center gap-2 px-4 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <BarChart3 className="h-4 w-4" />
           </div>
-          <div className='grid flex-1 text-left text-sm leading-tight'>
-            <span className='truncate font-semibold'>BriskBold AI</span>
-            <span className='truncate text-xs text-muted-foreground'>
+          <div className="grid flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-semibold">BriskBold AI</span>
+            <span className="truncate text-xs text-muted-foreground">
               Dashboard
             </span>
           </div>
@@ -98,13 +101,12 @@ export function AdminSidebar({ activeView, setActiveView }: AdminSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navigationItems.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    isActive={activeView === item.id}
-                    onClick={() => setActiveView(item.id)}
-                  >
-                    <item.icon className='h-4 w-4' />
-                    <span>{item.title}</span>
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={isActive(item.href)}>
+                    <Link href={item.href}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -116,13 +118,12 @@ export function AdminSidebar({ activeView, setActiveView }: AdminSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {adminItems.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    isActive={activeView === item.id}
-                    onClick={() => setActiveView(item.id)}
-                  >
-                    <item.icon className='h-4 w-4' />
-                    <span>{item.title}</span>
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={isActive(item.href)}>
+                    <Link href={item.href}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -131,10 +132,12 @@ export function AdminSidebar({ activeView, setActiveView }: AdminSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className='p-4'>
-          <Button variant='outline' className='w-full bg-transparent'>
-            <Settings className='h-4 w-4 mr-2' />
-            System Settings
+        <div className="p-4">
+          <Button asChild variant="outline" className="w-full bg-transparent">
+            <Link href="/admin/system-settings">
+              <Settings className="h-4 w-4 mr-2" />
+              System Settings
+            </Link>
           </Button>
         </div>
       </SidebarFooter>

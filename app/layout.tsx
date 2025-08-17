@@ -24,13 +24,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang='en'>
+    <html lang="en">
+      <link rel="icon" href="/favicon.png" sizes="any" />
       <body className={inter.className}>
         <NotificationProvider>
           <NotificationContainer />
           <QueryClientProvider client={queryClient}>
-            <Toaster richColors position='top-right' closeButton />
-            <div className='relative flex min-h-screen flex-col'>
+            <Toaster richColors position="top-right" closeButton />
+            <div className="relative flex min-h-screen flex-col">
               {children}
             </div>
           </QueryClientProvider>

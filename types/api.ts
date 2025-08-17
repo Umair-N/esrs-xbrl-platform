@@ -7,13 +7,15 @@ type ApiErrorData = {
 
 export type AxiosErrorResponse = AxiosError<ApiErrorData>;
 
-export type APIResponse<T> = {
+export type APIResponse<T, K extends string = "data"> = {
     total: number;
     page: number;
     pages: number;
     limit: number;
+} & {
+    [key in K]: T; // This allows dynamic property names like `users`, `clients`, etc.
+};
 
-}
 export type BaseEntity = {
     id: string;
     created_at: string;
@@ -38,6 +40,9 @@ export type User = Entity<{
     last_login: string;
     last_accessed_at: string;
 }>;
+export type UsersAPIResponse = APIResponse<User[], "users">;
+
+
 export type AuthResponse = {
     jwt: string;
     user: User;
@@ -54,4 +59,3 @@ export type UserStats = {
     access_change_percentage: number;
 
 }
-export type UsersAPIResponse = APIResponse<User[]>;
