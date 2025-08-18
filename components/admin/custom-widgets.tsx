@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -18,9 +19,10 @@ import { showSuccess } from '@/components/heads-up';
 import { User } from '@/types/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePagination } from '@/hooks/use-paginated';
-import { Pagination } from '../pagination';
-import { Skeleton } from '../ui/skeleton';
+import { Pagination } from '@/components/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 
 export function CustomWidgets() {
   const queryClient = useQueryClient();
@@ -153,18 +155,21 @@ export function CustomWidgets() {
               })}
             </div>
           )}
+          <Separator />
+          <CardFooter className="p-4">
+            <Pagination
+              currentPage={data?.page}
+              totalPages={data?.pages}
+              totalItems={data?.total}
+              itemsPerPage={data?.limit}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              showInfo={false}
+              className="ml-auto"
+            />
+          </CardFooter>
         </CardContent>
       </Card>
-      <Pagination
-        currentPage={data?.page}
-        totalPages={data?.pages}
-        totalItems={data?.total}
-        itemsPerPage={data?.limit}
-        onPageChange={handlePageChange}
-        onItemsPerPageChange={handleItemsPerPageChange}
-        showItemsPerPage={true}
-        showInfo={true}
-      />
     </div>
   );
 }

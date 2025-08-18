@@ -51,6 +51,8 @@ export function LoginForm({ loginForm }: any) {
                     type="email"
                     placeholder="Enter your email"
                     {...field}
+                    id="email"
+                    autoComplete="email"
                     className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                   />
                 </div>
@@ -71,6 +73,7 @@ export function LoginForm({ loginForm }: any) {
                     type="password"
                     placeholder="Enter your password"
                     {...field}
+                    id="password"
                     className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                   />
                 </div>

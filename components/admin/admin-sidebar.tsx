@@ -81,15 +81,15 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar variant="inset">
+    <Sidebar variant='inset' className=''>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BarChart3 className="h-4 w-4" />
+        <div className='flex items-center gap-2 px-4 py-2 invisible'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
+            <BarChart3 className='h-4 w-4' />
           </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">BriskBold AI</span>
-            <span className="truncate text-xs text-muted-foreground">
+          <div className='grid flex-1 text-left text-sm leading-tight'>
+            <span className='truncate font-semibold'>BriskBold AI</span>
+            <span className='truncate text-xs text-muted-foreground'>
               Dashboard
             </span>
           </div>
@@ -104,7 +104,7 @@ export function AdminSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={isActive(item.href)}>
                     <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className='h-4 w-4' />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -121,7 +121,7 @@ export function AdminSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={isActive(item.href)}>
                     <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className='h-4 w-4' />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -132,10 +132,10 @@ export function AdminSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-4">
-          <Button asChild variant="outline" className="w-full bg-transparent">
-            <Link href="/admin/system-settings">
-              <Settings className="h-4 w-4 mr-2" />
+        <div className='p-4'>
+          <Button asChild variant='outline' className='w-full bg-transparent'>
+            <Link href='/admin/system-settings'>
+              <Settings className='h-4 w-4 mr-2' />
               System Settings
             </Link>
           </Button>

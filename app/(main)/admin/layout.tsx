@@ -10,7 +10,7 @@ export default function EditorLayout({
 }) {
   return (
     <AdminAccess showError>
-      <SidebarProvider>
+      <SidebarProvider className='z-[99999]'>
         <AdminSidebar />
         <SidebarInset>
           <DashboardHeader />

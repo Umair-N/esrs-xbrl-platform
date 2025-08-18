@@ -1,3 +1,5 @@
+import { UserManagement } from '@/components/admin/user-management';
+
 export default function Users() {
-  return <div>Users</div>;
+  return <UserManagement />;
 }

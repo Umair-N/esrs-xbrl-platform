@@ -36,7 +36,7 @@ export type User = Entity<{
     company: string;
     platform_access: boolean;
     designation: string;
-    status: string;
+    status: 'active' | 'inactive' | 'disabled' | 'pending';
     last_login: string;
     last_accessed_at: string;
 }>;

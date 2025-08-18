@@ -61,7 +61,9 @@ export function ForgotPasswordForm({
                   <Input
                     {...field}
                     type="email"
+                    id="email"
                     placeholder="Enter your email"
+                    autoComplete="email"
                     className="h-12 pl-12 bg-gray-800/30 border-gray-600/50 text-white placeholder:text-gray-500 rounded-xl focus:border-purple-500 focus:ring-purple-500/20"
                   />
                 </div>

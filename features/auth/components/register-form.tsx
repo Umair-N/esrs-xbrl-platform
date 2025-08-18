@@ -60,6 +60,7 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       <Input
                         placeholder="Full name"
                         {...field}
+                        id="full_name"
                         className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-11"
                       />
                     </div>
@@ -79,6 +80,8 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       <Input
                         placeholder="Username"
                         {...field}
+                        id="username"
+                        autoComplete="off"
                         className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-11"
                       />
                     </div>
@@ -101,6 +104,8 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       type="email"
                       placeholder="Enter your email"
                       {...field}
+                      id="email"
+                      autoComplete="email"
                       className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                     />
                   </div>
@@ -122,6 +127,8 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       <Input
                         placeholder="Company"
                         {...field}
+                        id="company"
+                        autoComplete="off"
                         className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-11"
                       />
                     </div>
@@ -141,6 +148,7 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       <Input
                         placeholder="Job title"
                         {...field}
+                        id="designation"
                         className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-11"
                       />
                     </div>
@@ -163,6 +171,7 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       type="password"
                       placeholder="Create password"
                       {...field}
+                      id="password"
                       className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                     />
                   </div>
@@ -184,6 +193,7 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
                       type="password"
                       placeholder="Confirm password"
                       {...field}
+                      id="confirmPassword"
                       className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
                     />
                   </div>

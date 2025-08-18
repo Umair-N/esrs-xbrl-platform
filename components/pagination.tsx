@@ -109,7 +109,7 @@ export function Pagination({
                 onItemsPerPageChange(Number.parseInt(value))
               }
             >
-              <SelectTrigger className="w-16">
+              <SelectTrigger className="w-12 p-2 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
