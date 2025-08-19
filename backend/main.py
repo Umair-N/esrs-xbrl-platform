@@ -72,29 +72,37 @@ app.add_middleware(
 @app.middleware("http")
 async def auto_refresh_tokens(request: Request, call_next):
     response = await call_next(request)
-    if hasattr(request.state, "new_tokens"):
-        tokens = request.state.new_tokens
+
+    tokens = getattr(request.state, "new_tokens", None)
+    if tokens:
         is_production = getattr(settings, "ENVIRONMENT", "development").lower() == "production"
+
+        if is_production:
+            same_site, secure_flag = "none", True   # HTTPS + cross-site
+        else:
+            same_site, secure_flag = "lax", False   # localhost HTTP (same-origin via proxy)
 
         response.set_cookie(
             key="access_token",
             value=tokens["access_token"],
             httponly=True,
-            samesite="strict",
-            secure=is_production,
-            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            path="/"
+            samesite=same_site,
+            secure=secure_flag,
+            max_age=int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
+            path="/",
         )
         response.set_cookie(
             key="refresh_token",
             value=tokens["refresh_token"],
             httponly=True,
-            samesite="strict",
-            secure=is_production,
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-            path="/"
+            samesite=same_site,
+            secure=secure_flag,
+            max_age=int(settings.REFRESH_TOKEN_EXPIRE_DAYS) * 24 * 60 * 60,
+            path="/",
         )
+
     return response
+
 # Mount static uploads
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIRECTORY), name="uploads")
 

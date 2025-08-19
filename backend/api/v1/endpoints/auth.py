@@ -12,6 +12,8 @@ from services.user_service import user_service
 from utils.validators import validate_user_input
 from datetime import datetime, timezone
 from schemas.user import UserUpdate
+import uuid
+
 
 router = APIRouter()
 
@@ -66,6 +68,17 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         data={"sub": user.email}, expires_delta=refresh_token_expires
     )
 
+
+    is_production = (
+        getattr(settings, "ENVIRONMENT", "development").lower() == "production"
+    )
+
+    if is_production:
+        same_site, secure_flag = "none", True
+    else:
+        same_site, secure_flag = "lax", False
+
+
     response = JSONResponse(
         content={
             "message": "Login successful",
@@ -75,16 +88,12 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         }
     )
 
-    is_production = (
-        getattr(settings, "ENVIRONMENT", "development").lower() == "production"
-    )
-
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="strict",
-        secure=is_production,  
+        samesite=same_site,
+        secure=secure_flag, 
         max_age=int(refresh_token_expires.total_seconds()),
         path="/",  
     )
@@ -92,28 +101,35 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="strict",
-        secure=is_production,  
+        samesite=same_site,
+        secure=secure_flag,
         max_age=int(access_token_expires.total_seconds()),
         path="/",  
     )
+
     return response
 
 
-@router.post("/refresh")  
-async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
-    if not refresh_token:
+@router.post("/refresh")
+async def refresh_tokens(
+    rt_cookie: str = Cookie(None, alias="refresh_token"),
+    db = Depends(get_db),
+):
+    if not rt_cookie:
         raise HTTPException(status_code=401, detail="Missing refresh token")
 
-    payload = verify_token(refresh_token, token_type="refresh")
-    if not payload:
+    try:
+        payload = verify_token(rt_cookie, token_type="refresh")
+    except Exception:
+        # map any verification failure to 401 without leaking details
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    payload = verify_token(refresh_token, token_type="refresh")
-    if not payload:
+    if not payload or payload.get("typ") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     email = payload.get("sub")
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
 
     # Verify user still exists and is active
     user = user_service.get_user_by_email(email, db)
@@ -123,12 +139,12 @@ async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
+    new_jti = str(uuid.uuid4())
     new_access_token = create_access_token(
         data={"sub": email}, expires_delta=access_token_expires
     )
-
     new_refresh_token = create_refresh_token(
-        data={"sub": email}, expires_delta=refresh_token_expires
+        data={"sub": email, "jti": new_jti}, expires_delta=refresh_token_expires
     )
 
     response = JSONResponse(
@@ -139,22 +155,35 @@ async def refresh_token(refresh_token: str = Cookie(None), db=Depends(get_db)):
         }
     )
 
-    # Set the new refresh token
-    is_production = (
-        getattr(settings, "ENVIRONMENT", "development").lower() == "production"
+    is_production = (getattr(settings, "ENVIRONMENT", "development").lower() == "production")
+
+    if is_production:
+        same_site, secure_flag = "none", True
+    else:
+        same_site, secure_flag = "lax", False
+    
+    response.set_cookie(
+    key="access_token",
+    value=new_access_token,
+    httponly=True,
+    samesite=same_site,      # "lax" in dev proxy / "none" in prod HTTPS
+    secure=secure_flag,      # False in dev HTTP / True in prod HTTPS
+    max_age=int(access_token_expires.total_seconds()),
+    path="/",
     )
 
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        samesite="strict",
-        secure=is_production,
+        samesite=same_site,
+        secure=secure_flag,         
         max_age=int(refresh_token_expires.total_seconds()),
         path="/",
     )
 
     return response
+
 
 
 @router.post("/logout", response_model=dict)

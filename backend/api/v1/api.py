@@ -1,4 +1,4 @@
-from api.v1.endpoints import auth, files, reports, users, stats
+from api.v1.endpoints import auth, reports, users, stats
 from fastapi import APIRouter
 
 api_router = APIRouter()
