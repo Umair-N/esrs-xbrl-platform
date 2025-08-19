@@ -1,11 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "../hooks/useAuth";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Form,
   FormControl,
@@ -13,73 +12,49 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   MailIcon,
   LockIcon,
   UserIcon,
   BriefcaseIcon,
   BuildingIcon,
-  AlertTriangle,
-} from "lucide-react";
-import { useRegister } from "@/hooks/useAuthQueries";
-import { toast } from "sonner";
+} from 'lucide-react';
+import { registerInputSchema, useRegister } from '@/lib/auth';
+import { toast } from 'sonner';
+import Link from 'next/link';
 
-// Validation schema
-const registerSchema = z
-  .object({
-    email: z.string().email({ message: "Invalid email address" }),
-    username: z
-      .string()
-      .min(3, { message: "Username must be at least 3 characters" }),
-    full_name: z.string().optional(),
-    password: z
-      .string()
-      .min(6, { message: "Password must be at least 6 characters" }),
-    confirmPassword: z.string(),
-    company: z.string().min(1, { message: "Company is required" }),
-    designation: z.string().min(1, { message: "Designation is required" }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type RegisterSchema = z.infer<typeof registerSchema>;
+type RegisterSchema = z.infer<typeof registerInputSchema>;
 
 const RegisterForm = () => {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-
   const form = useForm<RegisterSchema>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registerInputSchema),
     defaultValues: {
-      email: "",
-      username: "",
-      full_name: "",
-      password: "",
-      confirmPassword: "",
-      company: "",
-      designation: "",
+      email: '',
+      username: '',
+      full_name: '',
+      password: '',
+      confirmPassword: '',
+      company: '',
+      designation: '',
     },
   });
 
   const registerMutation = useRegister({
     onSuccess: async () => {
-      router.push("/login");
-      toast.success("Registration successful");
+      router.push('/login');
+      toast.success('Registration successful');
     },
     onError: (err) => {
-      toast.error((err as Error).message || "Registration failed");
+      toast.error((err as Error).message || 'Registration failed');
     },
   });
 
   const onSubmit = async (values: RegisterSchema) => {
-    setError(null);
-    const { confirmPassword, ...registrationData } = values;
+    const { ...registrationData } = values;
     registerMutation.mutate(registrationData);
   };
 
@@ -95,14 +70,6 @@ const RegisterForm = () => {
               Fill in the details to get started
             </p>
           </div>
-
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -270,15 +237,15 @@ const RegisterForm = () => {
               <Button
                 type="submit"
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200"
-                disabled={form.formState.isSubmitting}
+                disabled={registerMutation.isPending}
               >
-                {form.formState.isSubmitting ? (
+                {registerMutation.isPending ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                     Registering...
                   </div>
                 ) : (
-                  "Register"
+                  'Register'
                 )}
               </Button>
             </form>
@@ -286,13 +253,13 @@ const RegisterForm = () => {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Already have an account?{" "}
-              <a
+              Already have an account?{' '}
+              <Link
                 href="/login"
                 className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Login
-              </a>
+              </Link>
             </p>
           </div>
         </div>

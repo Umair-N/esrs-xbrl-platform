@@ -3,7 +3,7 @@ from fastapi import Query
 
 from api.dep import get_current_user, require_admin
 from database.session import get_db
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from models.user import User
 from schemas.user import UserResponse, UserUpdate
 from services.user_service import user_service
@@ -63,26 +63,31 @@ async def update_current_user(
         created_at=updated_user.created_at,
     )
 
-
 @router.get("/", response_model=dict)
 async def get_all_users(
+    request: Request,
     admin_user: User = Depends(require_admin),
     db = Depends(get_db),
-    skip: int = Query(0, ge=0),                       
-    limit: int = Query(10, gt=0, le=100),            
-    sort_by: str = Query("created_at"),               
-    sort_order: str = Query("desc", regex="^(asc|desc)$"), 
-    search: Optional[str] = None                      
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, gt=0, le=100),
+    sort_by: str = Query("created_at"),
+    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    search: Optional[str] = None
 ):
-    total_users = user_service.count_users(db, search=search)
+    # Convert query params to dict, remove known ones
+    query_params = dict(request.query_params)
+    known_params = {"skip", "limit", "sort_by", "sort_order", "search"}
+    filters = {k: v for k, v in query_params.items() if k not in known_params}
 
+    total_users = user_service.count_users(db, search=search, filters=filters)
     users = user_service.get_all_users(
         db=db,
         skip=skip,
         limit=limit,
         sort_by=sort_by,
         sort_order=sort_order,
-        search=search
+        search=search,
+        filters=filters
     )
 
     return {
@@ -90,26 +95,7 @@ async def get_all_users(
         "page": skip // limit + 1,
         "pages": ceil(total_users / limit) if total_users > 0 else 0,
         "limit": limit,
-        "users": [
-            UserResponse(
-                id=user.id,
-                email=user.email,
-                username=user.username,
-                full_name=user.full_name,
-                is_active=user.is_active,
-                is_verified=user.is_verified,
-                role=user.role,
-                created_at=user.created_at,
-                company=user.company,
-                platform_access=user.platform_access,
-                designation=user.designation,
-                status=user.status,
-                updated_at=user.updated_at,
-                last_login=user.last_login,
-                last_accessed_at=user.last_accessed_at,
-            )
-            for user in users
-        ]
+        "users": [UserResponse(**user.__dict__) for user in users]
     }
 
 
@@ -158,3 +144,7 @@ async def update_user(
         role=updated_user.role,
         created_at=updated_user.created_at,
     )
+
+@router.put("/{user_id}/grant-access", response_model=UserResponse)
+async def grant_platform_access(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
+    return user_service.grant_access(user_id, db)

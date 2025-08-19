@@ -1,20 +1,21 @@
-"use client";
-import { AuthProvider } from "@/hooks/useAuth";
-import "./globals.css";
-// import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/react-query";
-import { useEffect } from "react";
-import AuthService from "@/lib/auth";
+'use client';
+import './globals.css';
+import { Inter } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/react-query';
+import { Metadata } from 'next';
+import {
+  NotificationContainer,
+  NotificationProvider,
+} from '@/components/heads-up';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 // export const metadata: Metadata = {
-//   title: "ESRS XBRL Tagging Platform",
+//   title: 'ESRS XBRL Tagging Platform',
 //   description:
-//     "A comprehensive solution for tagging financial reports with ESRS XBRL concepts",
+//     'A comprehensive solution for tagging financial reports with ESRS XBRL concepts',
 // };
 
 export default function RootLayout({
@@ -22,21 +23,19 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    AuthService.ensureAccessToken();
-  }, []);
   return (
     <html lang="en">
+      <link rel="icon" href="/favicon.png" sizes="any" />
       <body className={inter.className}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <Toaster richColors position="top-right" />
+        <NotificationProvider>
+          <NotificationContainer />
+          <QueryClientProvider client={queryClient}>
+            <Toaster richColors position="top-right" closeButton />
             <div className="relative flex min-h-screen flex-col">
               {children}
             </div>
-          </AuthProvider>
-          {/* Add React Query DevTools for development */}
-        </QueryClientProvider>
+          </QueryClientProvider>
+        </NotificationProvider>
       </body>
     </html>
   );

@@ -69,6 +69,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.middleware("http")
+async def auto_refresh_tokens(request: Request, call_next):
+    response = await call_next(request)
+
+    tokens = getattr(request.state, "new_tokens", None)
+    if tokens:
+        is_production = getattr(settings, "ENVIRONMENT", "development").lower() == "production"
+
+        if is_production:
+            same_site, secure_flag = "none", True   # HTTPS + cross-site
+        else:
+            same_site, secure_flag = "lax", False   # localhost HTTP (same-origin via proxy)
+
+        response.set_cookie(
+            key="access_token",
+            value=tokens["access_token"],
+            httponly=True,
+            samesite=same_site,
+            secure=secure_flag,
+            max_age=int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
+            path="/",
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens["refresh_token"],
+            httponly=True,
+            samesite=same_site,
+            secure=secure_flag,
+            max_age=int(settings.REFRESH_TOKEN_EXPIRE_DAYS) * 24 * 60 * 60,
+            path="/",
+        )
+
+    return response
 
 # Mount static uploads
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIRECTORY), name="uploads")
@@ -91,19 +124,19 @@ async def health_check():
     }
 
 # Global HTTPException handler
-# @app.exception_handler(HTTPException)
-# async def http_exception_handler(request: Request, exc: HTTPException):
-#     logger.warning(f"HTTP error occurred: {exc.detail}")
-#     return JSONResponse(
-#         status_code=exc.status_code,
-#         content={"detail": exc.detail, "error": "A handled HTTP error occurred"},
-#     )
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.warning(f"HTTP error occurred: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "error": "A handled HTTP error occurred"},
+    )
 
-# # Global unhandled exception handler
-# @app.exception_handler(Exception)
-# async def unhandled_exception_handler(request: Request, exc: Exception):
-#     logger.error("Unhandled exception", exc_info=exc)
-#     return JSONResponse(
-#         status_code=500,
-#         content={"detail": "Internal Server Error", "error": str(exc)},
-#     )
+# Global unhandled exception handler
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc)},
+    )
