@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { ReportDocument } from "@/types/report";
-import axiosInstance from "@/lib/axios";
+import {axiosInstance} from "@/lib/axios";
 
 interface FileUploaderProps {
   onReportLoaded: (report: ReportDocument) => void;
