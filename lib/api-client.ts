@@ -68,7 +68,7 @@ async function fetchApi<T>(
     //     cookieHeader = await getServerCookies();
     // }
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL ||  'https://api.briskbold.ai/api/v1';
+    const API_URL = 'https://api.briskbold.ai/api/v1';
     const fullUrl = buildUrlWithParams(`${API_URL}${url}`, params);
 
     const response = await fetch(fullUrl, {
