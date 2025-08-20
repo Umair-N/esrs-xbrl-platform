@@ -189,8 +189,14 @@ async def refresh_tokens(
 @router.post("/logout", response_model=dict)
 async def logout():
     response = JSONResponse(content={"message": "Logged out successfully"})
+    is_production = (getattr(settings, "ENVIRONMENT", "development").lower() == "production")
+
+    if is_production:
+        same_site, secure_flag = "none", True
+    else:
+        same_site, secure_flag = "lax", False
 
     # Match cookie deletion parameters with set_cookie parameters
-    response.delete_cookie(key="refresh_token", path="/", samesite="strict")
-    response.delete_cookie(key="access_token", path="/", samesite="strict")
+    response.delete_cookie(key="refresh_token", path="/", samesite= same_site, secure=secure_flag)
+    response.delete_cookie(key="access_token", path="/", samesite= same_site, secure=secure_flag)
     return response
