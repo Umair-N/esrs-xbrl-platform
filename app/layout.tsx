@@ -23,15 +23,25 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   return (
-    <html lang="en">
-      <link rel="icon" href="/favicon.png" sizes="any" />
+    <html lang='en'>
+      <head>
+        {isProduction && (
+          <meta
+            httpEquiv='Content-Security-Policy'
+            content='upgrade-insecure-requests'
+          />
+        )}
+      </head>
+      <link rel='icon' href='/favicon.png' sizes='any' />
       <body className={inter.className}>
         <NotificationProvider>
           <NotificationContainer />
           <QueryClientProvider client={queryClient}>
-            <Toaster richColors position="top-right" closeButton />
-            <div className="relative flex min-h-screen flex-col">
+            <Toaster richColors position='top-right' closeButton />
+            <div className='relative flex min-h-screen flex-col'>
               {children}
             </div>
           </QueryClientProvider>
