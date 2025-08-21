@@ -54,121 +54,116 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     }
   };
 
-  const handleFileProcess = async (file: File) => {
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-    ];
+// Ensure you import the fetchApi correctly
 
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type", {
-        description: "Please upload a PDF or DOCX file"
-      });
-      return;
-    }
+const handleFileProcess = async (file: File) => {
+  const allowedTypes = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+  ];
 
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error("File too large", {
-        description: "File size must be less than 10MB"
-      });
-      return;
-    }
+  if (!allowedTypes.includes(file.type)) {
+    toast.error("Invalid file type", {
+      description: "Please upload a PDF or DOCX file"
+    });
+    return;
+  }
 
-    setIsUploading(true);
-    setUploadProgress(0);
+  const maxSize = 10 * 1024 * 1024;
+  if (file.size > maxSize) {
+    toast.error("File too large", {
+      description: "File size must be less than 10MB"
+    });
+    return;
+  }
 
-    // Create AbortController for request cancellation
-    const controller = new AbortController();
+  setIsUploading(true);
+  setUploadProgress(0);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
+  // Create a new FormData object and append the file
+  const formData = new FormData();
+  formData.append("file", file);
 
-      // Progress simulation with slower increments for longer operations
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev < 30) return prev + 5;
-          if (prev < 70) return prev + 2;
-          if (prev < 90) return prev + 1;
-          return prev;
-        });
-      }, 500);
+  // Simulating progress for the file upload
+  const progressInterval = setInterval(() => {
+    setUploadProgress(prev => {
+      if (prev < 30) return prev + 5;
+      if (prev < 70) return prev + 2;
+      if (prev < 90) return prev + 1;
+      return prev;
+    });
+  }, 500);
 
-      // Show processing message after 5 seconds
-      const messageTimeout = setTimeout(() => {
-        toast.info("Still processing...", {
-          description: "Large documents may take up to 2 minutes to process",
-          duration: 5000
-        });
-      }, 5000);
+  // Show processing message after 5 seconds
+  const messageTimeout = setTimeout(() => {
+    toast.info("Still processing...", {
+      description: "Large documents may take up to 2 minutes to process",
+      duration: 5000
+    });
+  }, 5000);
 
-      const response = await axiosInstance.post(
-        "/reports/upload",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${getAuthToken()}`,
-            "Content-Type": "multipart/form-data",
-          },
-          timeout: 120000, // 2 minutes timeout
-          signal: controller.signal,
-          // Add progress tracking if your axios instance supports it
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              setUploadProgress(Math.min(percentCompleted, 95));
-            }
-          },
-        }
-      );
-
-      clearInterval(progressInterval);
-      clearTimeout(messageTimeout);
-      setUploadProgress(100);
-
-      const reportData: ReportDocument = response.data;
-      
-      toast.success("Upload successful!", {
-        description: `Successfully processed "${file.name}"`,
-        icon: <CheckCircle className="h-4 w-4" />
-      });
-      
-      onReportLoaded(reportData);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      
-      let message = "Upload failed";
-      let description = "Please try again";
-
-      if (error.name === 'AbortError') {
-        message = "Upload cancelled";
-        description = "The upload was cancelled";
-      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        message = "Upload timeout";
-        description = "The upload took too long. Try with a smaller file or check your connection";
-      } else if (error.response?.status === 413) {
-        message = "File too large";
-        description = "The file exceeds the server's size limit";
-      } else if (error.response?.status >= 500) {
-        message = "Server error";
-        description = "There was a problem processing your file on the server";
-      } else {
-        const serverMessage = error.response?.data?.detail || error.response?.data?.message;
-        if (serverMessage) {
-          description = serverMessage;
+  try {
+    // Make the request using fetchApi
+    const response = await axiosInstance.post('/reports/upload', formData, {
+      headers: {
+        "Content-Type": "multipart/form-data", 
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(Math.min(percentCompleted, 95));  // Update progress bar
         }
       }
+    });
 
-      toast.error(message, { description });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
+    clearInterval(progressInterval);
+    clearTimeout(messageTimeout);
+    setUploadProgress(100);
+
+    // Assuming the response data is the report object
+    const reportData = response.data;
+
+    toast.success("Upload successful!", {
+      description: `Successfully processed "${file.name}"`,
+      icon: <CheckCircle className="h-4 w-4" />
+    });
+
+    onReportLoaded(reportData);
+  } catch (error: any) {
+    console.error("Upload error:", error);
+
+    let message = "Upload failed";
+    let description = "Please try again";
+
+    if (error.name === 'AbortError') {
+      message = "Upload cancelled";
+      description = "The upload was cancelled";
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      message = "Upload timeout";
+      description = "The upload took too long. Try with a smaller file or check your connection";
+    } else if (error.response?.status === 413) {
+      message = "File too large";
+      description = "The file exceeds the server's size limit";
+    } else if (error.response?.status >= 500) {
+      message = "Server error";
+      description = "There was a problem processing your file on the server";
+    } else {
+      const serverMessage = error.response?.data?.detail || error.response?.data?.message;
+      if (serverMessage) {
+        description = serverMessage;
+      }
     }
-  };
+
+    toast.error(message, { description });
+  } finally {
+    setIsUploading(false);
+    setUploadProgress(0);
+  }
+};
+
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
