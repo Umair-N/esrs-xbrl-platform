@@ -7,7 +7,7 @@ interface PageSwitcherLoadingProps {
 }
 
 export default function PageSwitcherLoader({
-  message = 'Loading...',
+  message,
 }: PageSwitcherLoadingProps) {
   //   useEffect(() => {
   //     const interval = setInterval(() => {
@@ -59,9 +59,9 @@ export default function PageSwitcherLoader({
         </div>
 
         {/* Progress bar - indeterminate */}
-        <div className='w-48 h-1 bg-slate-200 rounded-full overflow-hidden'>
+        {/* <div className='w-48 h-1 bg-slate-200 rounded-full overflow-hidden'>
           <div className='h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full animate-progress-slide' />
-        </div>
+        </div> */}
       </div>
     </div>
   );
