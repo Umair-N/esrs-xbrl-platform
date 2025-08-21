@@ -20,7 +20,7 @@ function authRequestInterceptor(config: InternalAxiosRequestConfig) {
 }
 
 export const axiosInstance = Axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.briskbold.ai/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
 });
 
 axiosInstance.interceptors.request.use(authRequestInterceptor);

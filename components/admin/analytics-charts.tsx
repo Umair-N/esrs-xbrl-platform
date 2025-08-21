@@ -23,7 +23,7 @@ export function AnalyticsCharts() {
 
   const { data, error, isLoading } = useUsers({
     params: {
-      skip: pagination.currentPage,
+      page: pagination.currentPage,
       limit: pagination.limit,
       sort_by: 'last_login',
       sort_order: 'desc',

@@ -55,23 +55,23 @@ const navigationItems = [
   // },
 ];
 
-const adminItems = [
-  // {
-  //   title: 'Security',
-  //   icon: Shield,
-  //   href: '/admin/security',
-  // },
-  {
-    title: 'Settings',
-    icon: Settings,
-    href: '/admin/settings',
-  },
-  // {
-  //   title: 'Notifications',
-  //   icon: Bell,
-  //   href: '/admin/notifications',
-  // },
-];
+// const adminItems = [
+//   // {
+//   //   title: 'Security',
+//   //   icon: Shield,
+//   //   href: '/admin/security',
+//   // },
+//   {
+//     title: 'Settings',
+//     icon: Settings,
+//     href: '/admin/settings',
+//   },
+//   // {
+//   //   title: 'Notifications',
+//   //   icon: Bell,
+//   //   href: '/admin/notifications',
+//   // },
+// ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -113,7 +113,7 @@ export function AdminSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
+        {/* <SidebarGroup>
           <SidebarGroupLabel>Administration</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -129,9 +129,9 @@ export function AdminSidebar() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup> */}
       </SidebarContent>
-      <SidebarFooter>
+      {/* <SidebarFooter>
         <div className='p-4'>
           <Button asChild variant='outline' className='w-full bg-transparent'>
             <Link href='/admin/system-settings'>
@@ -140,7 +140,7 @@ export function AdminSidebar() {
             </Link>
           </Button>
         </div>
-      </SidebarFooter>
+      </SidebarFooter> */}
       <SidebarRail />
     </Sidebar>
   );

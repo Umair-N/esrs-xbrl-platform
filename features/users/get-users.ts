@@ -4,7 +4,7 @@ import { QueryConfig } from '@/lib/react-query';
 import { User, UsersAPIResponse } from '@/types/api';
 
 type QueryParams = {
-    skip?: number;
+    page?: number;
     limit?: number;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';

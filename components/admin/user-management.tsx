@@ -144,7 +144,7 @@ export function UserManagement() {
   const pagination = usePagination({ initialPage: 1, initialLimit: 10 });
   const { data, error, isLoading } = useUsers({
     params: {
-      skip: pagination.currentPage,
+      page: pagination.currentPage,
       limit: pagination.limit,
       sort_by: 'created_at',
       sort_order: 'desc',

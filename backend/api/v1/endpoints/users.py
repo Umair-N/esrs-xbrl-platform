@@ -63,20 +63,21 @@ async def update_current_user(
         created_at=updated_user.created_at,
     )
 
-@router.get("/", response_model=dict)
+@router.get("", response_model=dict)
 async def get_all_users(
     request: Request,
     admin_user: User = Depends(require_admin),
     db = Depends(get_db),
-    skip: int = Query(0, ge=0),
+    page: int = Query(1, ge=1),  
     limit: int = Query(10, gt=0, le=100),
     sort_by: str = Query("created_at"),
     sort_order: str = Query("desc", regex="^(asc|desc)$"),
     search: Optional[str] = None
 ):
-    # Convert query params to dict, remove known ones
+    skip = (page - 1) * limit
+
     query_params = dict(request.query_params)
-    known_params = {"skip", "limit", "sort_by", "sort_order", "search"}
+    known_params = {"page", "limit", "sort_by", "sort_order", "search"}
     filters = {k: v for k, v in query_params.items() if k not in known_params}
 
     total_users = user_service.count_users(db, search=search, filters=filters)
@@ -92,7 +93,7 @@ async def get_all_users(
 
     return {
         "total": total_users,
-        "page": skip // limit + 1,
+        "page": page,
         "pages": ceil(total_users / limit) if total_users > 0 else 0,
         "limit": limit,
         "users": [UserResponse(**user.__dict__) for user in users]

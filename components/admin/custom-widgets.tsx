@@ -30,7 +30,7 @@ export function CustomWidgets() {
 
   const { data, error, isLoading } = useUsers({
     params: {
-      skip: pagination.currentPage,
+      page: pagination.currentPage,
       limit: pagination.limit,
       sort_by: 'platform_access',
       sort_order: 'asc',

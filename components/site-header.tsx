@@ -154,7 +154,7 @@ export function SiteHeader() {
                     variant="ghost"
                     size="sm"
                     disabled={logoutMutation.isPending}
-                    className="text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 disabled:opacity-50 py-1 h-5"
+                    className="text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 disabled:opacity-50 py-1 h-5 w-full"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
                     <span className="hidden sm:inline">
