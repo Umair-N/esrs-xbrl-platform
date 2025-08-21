@@ -31,7 +31,7 @@ const navigationItems = [
   {
     title: 'Overview',
     icon: Home,
-    href: 'overview',
+    href: '/admin/overview',
   },
   {
     title: 'User Management',

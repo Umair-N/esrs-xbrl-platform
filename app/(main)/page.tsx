@@ -225,7 +225,7 @@ export default function Home() {
                   size='lg'
                   variant='outline'
                   asChild
-                  className='border-white/30 text-white hover:bg-white/10 hover:border-white/50'
+                  className='border-white/30 text-black hover:bg-white/10 hover:border-white/50'
                 >
                   <Link href='/taxonomy' className='flex items-center gap-2'>
                     <BookOpen className='w-5 h-5' />
