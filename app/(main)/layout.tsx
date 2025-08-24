@@ -43,7 +43,7 @@ export default function MainLayout({
     <div className='flex flex-col min-h-screen'>
       <SiteHeader />
       <main className='flex-1'>{children}</main>
-      <SiteFooter />
+      {/* <SiteFooter /> */}
     </div>
   ) : (
     <Navigate to='/login' />
