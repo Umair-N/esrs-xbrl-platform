@@ -69,7 +69,7 @@ export default function Home() {
       title: 'Interactive Taxonomy Explorer',
       description: 'Visual taxonomy navigation with semantic search',
       content:
-        'Navigate complex ESRS taxonomy with our interactive visual interface. Find concepts instantly with semantic AI search.',
+        'Navigate complex taxonomy with our interactive visual interface. Find concepts instantly with semantic AI search.',
       href: '/taxonomy',
       buttonText: 'Explore Taxonomy',
       gradient: 'from-green-500 to-emerald-500',
@@ -127,7 +127,7 @@ export default function Home() {
               </span>
             </h2>
             <p className='text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto'>
-              Advanced AI-powered tools designed to simplify your ESRS reporting
+              Advanced AI-powered tools designed to simplify your reporting
               workflow
             </p>
           </div>

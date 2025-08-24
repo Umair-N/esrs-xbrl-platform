@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Form,
   FormControl,
@@ -13,6 +14,8 @@ import {
   LockIcon,
   MailIcon,
   UserIcon,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import * as z from 'zod';
 import { registerInputSchema, useRegister } from '@/lib/auth';
@@ -24,6 +27,27 @@ type RegisterSchema = z.infer<typeof registerInputSchema>;
 export function RegisterForm({ registerForm }: { registerForm: any }) {
   const params = new URLSearchParams(window.location.search);
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Watch password fields for real-time validation
+  const watchedPassword = registerForm.watch('password');
+  const watchedConfirmPassword = registerForm.watch('confirmPassword');
+
+  // Real-time password matching validation
+  useEffect(() => {
+    if (watchedConfirmPassword && watchedPassword) {
+      if (watchedPassword !== watchedConfirmPassword) {
+        registerForm.setError('confirmPassword', {
+          type: 'manual',
+          message: "Passwords don't match"
+        });
+      } else {
+        registerForm.clearErrors('confirmPassword');
+      }
+    }
+  }, [watchedPassword, watchedConfirmPassword, registerForm]);
+
   const registerMutation = useRegister({
     onSuccess: async () => {
       showSuccess({ title: 'Registration successful! Please sign in.' });
@@ -37,9 +61,21 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
   });
 
   const onRegisterSubmit = async (values: RegisterSchema) => {
-    const { ...registrationData } = values;
-    registerMutation.mutate(registrationData);
+    // Validate passwords match before submitting
+    if (values.password !== values.confirmPassword) {
+      registerForm.setError('confirmPassword', {
+        type: 'manual',
+        message: "Passwords don't match"
+      });
+      return;
+    }
+
+    // Remove confirmPassword before sending to API
+    const { confirmPassword, ...registrationData } = values;
+    console.log('Registration data:', registrationData); // Debug log
+    registerMutation.mutate(registrationData as any);
   };
+
   return (
     <>
       <Form {...registerForm}>
@@ -166,13 +202,19 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
               <FormItem>
                 <FormControl>
                   <div className="relative">
-                    <LockIcon className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                     <Input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Create password"
                       {...field}
                       id="password"
-                      className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
+                      className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12 pr-12"
                     />
                   </div>
                 </FormControl>
@@ -188,13 +230,19 @@ export function RegisterForm({ registerForm }: { registerForm: any }) {
               <FormItem>
                 <FormControl>
                   <div className="relative">
-                    <LockIcon className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                     <Input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       placeholder="Confirm password"
                       {...field}
                       id="confirmPassword"
-                      className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12"
+                      className="bg-gray-800/50 border-gray-600/50 text-white placeholder:text-gray-400 focus:border-purple-500 focus:ring-purple-500/20 h-12 rounded-xl pl-12 pr-12"
                     />
                   </div>
                 </FormControl>

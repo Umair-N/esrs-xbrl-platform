@@ -202,7 +202,7 @@ const handleFileProcess = async (file: File) => {
       // Show processing message for long operations
       const messageTimeout = setTimeout(() => {
         toast.info("Processing text...", {
-          description: "Analyzing content for ESRS compliance",
+          description: "Analyzing content for compliance",
           duration: 3000
         });
       }, 3000);
@@ -284,7 +284,7 @@ const handleFileProcess = async (file: File) => {
               </div>
               <CardTitle className="text-2xl">Upload Your Report</CardTitle>
               <CardDescription className="text-base">
-                Upload a PDF or DOCX file to extract content for ESRS tagging
+                Upload a PDF or DOCX file to extract content for tagging
               </CardDescription>
             </CardHeader>
             

@@ -128,7 +128,7 @@ export default function EditorPage() {
                     Document Content
                   </span>
                   <p className="text-sm text-muted-foreground font-normal mt-1">
-                    Select text to add ESRS tags
+                    Select text to add tags
                   </p>
                 </div>
               </CardTitle>
@@ -167,7 +167,7 @@ export default function EditorPage() {
                       <Tags className="h-5 w-5 text-white" />
                     </div>
                     <span className="bg-gradient-to-r from-emerald-700 to-green-700 dark:from-emerald-300 dark:to-green-300 bg-clip-text text-transparent">
-                      ESRS Tagging Tools
+                      XBRL Tagging Tools
                     </span>
                   </CardTitle>
                 </CardHeader>

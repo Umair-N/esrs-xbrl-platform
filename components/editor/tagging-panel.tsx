@@ -234,7 +234,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, hi
               <AlertCircle className="h-4 w-4 shrink-0" />
               <div>
                 <AlertTitle>Error</AlertTitle>
-                <AlertDescription>Failed to load ESRS taxonomy data. Please check your taxonomy file.</AlertDescription>
+                <AlertDescription>Failed to load taxonomy data. Please check your taxonomy file.</AlertDescription>
               </div>
             </Alert>
           </CardContent>
@@ -253,7 +253,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, hi
             </div>
             <h3 className="text-lg font-semibold mb-2">Select Text to Tag</h3>
             <p className="text-sm text-muted-foreground">
-              Choose a block of text from the document to start adding ESRS tags
+              Choose a block of text from the document to start adding tags
             </p>
           </CardContent>
         </Card>
@@ -308,7 +308,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, hi
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Tag className="h-4 w-4 text-emerald-600" />
-                ESRS Taxonomy
+                 Taxonomy
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -316,7 +316,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, hi
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search ESRS concepts..."
+                  placeholder="Search concepts..."
                   className="pl-10 h-10 border-2 focus:border-emerald-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -567,7 +567,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({ report, selectedBlockId, hi
                 size="lg"
               >
                 <Plus className="mr-2 h-5 w-5" />
-                Add ESRS Tag
+                Add Tag
               </Button>
               {!selectedConcept && (
                 <p className="text-xs text-muted-foreground text-center mt-2">

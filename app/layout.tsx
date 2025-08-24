@@ -12,11 +12,7 @@ import {
 
 const inter = Inter({ subsets: ['latin'] });
 
-// export const metadata: Metadata = {
-//   title: 'ESRS XBRL Tagging Platform',
-//   description:
-//     'A comprehensive solution for tagging financial reports with ESRS XBRL concepts',
-// };
+
 
 export default function RootLayout({
   children,

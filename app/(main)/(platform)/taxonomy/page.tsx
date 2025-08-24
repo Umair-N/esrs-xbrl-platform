@@ -341,9 +341,9 @@ export default function TaxonomyPage() {
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">ESRS Taxonomy Browser</h1>
+        <h1 className="text-3xl font-bold">Taxonomy Browser</h1>
         <p className="text-muted-foreground mt-2">
-          Browse the European Sustainability Reporting Standards (ESRS) XBRL Taxonomy - Section{" "}
+          Browse the European Sustainability Reporting Standards XBRL Taxonomy - Section{" "}
           {taxonomyData.sectionCode || "General"}
         </p>
         {/* Breadcrumb for selected node */}

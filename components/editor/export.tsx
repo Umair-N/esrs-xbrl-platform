@@ -193,7 +193,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
             </div>
             <div className="text-center p-2 bg-white/60 dark:bg-slate-800/60 rounded border">
               <div className="text-lg font-bold text-emerald-600">{esrsTags}</div>
-              <div className="text-xs text-muted-foreground">ESRS Tags</div>
+              <div className="text-xs text-muted-foreground">Tags</div>
             </div>
           </div>
         </CardContent>
@@ -206,14 +206,14 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
             <Alert variant="destructive" className="border-0">
               <AlertCircle className="h-3 w-3" />
               <AlertDescription className="text-xs">
-                No tags added yet. Add some ESRS tags before exporting.
+                No tags added yet. Add some tags before exporting.
               </AlertDescription>
             </Alert>
           ) : (
             <Alert className="border-0 bg-blue-50 dark:bg-blue-950/20">
               <FileText className="h-3 w-3 text-blue-600" />
               <AlertDescription className="text-xs">
-                <span className="font-medium">Ready!</span> {totalTags} tags ({esrsTags} ESRS) ready for export.
+                <span className="font-medium">Ready!</span> {totalTags} tags ({esrsTags} ) ready for export.
               </AlertDescription>
             </Alert>
           )}
@@ -259,10 +259,10 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  ESRS iXBRL Preview
+                 iXBRL Preview
                 </DialogTitle>
                 <DialogDescription>
-                  Preview of the generated ESRS iXBRL file
+                  Preview of the generated iXBRL file
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="h-[500px] w-full rounded border">
