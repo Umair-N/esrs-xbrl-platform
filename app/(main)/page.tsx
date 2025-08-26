@@ -191,10 +191,10 @@ export default function Home() {
                 Ready to streamline your XBRL reporting?
               </h2>
 
-              <p className='text-xl text-blue-100 max-w-2xl mx-auto'>
+              {/* <p className='text-xl text-blue-100 max-w-2xl mx-auto'>
                 Join 500+ enterprises who've reduced XBRL preparation time by
                 90% while achieving 99.9% accuracy.
-              </p>
+              </p> */}
 
               <div className='flex flex-col sm:flex-row gap-4 justify-center pt-4'>
                 <Button
@@ -234,7 +234,7 @@ export default function Home() {
                 </Button>
               </div>
 
-              <div className='flex justify-center items-center gap-6 pt-6 text-blue-100 text-sm'>
+              {/* <div className='flex justify-center items-center gap-6 pt-6 text-blue-100 text-sm'>
                 <div className='flex items-center gap-2'>
                   <Lock className='w-4 h-4' />
                   <span>Enterprise Security</span>
@@ -247,7 +247,7 @@ export default function Home() {
                   <Award className='w-4 h-4' />
                   <span>SOC 2 Compliant</span>
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
