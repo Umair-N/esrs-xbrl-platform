@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card';
 import { useUserStats } from '@/features/stats/get-stats';
 import { Button } from '../ui/button';
+import { Skeleton } from '../ui/skeleton';
 
 type StatsOptions = {
   title: string;
@@ -32,7 +33,7 @@ type StatsOptions = {
   gradient: string;
 };
 export function OverviewCards() {
-  const { data } = useUserStats();
+  const { data, isLoading } = useUserStats();
 
   const stats: StatsOptions[] = [
     {
@@ -81,64 +82,73 @@ export function OverviewCards() {
     },
   ];
 
-  const quickStats = [
-    {
-      label: 'Online Users',
-      value: '234',
-      icon: Users,
-      color: 'text-green-600',
-    },
-    {
-      label: 'Pending Requests',
-      value: '12',
-      icon: Clock,
-      color: 'text-orange-600',
-    },
-    {
-      label: 'Active Sessions',
-      value: '1,234',
-      icon: Shield,
-      color: 'text-blue-600',
-    },
-    {
-      label: 'Completed Today',
-      value: '89',
-      icon: CheckCircle,
-      color: 'text-purple-600',
-    },
-  ];
+  // const quickStats = [
+  //   {
+  //     label: 'Online Users',
+  //     value: '234',
+  //     icon: Users,
+  //     color: 'text-green-600',
+  //   },
+  //   {
+  //     label: 'Pending Requests',
+  //     value: '12',
+  //     icon: Clock,
+  //     color: 'text-orange-600',
+  //   },
+  //   {
+  //     label: 'Active Sessions',
+  //     value: '1,234',
+  //     icon: Shield,
+  //     color: 'text-blue-600',
+  //   },
+  //   {
+  //     label: 'Completed Today',
+  //     value: '89',
+  //     icon: CheckCircle,
+  //     color: 'text-purple-600',
+  //   },
+  // ];
 
+  if (isLoading) {
+    return (
+      <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className='h-40' />
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
       {stats.map((stat) => (
         <Card
           key={stat.title}
-          className="relative overflow-hidden border-0 shadow-lg"
+          className='relative overflow-hidden border-0 shadow-lg'
         >
           <div
             className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-5`}
           />
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <CardTitle className='text-sm font-medium text-muted-foreground'>
               {stat.title}
             </CardTitle>
             <div
               className={`p-2 rounded-lg bg-gradient-to-br ${stat.gradient}`}
             >
-              <stat.icon className="h-4 w-4 text-white" />
+              <stat.icon className='h-4 w-4 text-white' />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className='text-3xl font-bold text-foreground'>
               {stat.value}
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex items-center gap-1">
+            <div className='flex items-center gap-2 mt-2'>
+              <div className='flex items-center gap-1'>
                 {stat.changeType &&
                   (stat.changeType === 'positive' ? (
-                    <TrendingUp className="h-3 w-3 text-green-600" />
+                    <TrendingUp className='h-3 w-3 text-green-600' />
                   ) : (
-                    <TrendingDownIcon className="h-3 w-3 text-red-600" />
+                    <TrendingDownIcon className='h-3 w-3 text-red-600' />
                   ))}
 
                 <span
@@ -147,11 +157,11 @@ export function OverviewCards() {
                   {stat.change}
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className='text-xs text-muted-foreground'>
                 {stat?.changeSince || ' from last month'}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className='text-xs text-muted-foreground mt-1'>
               {stat.description}
             </p>
           </CardContent>
