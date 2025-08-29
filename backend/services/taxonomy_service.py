@@ -48,6 +48,24 @@ class TaxonomyService:
 
     def get_user_active_taxonomy(self, *, user_id: int, db) -> Optional[Dict[str, Any]]:
         return self.crud.get_user_active_taxonomy(user_id=user_id, db=db)
+    
+    def get_user_taxonomies(self, user_id: int, db):
+        """
+        Get all taxonomies assigned to a user (including active and inactive).
+        """
+        return self.crud.get_user_taxonomies(user_id, db)
+    def switch_taxonomy(self, user_id: int, taxonomy_id: int, db) -> Dict[str, str]:
+            """
+            Switch the active taxonomy for a user.
+            1. Disables all taxonomies for the user.
+            2. Enables the selected taxonomy.
+            """
+            if not self.crud.get_taxonomy(taxonomy_id, db):
+                raise ValueError("Taxonomy not found")
+            # Proceed to switch the taxonomy
+            return self.crud.switch_taxonomy(user_id, taxonomy_id, db)
+            
+       
 
 
 # singleton-ish service instance

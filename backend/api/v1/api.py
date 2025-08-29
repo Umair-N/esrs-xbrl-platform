@@ -1,5 +1,6 @@
-from api.v1.endpoints import auth, reports, users, stats, taxonomy, taxonomy_admin
+from api.v1.endpoints import auth, reports, users, stats, taxonomy_admin, taxonomy
 from fastapi import APIRouter
+
 
 # from backend.api.v1.endpoints import __taxonomy
 

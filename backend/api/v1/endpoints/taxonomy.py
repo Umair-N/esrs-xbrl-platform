@@ -1,4 +1,3 @@
-# taxonomy.py
 from __future__ import annotations
 
 import asyncio
@@ -18,12 +17,9 @@ from fastapi import UploadFile, File
 import shutil
 
 from services.taxonomy_service import taxonomy_service
-from psycopg2.extensions import connection as PGConnection
 from api.dep import get_current_user, get_db 
+from schemas.taxonomy import TaxonomyOut
 
-# =========================
-# Config (override via env)
-# =========================
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), "../../../config.json")
 DEFAULT_TAXONOMY_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../../../output/taxonomy_outline.zip")
@@ -35,16 +31,10 @@ MAX_CONCURRENT_STREAMS = int(os.getenv("MAX_CONCURRENT_STREAMS") or 3)
 YIELD_EVERY_N_ITEMS = int(os.getenv("YIELD_EVERY_N_ITEMS") or 50)    # cooperative yield after N items
 YIELD_INTERVAL_SEC = float(os.getenv("YIELD_INTERVAL_SEC") or 0.02)  # or every X seconds
 
-# =========================
-# Dependencies (stubs OK)
-# =========================
 
 taxonomy_router = APIRouter()
 _stream_semaphore = asyncio.Semaphore(MAX_CONCURRENT_STREAMS)
 
-# =========================
-# Incremental JSON helpers
-# =========================
 def _iter_text_chunks(fileobj: io.BufferedReader, read_size: int) -> Iterator[str]:
     """Incrementally decode utf-8 bytes to text."""
     import codecs
@@ -335,9 +325,6 @@ def _skip_json_value_fast(reader: io.BufferedReader, buf: str, i: int) -> tuple[
             return buf, i
         i += 1
 
-# =========================
-# Flattening item iterators
-# =========================
 def _iter_top_level_array_from_member(zf: zipfile.ZipFile, member: str, read_size: int) -> Iterator[Any]:
     """If the file's first non-space char is '[', parse it as a single array and yield items."""
     with zf.open(member, "r") as raw:
@@ -440,6 +427,29 @@ def _iter_top_level_value_arrays_from_member(zf: zipfile.ZipFile, member: str, r
     Stream **every item** from **every** top-level array.
     Non-array values are skipped FAST (no full decode).
     """
+    # First, try to parse the entire member with json.load and flatten top-level arrays.
+    try:
+        content_bytes = zf.read(member)
+        # Decode as UTF-8, ignoring any stray bytes.
+        text = content_bytes.decode("utf-8", errors="ignore")
+        parsed = json.loads(text)
+        # If the parsed object is a dictionary, its values may contain arrays to flatten.
+        if isinstance(parsed, dict):
+            for value in parsed.values():
+                if isinstance(value, list):
+                    for item in value:
+                        yield item
+            # Early return because we've exhausted all items.
+            return
+        # If the top-level parsed object is a list, yield each element directly.
+        if isinstance(parsed, list):
+            for item in parsed:
+                yield item
+            return
+    except Exception:
+        # On any exception (invalid JSON, large file), fall back to incremental streaming.
+        pass
+
     with zf.open(member, "r") as raw:
         reader = io.BufferedReader(raw, buffer_size=max(65536, read_size))
         buf = ""
@@ -925,89 +935,20 @@ def _register_all_once():
 _register_all_once()
 
 
+@taxonomy_router.get("/my/taxonomies", response_model=List[TaxonomyOut])
+async def get_my_taxonomies(db = Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Get all taxonomies assigned to the logged-in user (both active and inactive).
+    """
+    user_id = current_user.id  # Extract user_id from the logged-in user
 
+    return taxonomy_service.get_user_taxonomies(user_id, db)
 
-# def set_active_taxonomy(new_zip_path: str):
-#     """Set the new active taxonomy by updating the config file."""
-#     config = {"active_taxonomy": new_zip_path}
-#     with open(CONFIG_FILE_PATH, "w") as f:
-#         json.dump(config, f)
+@taxonomy_router.post("/my/switch-taxonomy/{taxonomy_id}")
+async def switch_my_taxonomy(taxonomy_id: int, db = Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Switch the active taxonomy for the logged-in user.
+    """
+    user_id = current_user.id  # Extract user_id from the logged-in user
 
-
-# # =========================
-# # API to get the active taxonomy
-# # =========================
-# @taxonomy_router.get("/active")
-# async def get_active_taxonomy_api():
-#     """Returns the currently active taxonomy."""
-#     active_taxonomy = get_active_taxonomy() 
-#     if active_taxonomy:
-#         return {"active_taxonomy": active_taxonomy}
-#     else:
-#         raise HTTPException(status_code=404, detail="No active taxonomy set.")
-
-# =========================
-# API to update/change the taxonomy (upload a new zip)
-# =========================
-# @taxonomy_router.post("/update")
-# async def update_taxonomy(file: UploadFile = File(...)):
-#     """Uploads a new taxonomy zip file and sets it as active."""
-#     try:
-#         # Define the path where the file will be stored
-#         upload_dir = os.path.join(os.path.dirname(__file__), "../../../output/taxonomies")
-#         os.makedirs(upload_dir, exist_ok=True)
-#         zip_file_path = os.path.join(upload_dir, file.filename)
-
-#         # Save the uploaded zip file
-#         with open(zip_file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-
-#         # Set the new taxonomy as the active one
-#         set_active_taxonomy(file.filename)
-
-#         # Update the global variable for active taxonomy
-#         global ACTIVE_TAXONOMY
-#         ACTIVE_TAXONOMY = zip_file_path
-
-#         return {"message": f"New taxonomy file '{file.filename}' is now active.", "file_path": zip_file_path}
-    
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Failed to update taxonomy: {str(e)}")
-
-# # =========================
-# # API to disable the current taxonomy (set it to None)
-# # =========================
-# @taxonomy_router.post("/disable")
-# async def disable_taxonomy():
-#     """Disables the active taxonomy."""
-#     global ACTIVE_TAXONOMY
-#     ACTIVE_TAXONOMY = None
-#     set_active_taxonomy("")  # Reset active taxonomy in config.json
-#     return {"message": "Taxonomy has been disabled."}
-
-# # =========================
-# # API to get all available taxonomy files
-# # =========================
-# @taxonomy_router.get("/list")
-# async def list_taxonomies():
-#     """Returns the list of all taxonomy zip files in the 'output' directory."""
-#     taxonomy_dir = os.path.join(os.path.dirname(__file__), "../../../output/taxonomies")
-#     taxonomy_files = [f for f in os.listdir(taxonomy_dir) if f.endswith(".zip")]
-#     return {"taxonomy_files": taxonomy_files}
-
-
-# @taxonomy_router.post("/set-active")
-# async def set_active_taxonomy_api(taxonomy_name: str = Query(..., description="The name of the taxonomy file to set as active")):
-#     """Set an existing taxonomy file as the active one."""
-    
-#     TAXONOMY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../output/taxonomies"))
-#     taxonomy_path = os.path.join(TAXONOMY_DIR, taxonomy_name)
-
-#     # Check if the specified file exists
-#     if not os.path.exists(taxonomy_path):
-#         raise HTTPException(status_code=404, detail=f"Taxonomy file '{taxonomy_name}' not found.")
-
-#     # Set this taxonomy as the active one
-#     set_active_taxonomy(taxonomy_name)
-
-#     return {"message": f"Taxonomy '{taxonomy_name}' is now set as the active taxonomy."}
+    return taxonomy_service.switch_taxonomy(user_id=user_id, taxonomy_id=taxonomy_id, db=db)

@@ -163,4 +163,45 @@ class TaxonomyCRUD:
         finally:
             cur.close()
 
+    def get_user_taxonomies(self, user_id: int, db) -> List[Dict[str, Any]]:
+        """Get all taxonomies assigned to a user (including active and inactive)."""
+        cur = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            cur.execute("""
+                SELECT t.id, t.name, t.file_name, t.file_path, t.enabled, t.created_at
+                FROM user_taxonomies ut
+                JOIN taxonomies t ON t.id = ut.taxonomy_id
+                WHERE ut.user_id = %(uid)s
+                ORDER BY t.created_at DESC;
+            """, {"uid": user_id})
+            rows = cur.fetchall()
+            return rows if rows else []
+        finally:
+            cur.close()
+
+    def switch_taxonomy(self, user_id: int, taxonomy_id: int, db) -> None:
+        """Switch the active taxonomy for a user."""
+        cur = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            # Disable all active taxonomies for this user
+            cur.execute("""
+                UPDATE user_taxonomies
+                SET enabled = FALSE
+                WHERE user_id = %(user_id)s;
+            """, {"user_id": user_id})
+
+            # Enable the selected taxonomy for the user
+            cur.execute("""
+                UPDATE user_taxonomies
+                SET enabled = TRUE
+                WHERE user_id = %(user_id)s AND taxonomy_id = %(taxonomy_id)s;
+            """, {"user_id": user_id, "taxonomy_id": taxonomy_id})
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            cur.close()
+    
+
 taxonomy_crud = TaxonomyCRUD()
