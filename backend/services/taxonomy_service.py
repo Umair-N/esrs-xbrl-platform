@@ -7,10 +7,10 @@ from crud.taxonomy import taxonomy_crud
 
 class TaxonomyService:
     def __init__(self):
-        # The base directory for taxonomies should be relative to the project root
         self.crud = taxonomy_crud
-        self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Gets the current directory of the script
-        self.TAXONOMY_DIR = os.path.join(self.BASE_DIR, "../output/taxonomies")
+        self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
+        # Fix: Remove the leading slash to make it a proper relative path
+        self.TAXONOMY_DIR = os.path.join(self.BASE_DIR, "output", "taxonomies")
 
         print(f"TaxonomyService: using TAXONOMY_DIR={self.TAXONOMY_DIR}")
         os.makedirs(self.TAXONOMY_DIR, exist_ok=True)
@@ -26,8 +26,7 @@ class TaxonomyService:
         if not base.lower().endswith(".zip"):
             raise ValueError("Only .zip files are allowed")
         
-        # Generate a platform-independent path for the file
-        # Join the taxonomy directory with the filename
+        # Generate the destination path
         dest = os.path.join(self.TAXONOMY_DIR, base)
         
         with open(dest, "wb") as f:
@@ -38,8 +37,7 @@ class TaxonomyService:
         if existing:
             raise ValueError("A taxonomy with this file_name already exists")
 
-        # Store the file with a relative path in the database
-        # Use os.path.relpath to make sure the path is relative to the base directory
+        # Store the relative path in the database (relative to BASE_DIR)
         file_path_relative = os.path.relpath(dest, self.BASE_DIR)
 
         return self.crud.create_taxonomy(name=name, file_name=base, file_path=file_path_relative, created_by=created_by, db=db)
@@ -56,7 +54,17 @@ class TaxonomyService:
 
     # ------- Resolve -------
     def resolve_active_taxonomy_path(self, *, user_id: int, db) -> str:
-        return self.crud.resolve_active_taxonomy_path(user_id=user_id, db=db)
+        """
+        Resolve the absolute path to the active taxonomy file for a user.
+        Returns an absolute path that can be used to access the file.
+        """
+        relative_path = self.crud.resolve_active_taxonomy_path(user_id=user_id, db=db)
+        if not relative_path:
+            return ""
+        
+        # Convert relative path to absolute path
+        absolute_path = os.path.join(self.BASE_DIR, relative_path)
+        return os.path.normpath(absolute_path)
 
     def get_user_active_taxonomy(self, *, user_id: int, db) -> Optional[Dict[str, Any]]:
         return self.crud.get_user_active_taxonomy(user_id=user_id, db=db)

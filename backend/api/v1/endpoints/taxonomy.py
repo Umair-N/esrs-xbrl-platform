@@ -838,6 +838,8 @@ def get_active_taxonomy() -> str:
     return ""  # Return empty string if no active taxonomy is set in config.json
 
 
+import os
+
 def _make_flattened_handler(member_filename: str) -> Callable:
     async def handler(
         # search/filter
@@ -866,19 +868,29 @@ def _make_flattened_handler(member_filename: str) -> Callable:
 
         # ✅ resolve from DB via service
         zip_path = taxonomy_service.resolve_active_taxonomy_path(user_id=user_id, db=db)
+
+        # Debugging the resolved path
+        print(f"Resolved active taxonomy path for user {user_id}: {zip_path}")
         if not zip_path:
             raise HTTPException(status_code=404, detail="No active taxonomy available for this user.")
 
+        # Ensure the path is absolute
+        zip_path_absolute = os.path.abspath(zip_path)
+
+        print(f"Absolute resolved taxonomy path for user {user_id}: {zip_path_absolute}")
+        if not os.path.exists(zip_path_absolute):
+            raise HTTPException(status_code=404, detail="Taxonomy file not found at the resolved path.")
+
         # ✅ unchanged streaming call
         gen = _stream_flattened(
-            zip_path, member_filename, chunk_bytes, rate_limit_bps,
+            zip_path_absolute, member_filename, chunk_bytes, rate_limit_bps,
             filter_key=filter_key, filter_value=filter_value,
             search_query=search_query, search_field=search_field,
             parent_id=parent_id, level=level, abstract_only=abstract_only,
             raw=raw,
         )
 
-        filters_used = any([
+        filters_used = any([ 
             filter_key is not None, filter_value is not None, search_query is not None,
             parent_id is not None, level is not None, abstract_only is not None
         ])
@@ -897,6 +909,7 @@ def _make_flattened_handler(member_filename: str) -> Callable:
             return _as_stream_response(gen, "application/json; charset=utf-8", nice, download)
 
     return handler
+
 
 def register_streaming_endpoint(path: str, member_filename: str, *, name: str):
     handler = _make_flattened_handler(member_filename)

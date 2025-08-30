@@ -138,8 +138,9 @@ class TaxonomyCRUD:
             """, {"uid": user_id})
             row = cur.fetchone()
             if row and row.get("file_path"):
-                return row["file_path"]
+                return row["file_path"]  # This will return the relative file path
 
+            # Fallback for global taxonomy
             cur.execute("""
                 SELECT file_path
                 FROM taxonomies
@@ -151,6 +152,7 @@ class TaxonomyCRUD:
             return row["file_path"] if row and row.get("file_path") else ""
         finally:
             cur.close()
+
 
     def get_user_active_taxonomy(self, *, user_id: int, db) -> Optional[Dict[str, Any]]:
         cur = db.cursor(cursor_factory=RealDictCursor)
