@@ -11,6 +11,7 @@ import {
   Calendar,
   Search,
   Users,
+  Tags,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +78,24 @@ import { useUsers } from '@/features/users/get-users';
 import { getInitials } from '@/lib/utils';
 import { User } from '@/types/api';
 import { Pagination } from '../pagination';
+import { DialogClose } from '@radix-ui/react-dialog';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '../ui/form';
+import { MultiSelect } from '../ui/multi-select';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import z from 'zod';
+import { useAllTaxonomies } from '@/features/taxonomy/api/get-all-taxonomy-list';
+import { TaxonomyList } from '@/types/taxonomy';
+import { useSetActiveUserTaxonomy } from '@/features/taxonomy/api/assign-taxonomies';
+import { toast } from 'sonner';
 
 // const mockUsers: User[] = [
 //   {
@@ -140,6 +159,7 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [taxonomyModalOpen, setTaxonomyModalOpen] = useState<boolean>(false);
 
   const pagination = usePagination({ initialPage: 1, initialLimit: 10 });
   const { data, error, isLoading } = useUsers({
@@ -268,7 +288,11 @@ export function UserManagement() {
     pagination.setLimit(itemsPerPage);
     pagination.goToFirstPage();
   };
-
+  const handleSetTaxonomy = (e: Event, user: User) => {
+    e.preventDefault();
+    setActionUser(user);
+    setTaxonomyModalOpen(true); // Assuming you have this function
+  };
   return (
     <div className='space-y-6'>
       <Card className='border-0 shadow-lg'>
@@ -427,6 +451,7 @@ export function UserManagement() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='end'>
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
                           <Dialog>
                             <DialogTrigger asChild>
                               <DropdownMenuItem
@@ -440,7 +465,9 @@ export function UserManagement() {
                               </DropdownMenuItem>
                             </DialogTrigger>
                           </Dialog>
+
                           <DropdownMenuSeparator />
+
                           {user.status === 'active' ? (
                             <DropdownMenuItem
                               onSelect={(e) => {
@@ -464,7 +491,9 @@ export function UserManagement() {
                               Enable Account
                             </DropdownMenuItem>
                           )}
+
                           <DropdownMenuSeparator />
+
                           {user?.platform_access ? (
                             <DropdownMenuItem
                               onSelect={(e) => {
@@ -488,8 +517,25 @@ export function UserManagement() {
                               Grant Access
                             </DropdownMenuItem>
                           )}
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onSelect={(e) => handleSetTaxonomy(e, user)}
+                          >
+                            <Tags className='mr-2 h-4 w-4' />
+                            Set Taxonomies
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+
+                      <SetTaxonomyModal
+                        user={actionUser!}
+                        open={taxonomyModalOpen}
+                        setOpen={setTaxonomyModalOpen}
+
+                        // taxonomies={taxonomies}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -629,5 +675,131 @@ export function UserManagement() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+type SetTaxonomyModalProps = {
+  user: User;
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+export function SetTaxonomyModal({
+  user,
+  open,
+  setOpen,
+}: SetTaxonomyModalProps) {
+  const { data: taxonomiesList, isLoading } = useAllTaxonomies();
+  const { mutate: setActiveUserTaxonomies } = useSetActiveUserTaxonomy({
+    mutationConfig: {
+      onSuccess: (data, variables) => {
+        toast.success('User taxonomies updated successfully.');
+      },
+      onError: (error, variables) => {
+        toast.error('Failed to update user taxonomies. Please try again.');
+        console.error('Update user taxonomies error:', error);
+      },
+    },
+  });
+  const convertTaxonomiesToOptions = (taxonomies: TaxonomyList[]) => {
+    return taxonomies
+      .filter((taxonomy) => taxonomy.enabled) // Only show enabled taxonomies
+      .map((taxonomy) => ({
+        value: taxonomy.id.toString(),
+        label: taxonomy.name,
+      }));
+  };
+  const taxonomyFormSchema = z.object({
+    taxonomies: z.array(z.string()).min(1, {
+      message: 'Please select at least one taxonomy.',
+    }),
+  });
+  const form = useForm({
+    resolver: zodResolver(taxonomyFormSchema),
+    defaultValues: {
+      taxonomies: [],
+    },
+  });
+  type TaxonomyFormValues = z.infer<typeof taxonomyFormSchema>;
+  const onSubmit = (data: TaxonomyFormValues): void => {
+    // Convert selected IDs back to taxonomy objects for API call
+    setActiveUserTaxonomies({
+      data: { taxonomy_ids: data.taxonomies },
+      userId: Number(user.id),
+    });
+    // const selectedTaxonomyIds = data.taxonomies.map((id) => parseInt(id));
+    // const selectedTaxonomies = convertTaxonomiesToOptions(
+    //   taxonomiesList!
+    // ).filter((t) => selectedTaxonomyIds.includes(t.id));
+
+    // console.log('Assigning taxonomies:', selectedTaxonomies, 'to user:', user);
+    // Add your API call or state update logic here
+    // Example API call structure:
+    // assignTaxonomiesToUser(user.id, selectedTaxonomyIds);
+
+    // Reset form and close modal
+    form.reset();
+    setOpen(false);
+  };
+
+  const handleOpenChange = (newOpen: boolean): void => {
+    if (!newOpen) {
+      form.reset();
+    }
+    setOpen(newOpen);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className='sm:max-w-[500px]'>
+        <DialogHeader>
+          <DialogTitle>Set Taxonomies</DialogTitle>
+          <DialogDescription>
+            Assign taxonomies to{' '}
+            <strong>{user?.full_name || 'selected user'}</strong>. Select
+            multiple taxonomies to define their roles and permissions.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+            <FormField
+              control={form.control}
+              name='taxonomies'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Taxonomies</FormLabel>
+                  <FormControl>
+                    <MultiSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={convertTaxonomiesToOptions(taxonomiesList!)}
+                      placeholder='Select taxonomies...'
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Choose one or more taxonomies to assign to this user.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type='button' variant='outline'>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type='submit' disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting
+                  ? 'Assigning...'
+                  : 'Assign Taxonomies'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

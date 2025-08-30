@@ -2,5 +2,6 @@ from .auth import RefreshToken
 from .file import FileUpload
 from .report import Report, ReportBlock
 from .user import User
+from .taxonomy import Taxonomy, UserTaxonomy
 
-__all__ = ["RefreshToken", "FileUpload", "Report", "ReportBlock", "User"]
+__all__ = ["RefreshToken", "FileUpload", "Report", "ReportBlock", "User", "Taxonomy", "UserTaxonomy"]

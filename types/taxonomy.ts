@@ -34,3 +34,11 @@ export interface TaxonomyData {
   children: TaxonomyNode[];
   [key: string]: any;
 }
+
+export interface TaxonomyList {
+  id: number;
+  name: string;
+  file_name: string;
+  enabled: boolean;
+  created_at: string; // ISO 8601 date string
+}
