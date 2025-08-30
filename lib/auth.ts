@@ -63,6 +63,7 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
     mutationFn: logout,
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: userQueryKey });
+      localStorage.removeItem('xbrl-editor-session')
       onSuccess?.();
     },
     onSettled: () => {

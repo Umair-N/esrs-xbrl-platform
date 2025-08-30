@@ -38,11 +38,11 @@ const navigationItems = [
     icon: Users,
     href: '/admin/users',
   },
-  // {
-  //   title: 'Analytics',
-  //   icon: BarChart3,
-  //   href: '/admin/analytics',
-  // },
+  {
+    title: 'Taxonomy',
+    icon: BarChart3,
+    href: '/admin/taxonomy',
+  },
   // {
   //   title: 'Activity Monitor',
   //   icon: Activity,

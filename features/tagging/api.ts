@@ -29,6 +29,7 @@ export const useTaxonomyData = ({
 }) => {
   return useQuery<TaxonomyData, Error>({
     queryKey: [
+      'taxonomy-data',
       'taxonomy',
       filter_key,
       filter_value,

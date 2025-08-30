@@ -46,6 +46,8 @@ import { generateUniqueId } from '@/lib/utils';
 import { searchTaxonomy, flattenTree } from '@/lib/taxomony-data';
 import { useTaxonomyData } from '@/features/tagging/api';
 import useDebounceSearch from '@/hooks/use-search';
+import { useMyTaxonomies } from '@/features/taxonomy/api/get-user-taxonomies';
+import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -484,6 +486,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   const [selectedContextId, setSelectedContextId] = useState<string | null>(
     null
   );
+  const [value, setValue] = useState<string>('');
 
   // Load taxonomy for current tab
   // const { data, isLoading, isFetching, isError, error } = useQuery({
@@ -613,6 +616,38 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   /* --------------------------------- UI ---------------------------------- */
 
   const ActiveIcon = TAB_META[activeTab].icon;
+  const { data: myTaxonomies } = useMyTaxonomies();
+  const {
+    mutate: switchTaxonomy,
+    isPending: isSwitchLoading,
+    isError: isSwitchError,
+    error: switchError,
+  } = useSwitchTaxonomy({});
+
+  const handleSwitchTaxonomy = () => {
+    if (!value) return;
+
+    // Call the mutate function with the taxonomyId
+    switchTaxonomy(
+      { taxonomyId: Number(value) },
+      {
+        onSuccess: () => {
+          console.log('Taxonomy switched successfully');
+        },
+        onError: (error) => {
+          console.error('Error switching taxonomy:', error);
+        },
+      }
+    );
+  };
+
+  // Handle value change and automatically switch taxonomy
+  const handleValueChange = (newValue: string) => {
+    setValue(newValue);
+    if (newValue) {
+      switchTaxonomy({ taxonomyId: Number(newValue) });
+    }
+  };
 
   return (
     <div className='space-y-6 w-full'>
@@ -674,7 +709,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
           {/* Tabs */}
           <Card className='border-0 shadow-sm'>
-            <CardHeader className='pb-2'>
+            <CardHeader className='pb-2 flex items-center flex-row justify-between'>
               <div className='flex items-center gap-2'>
                 <ActiveIcon className='h-4 w-4 text-muted-foreground' />
                 <CardTitle className='text-base'>Taxonomy</CardTitle>
@@ -684,6 +719,20 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                   </span>
                 )}
               </div>
+              {myTaxonomies && myTaxonomies.length > 0 && (
+                <Select value={value} onValueChange={handleValueChange}>
+                  <SelectTrigger className='w-[180px]'>
+                    <SelectValue placeholder='Taxonomy' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {myTaxonomies.map((item) => (
+                      <SelectItem value={item.id.toString()} key={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </CardHeader>
             <CardContent className='p-0'>
               <Tabs
