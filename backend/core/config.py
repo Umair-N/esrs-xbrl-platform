@@ -61,6 +61,26 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = Field(default="development")
     DEBUG: bool = Field(default=False)
+    
+    # GCP Configuration
+    GOOGLE_CLOUD_PROJECT: Optional[str] = Field(default=None, description="GCP Project ID for deployment detection")
+    GAE_ENV: Optional[str] = Field(default=None, description="App Engine environment")
+    
+    # Computed properties for GCP detection
+    @property
+    def is_gcp_deployment(self) -> bool:
+        """Detect if running on GCP"""
+        return (
+            (self.GAE_ENV and self.GAE_ENV.startswith('standard')) or
+            (self.GOOGLE_CLOUD_PROJECT is not None) or
+            (os.getenv('GAE_ENV', '').startswith('standard')) or
+            (os.getenv('GOOGLE_CLOUD_PROJECT') is not None)
+        )
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production"""
+        return self.ENVIRONMENT.lower() == "production"
 
     @validator("DATABASE_URL", pre=True, always=True)
     def build_database_url(cls, v, values):
@@ -213,6 +233,28 @@ os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
 # Initialize database manager
 db_manager = DatabaseManager(settings)
 
+# Environment-specific configuration
+def configure_logging():
+    """Configure logging based on environment"""
+    if settings.is_gcp_deployment:
+        # GCP structured logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='{"severity": "%(levelname)s", "message": "%(message)s", "timestamp": "%(asctime)s"}'
+        )
+    else:
+        # Local development logging
+        level = logging.DEBUG if settings.DEBUG else logging.INFO
+        logging.basicConfig(
+            level=level,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
+configure_logging()
+
+# Log deployment info
+logger.info(f"Application starting - Environment: {settings.ENVIRONMENT}, GCP: {settings.is_gcp_deployment}")
+
 # Usage examples:
 def example_database_usage():
     """Example of how to use the database connection"""
@@ -240,15 +282,3 @@ def example_database_usage():
     finally:
         if conn:
             db_manager.return_connection(conn)
-
-
-# Environment-specific configuration
-def configure_logging():
-    """Configure logging based on environment"""
-    level = logging.DEBUG if settings.DEBUG else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-
-configure_logging()
