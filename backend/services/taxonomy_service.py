@@ -10,7 +10,9 @@ from crud.taxonomy import taxonomy_crud
 class TaxonomyService:
     def __init__(self):
         self.crud = taxonomy_crud
-        self.TAXONOMY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../output/taxonomies"))
+        self.TAXONOMY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../output/taxonomies"))
+
+        print(f"TaxonomyService: using TAXONOMY_DIR={self.TAXONOMY_DIR}")
         os.makedirs(self.TAXONOMY_DIR, exist_ok=True)
 
     # ------- Catalog -------
@@ -60,8 +62,6 @@ class TaxonomyService:
             1. Disables all taxonomies for the user.
             2. Enables the selected taxonomy.
             """
-            if not self.crud.get_taxonomy(taxonomy_id, db):
-                raise ValueError("Taxonomy not found")
             # Proceed to switch the taxonomy
             return self.crud.switch_taxonomy(user_id, taxonomy_id, db)
             
