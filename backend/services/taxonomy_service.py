@@ -1,16 +1,16 @@
-from __future__ import annotations
-
 import os
 import shutil
 from typing import Any, Dict, List, Optional
 
-from crud.taxonomy import taxonomy_crud
+from crud.taxonomy import taxonomy_crud 
 
 
 class TaxonomyService:
     def __init__(self):
+        # The base directory for taxonomies should be relative to the project root
         self.crud = taxonomy_crud
-        self.TAXONOMY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../output/taxonomies"))
+        self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Gets the current directory of the script
+        self.TAXONOMY_DIR = os.path.join(self.BASE_DIR, "../output/taxonomies")
 
         print(f"TaxonomyService: using TAXONOMY_DIR={self.TAXONOMY_DIR}")
         os.makedirs(self.TAXONOMY_DIR, exist_ok=True)
@@ -21,18 +21,28 @@ class TaxonomyService:
 
     def upload_taxonomy(self, *, name: str, upload_file, created_by: Optional[int], db) -> Dict[str, Any]:
         base = os.path.basename(upload_file.filename)
+        
+        # Check if the file is a valid .zip file
         if not base.lower().endswith(".zip"):
             raise ValueError("Only .zip files are allowed")
+        
+        # Generate a platform-independent path for the file
+        # Join the taxonomy directory with the filename
         dest = os.path.join(self.TAXONOMY_DIR, base)
+        
         with open(dest, "wb") as f:
             shutil.copyfileobj(upload_file.file, f)
 
-        # Ensure uniqueness by file_name
+        # Ensure uniqueness by checking the filename in the database
         existing = [t for t in self.crud.list_taxonomies(db) if t["file_name"] == base]
         if existing:
             raise ValueError("A taxonomy with this file_name already exists")
 
-        return self.crud.create_taxonomy(name=name, file_name=base, file_path=dest, created_by=created_by, db=db)
+        # Store the file with a relative path in the database
+        # Use os.path.relpath to make sure the path is relative to the base directory
+        file_path_relative = os.path.relpath(dest, self.BASE_DIR)
+
+        return self.crud.create_taxonomy(name=name, file_name=base, file_path=file_path_relative, created_by=created_by, db=db)
 
     def set_taxonomy_enabled(self, *, taxonomy_id: int, enabled: bool, db) -> None:
         self.crud.set_taxonomy_enabled(taxonomy_id=taxonomy_id, enabled=enabled, db=db)
@@ -56,16 +66,14 @@ class TaxonomyService:
         Get all taxonomies assigned to a user (including active and inactive).
         """
         return self.crud.get_user_taxonomies(user_id, db)
+
     def switch_taxonomy(self, user_id: int, taxonomy_id: int, db) -> Dict[str, str]:
-            """
-            Switch the active taxonomy for a user.
-            1. Disables all taxonomies for the user.
-            2. Enables the selected taxonomy.
-            """
-            # Proceed to switch the taxonomy
-            return self.crud.switch_taxonomy(user_id, taxonomy_id, db)
-            
-       
+        """
+        Switch the active taxonomy for a user.
+        1. Disables all taxonomies for the user.
+        2. Enables the selected taxonomy.
+        """
+        return self.crud.switch_taxonomy(user_id, taxonomy_id, db)
 
 
 # singleton-ish service instance
