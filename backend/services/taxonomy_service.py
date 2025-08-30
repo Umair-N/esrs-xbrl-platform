@@ -9,8 +9,9 @@ class TaxonomyService:
     def __init__(self):
         self.crud = taxonomy_crud
         self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
-        # Fix: Remove the leading slash to make it a proper relative path
-        self.TAXONOMY_DIR = os.path.join(self.BASE_DIR, "output", "taxonomies")
+        # Fix: Join properly and resolve the absolute path
+        self.TAXONOMY_DIR = os.path.join(self.BASE_DIR, "..", "output", "taxonomies")
+        self.TAXONOMY_DIR = os.path.abspath(self.TAXONOMY_DIR)  # Resolve to absolute path
 
         print(f"TaxonomyService: using TAXONOMY_DIR={self.TAXONOMY_DIR}")
         os.makedirs(self.TAXONOMY_DIR, exist_ok=True)
@@ -62,8 +63,12 @@ class TaxonomyService:
         if not relative_path:
             return ""
         
-        # Convert relative path to absolute path
-        absolute_path = os.path.join(self.BASE_DIR, relative_path)
+
+        parent_dir = os.path.dirname(self.BASE_DIR)  
+        absolute_path = os.path.join(parent_dir, relative_path)
+        absolute_path = os.path.abspath(absolute_path)  
+
+        print(f"Resolved taxonomy path for user {user_id}: {absolute_path}")
         return os.path.normpath(absolute_path)
 
     def get_user_active_taxonomy(self, *, user_id: int, db) -> Optional[Dict[str, Any]]:
