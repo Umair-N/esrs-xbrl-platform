@@ -59,3 +59,21 @@ export type UserStats = {
     access_change_percentage: number;
 
 }
+
+export type QueryRecommendationsBody = {
+    query: string,
+    taxonomy: string,
+    k: number,
+    rerank: boolean
+}
+export type QueryRecommendations = {
+    query: string,
+    taxonomy: string,
+    results: {
+        tag: string,
+        datatype: string,
+        reference: string,
+        score: number,
+        rank: number
+    }[]
+}

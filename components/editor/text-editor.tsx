@@ -14,6 +14,24 @@ import {
 } from '@/components/ui/hover-card';
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
+import { UseRecommendations } from '@/features/recommender/api/get-recommendations';
+
+/**
+ * Tag structure in a ReportBlock:
+ * {
+ *   id: string;
+ *   concept: {
+ *     id: string;
+ *     label: string;
+ *     definition: string;
+ *     type: string;
+ *     periodType: string;
+ *   };
+ *   startIndex: number;
+ *   endIndex: number;
+ *   context?: any; // optional context info if needed
+ * }
+ */
 
 interface TextEditorProps {
   report: ReportDocument;
@@ -39,6 +57,24 @@ export function TextEditor({
   const [editedContent, setEditedContent] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
+  // State for recommendations popover
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [popoverPos, setPopoverPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [showPopover, setShowPopover] = useState(false);
+  const [highlightedText, setHighlightedText] = useState('');
+
+  // Track the highlighted range (blockId, startIndex, endIndex)
+  const [highlightRange, setHighlightRange] = useState<{
+    blockId: string;
+    startIndex: number;
+    endIndex: number;
+  } | null>(null);
+
+  const { mutate } = UseRecommendations();
+
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
   };
@@ -50,7 +86,7 @@ export function TextEditor({
 
   const saveEditing = () => {
     if (!editingBlockId) return;
-    const updatedReport = {
+    const updatedReport: ReportDocument = {
       ...report,
       blocks: report.blocks.map((block) =>
         block.id === editingBlockId
@@ -62,8 +98,7 @@ export function TextEditor({
     onReportChange(updatedReport);
     setEditingBlockId(null);
 
-    // Persist the updated report to localStorage so the session is
-    // preserved when navigating away from the editor. Guard against SSR.
+    // Persist the updated report to localStorage.
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(
@@ -78,6 +113,10 @@ export function TextEditor({
 
   const cancelEditing = () => setEditingBlockId(null);
 
+  /**
+   * Handles highlighting text in a block.  Invokes the recommendations API
+   * with the selected text and positions a popover next to the selection.
+   */
   const handleTextSelection = (blockId: string) => {
     if (window.getSelection) {
       const selection = window.getSelection();
@@ -97,14 +136,88 @@ export function TextEditor({
 
           if (startIndex >= 0) {
             onTextHighlight(blockId, selectedText, startIndex, endIndex);
+            setHighlightRange({ blockId, startIndex, endIndex });
           }
+
+          // Position the popover
+          const rect = range.getBoundingClientRect();
+          setPopoverPos({
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+          });
+          setHighlightedText(selectedText);
+
+          // Query recommendations
+          mutate(
+            {
+              data: {
+                query: selectedText,
+                taxonomy: 'brsr',
+                k: 5,
+                rerank: true,
+              },
+            },
+            {
+              onSuccess: (res: any) => {
+                setRecommendations(res?.results ?? []);
+                setShowPopover(true);
+              },
+              onError: () => {
+                setRecommendations([]);
+                setShowPopover(true);
+              },
+            }
+          );
         }
       }
     }
   };
 
+  /**
+   * Apply a selected tag from the recommendations to the highlighted text.
+   */
+  const applyTag = (item: {
+    tag: string;
+    reference: string;
+    datatype: string;
+  }) => {
+    if (!highlightRange) return;
+    const { blockId, startIndex, endIndex } = highlightRange;
+
+    // Create a minimal concept from the recommendation.  If you have a taxonomy
+    // lookup available, enrich this object accordingly.
+    const concept = {
+      id: item.tag,
+      label: item.reference,
+      definition: '', // fill with taxonomy definition if available
+      type: item.datatype,
+      periodType: '', // fill if known
+    };
+
+    const newTag = {
+      id: `${Date.now()}`, // simple unique id; replace with uuid if you have one
+      concept,
+      startIndex,
+      endIndex,
+      context: {}, // add context if needed; can reuse context from another tag/block
+    };
+
+    // Update the report’s blocks with the new tag
+    const updatedReport: ReportDocument = {
+      ...report,
+      blocks: report.blocks.map((blk) =>
+        blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+
+    onReportChange(updatedReport);
+    setShowPopover(false);
+    setHighlightRange(null);
+  };
+
   const renderTaggedContent = (block: ReportBlock) => {
-    if (block.tags.length === 0) {
+    if (!block.tags || block.tags.length === 0) {
       return <p className='whitespace-pre-wrap'>{block.content}</p>;
     }
 
@@ -177,17 +290,12 @@ export function TextEditor({
   };
 
   /**
-   * Save any unsaved edits to localStorage when the editor unmounts. This
-   * ensures that if the user navigates away without explicitly saving,
-   * their latest changes are not lost. We capture the latest values of
-   * editingBlockId, editedContent, and report using refs so the cleanup
-   * function sees the most up-to-date state.
+   * Persist unsaved edits to localStorage if the editor unmounts.
    */
   const latestEditingBlockId = useRef<string | null>(editingBlockId);
   const latestEditedContent = useRef<string>(editedContent);
   const latestReport = useRef<ReportDocument>(report);
 
-  // Keep refs up to date whenever state changes
   useEffect(() => {
     latestEditingBlockId.current = editingBlockId;
   }, [editingBlockId]);
@@ -214,7 +322,6 @@ export function TextEditor({
           ),
           updatedAt: new Date().toISOString(),
         };
-        // Update parent state if possible
         onReportChange(updatedReport);
         if (typeof window !== 'undefined') {
           try {
@@ -258,8 +365,8 @@ export function TextEditor({
         `,
         }}
       />
+
       {/* Blocks container */}
-      {/* Remove the internal scrolling so all blocks are shown in a single flow. */}
       <div className='flex-1 space-y-4 p-1'>
         {report.blocks.map((block) => (
           <div
@@ -270,7 +377,7 @@ export function TextEditor({
               selectedBlockId === block.id && !editingBlockId
                 ? 'border-primary bg-primary/5'
                 : 'border-border hover:border-primary/50',
-              editingBlockId === block.id ? 'border-primary' : 'min-h-fite'
+              editingBlockId === block.id ? 'border-primary' : 'min-h-fit'
             )}
             onClick={() => handleBlockClick(block.id)}
             onMouseUp={() =>
@@ -314,7 +421,7 @@ export function TextEditor({
                 <div className='prose dark:prose-invert max-w-none leading-relaxed'>
                   {renderTaggedContent(block)}
                 </div>
-                {block.tags.length > 0 && (
+                {block.tags && block.tags.length > 0 && (
                   <div className='mt-2 flex flex-wrap gap-2 clear-both'>
                     {block.tags.map((tag) => (
                       <Badge
@@ -332,6 +439,51 @@ export function TextEditor({
           </div>
         ))}
       </div>
+
+      {/* Popover with recommendations and apply buttons */}
+      {showPopover && popoverPos && (
+        <div
+          style={{
+            position: 'absolute',
+            top: popoverPos.top,
+            left: popoverPos.left,
+            zIndex: 50,
+            maxWidth: '20rem',
+            backgroundColor: '#fff',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            padding: '0.75rem',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+          }}
+        >
+          <div className='flex justify-between items-center mb-2'>
+            <span className='font-medium'>
+              Suggestions for “{highlightedText}”
+            </span>
+            <button
+              onClick={() => setShowPopover(false)}
+              className='ml-2 text-sm'
+            >
+              ×
+            </button>
+          </div>
+          <ul className='space-y-1'>
+            {recommendations.map((item) => (
+              <li key={item.tag}>
+                <button
+                  className='w-full text-left hover:bg-gray-100 rounded p-1'
+                  onClick={() => applyTag(item)}
+                >
+                  <strong>{item.reference}</strong>
+                  <div className='text-xs text-muted-foreground'>
+                    {item.tag}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

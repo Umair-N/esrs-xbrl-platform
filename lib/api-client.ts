@@ -1,6 +1,4 @@
-import { showError, showNotification } from '@/components/heads-up';
-import { toast } from 'sonner'
-// import { env } from '@/config/env';
+import { showError } from "@/components/heads-up";
 
 type RequestOptions = {
     method?: string;
@@ -10,6 +8,18 @@ type RequestOptions = {
     params?: Record<string, string | number | boolean | undefined | null>;
     cache?: RequestCache;
     next?: NextFetchRequestConfig;
+    serviceType?: 'coreBackend' | 'aiRecommender';  // Optional serviceType
+};
+
+const CONFIG = {
+    coreBackend: {
+        local: 'http://localhost:8000/api/v1',
+        gcp: 'https://api.briskbold.ai/api/v1',
+    },
+    aiRecommender: {
+        local: 'http://localhost:8090',
+        gcp: 'https://ai-recommender.gcp.com',
+    },
 };
 
 function buildUrlWithParams(
@@ -29,25 +39,6 @@ function buildUrlWithParams(
     return `${url}?${queryString}`;
 }
 
-// Create a separate function for getting server-side cookies that can be imported where needed
-// export function getServerCookies() {
-//     if (typeof window !== 'undefined') return '';
-
-//     // Dynamic import next/headers only on server-side
-//     return import('next/headers').then(({ cookies }) => {
-//         try {
-//             const cookieStore = cookies();
-//             return cookieStore
-//                 .getAll()
-//                 .map((c) => `${c.name}=${c.value}`)
-//                 .join('; ');
-//         } catch (error) {
-//             console.error('Failed to access cookies:', error);
-//             return '';
-//         }
-//     });
-// }
-
 async function fetchApi<T>(
     url: string,
     options: RequestOptions = {},
@@ -60,15 +51,17 @@ async function fetchApi<T>(
         params,
         cache = 'no-store',
         next,
+        serviceType = 'coreBackend',  // Default to coreBackend if not provided
     } = options;
 
-    // Get cookies from the request when running on server
-    let cookieHeader = cookie;
-    // if (typeof window === 'undefined' && !cookie) {
-    //     cookieHeader = await getServerCookies();
-    // }
+    // Automatically determine the environment
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const env = isLocal ? 'local' : 'gcp';  // Set to local or gcp based on the hostname
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+    // Dynamically select base URL based on serviceType and env
+    const baseUrls = CONFIG[serviceType];
+    const API_URL = baseUrls[env];
+
     const fullUrl = buildUrlWithParams(`${API_URL}${url}`, params);
 
     const response = await fetch(fullUrl, {
@@ -77,7 +70,7 @@ async function fetchApi<T>(
             'Content-Type': 'application/json',
             Accept: 'application/json',
             ...headers,
-            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+            ...(cookie ? { Cookie: cookie } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
         credentials: 'include',
@@ -88,17 +81,11 @@ async function fetchApi<T>(
     if (!response.ok) {
         const message = (await response.json()).message || response.statusText;
         if (typeof window !== 'undefined') {
-            // toast.error('Error', {
-            //     description: message,
-            // });
-            if (response.status === 401) {
-                throw new Error(message);
-            }
             showError({
                 title: "Error!",
                 message: message,
                 duration: 2000,
-            })
+            });
         }
         throw new Error(message);
     }
