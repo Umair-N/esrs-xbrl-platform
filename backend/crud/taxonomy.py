@@ -72,36 +72,41 @@ class TaxonomyCRUD:
             cur.close()
 
     # ---------- User assignments ----------
-    def set_user_active_taxonomy(self, *, user_id: int, taxonomy_id: int, set_by: Optional[int], db) -> None:
+    def assign_user_taxonomy(self, *, user_id: int, taxonomy_id: int, set_by: Optional[int], db) -> None:
         """
-        Enforce single active mapping per user:
-        - disable all current enabled mappings
-        - upsert (user_id, taxonomy_id) with enabled=true
+        Assign a taxonomy to a user and make it active.
+        - If a taxonomy is already assigned to a user, update it.
+        - No longer enforce a single active taxonomy per user.
         """
         cur = db.cursor(cursor_factory=RealDictCursor)
         try:
+            # Check if the taxonomy exists and is enabled
             cur.execute("SELECT id FROM taxonomies WHERE id = %(id)s AND enabled = TRUE;", {"id": taxonomy_id})
             if cur.fetchone() is None:
                 raise ValueError("Taxonomy not found or disabled")
 
+            # Disable all active taxonomies for this user (if needed)
             cur.execute("""
                 UPDATE user_taxonomies
                 SET enabled = FALSE, updated_at = NOW()
                 WHERE user_id = %(user_id)s AND enabled = TRUE;
             """, {"user_id": user_id})
 
+            # Now insert or update the selected taxonomy to make it active
             cur.execute("""
                 INSERT INTO user_taxonomies (user_id, taxonomy_id, enabled, set_by, updated_at)
                 VALUES (%(user_id)s, %(taxonomy_id)s, TRUE, %(set_by)s, NOW())
                 ON CONFLICT (user_id, taxonomy_id)
                 DO UPDATE SET enabled = EXCLUDED.enabled, set_by = EXCLUDED.set_by, updated_at = NOW();
             """, {"user_id": user_id, "taxonomy_id": taxonomy_id, "set_by": set_by})
+
             db.commit()
         except Exception:
             db.rollback()
             raise
         finally:
             cur.close()
+
 
     def disable_user_taxonomy(self, *, user_id: int, db) -> int:
         cur = db.cursor(cursor_factory=RealDictCursor)
@@ -202,6 +207,34 @@ class TaxonomyCRUD:
             raise e
         finally:
             cur.close()
+    def set_user_active_taxonomy(self, *, user_id: int, taxonomy_id: int, set_by: Optional[int], db) -> None:
+        """
+        Assign a taxonomy to a user and make it active.
+        - No longer enforce a single active taxonomy per user.
+        - Allows multiple active taxonomies for the user.
+        """
+        cur = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            # Ensure the taxonomy exists and is enabled
+            cur.execute("SELECT id FROM taxonomies WHERE id = %(id)s AND enabled = TRUE;", {"id": taxonomy_id})
+            if cur.fetchone() is None:
+                raise ValueError("Taxonomy not found or disabled")
+
+            # Insert or update the taxonomy for the user, making it active (enabled = TRUE)
+            cur.execute("""
+                INSERT INTO user_taxonomies (user_id, taxonomy_id, enabled, set_by, updated_at)
+                VALUES (%(user_id)s, %(taxonomy_id)s, TRUE, %(set_by)s, NOW())
+                ON CONFLICT (user_id, taxonomy_id)
+                DO UPDATE SET enabled = EXCLUDED.enabled, set_by = EXCLUDED.set_by, updated_at = NOW();
+            """, {"user_id": user_id, "taxonomy_id": taxonomy_id, "set_by": set_by})
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            cur.close()
+
     
 
 taxonomy_crud = TaxonomyCRUD()

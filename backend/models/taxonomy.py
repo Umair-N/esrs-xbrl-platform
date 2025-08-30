@@ -26,31 +26,28 @@ class Taxonomy(Base):
 class UserTaxonomy(Base):
     __tablename__ = "user_taxonomies"
 
-    # keep your existing PK (if the table already has `id`), or at least don't try to change PKs here
-    # If you DO have an `id` column in DB, re-add it to the model:
-    # id: Mapped[int] = mapped_column(primary_key=True)
-
-    user_id: Mapped[int] = mapped_column(nullable=False)  # no PK here
+    user_id: Mapped[int] = mapped_column(nullable=False)
     taxonomy_id: Mapped[int] = mapped_column(ForeignKey("taxonomies.id", ondelete="CASCADE"), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     set_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),          # keep it fresh on updates
+        onupdate=func.now(),
         nullable=False
     )
 
     __table_args__ = (
-        # gives ON CONFLICT something concrete to hit
+        # Remove the unique constraint for one active taxonomy per user.
         UniqueConstraint("user_id", "taxonomy_id", name="user_taxonomies_user_taxonomy_uniq"),
-        # optional: enforce one active per user at DB level
-        Index(
-            "user_taxonomies_one_active_per_user",
-            "user_id",
-            unique=True,
-            postgresql_where=text("enabled = TRUE"),
-        ),
+    )
+
+    # Optional index to ensure fast lookups for active taxonomies
+    Index(
+        "user_taxonomies_one_active_per_user",
+        "user_id",
+        unique=False,
+        postgresql_where=text("enabled = TRUE"),
     )
 
     taxonomy: Mapped["Taxonomy"] = relationship(back_populates="assignments")

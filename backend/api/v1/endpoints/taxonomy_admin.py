@@ -7,6 +7,7 @@ from psycopg2.extensions import connection as PGConnection
 
 from api.dep import get_db, get_current_user, require_admin
 from services.taxonomy_service import taxonomy_service
+from schemas.taxonomy import TaxonomyRequestBody
 
 taxonomy_admin = APIRouter(prefix="/taxonomy/admin", tags=["taxonomy-admin"])
 
@@ -51,13 +52,16 @@ def disable_taxonomy(taxonomy_id: int, db: PGConnection = Depends(get_db), _: An
 @taxonomy_admin.post("/users/{user_id}/set-active")
 def set_user_taxonomy(
     user_id: int,
-    taxonomy_id: int = Query(...),
+    body: TaxonomyRequestBody,  
     db: PGConnection = Depends(get_db),
     admin=Depends(require_admin),
 ):
     try:
-        taxonomy_service.assign_user_taxonomy(user_id=user_id, taxonomy_id=taxonomy_id, set_by=getattr(admin, "id", None), db=db)
-        return {"message": f"Taxonomy {taxonomy_id} active for user {user_id}"}
+        for taxonomy_id in body.taxonomy_ids:
+            taxonomy_service.assign_user_taxonomy(
+                user_id=user_id, taxonomy_id=taxonomy_id, set_by=getattr(admin, "id", None), db=db
+            )
+        return {"message": f"Taxonomies {body.taxonomy_ids} are now active for user {user_id}"}
     except ValueError as e:
         raise HTTPException(404, detail=str(e))
 

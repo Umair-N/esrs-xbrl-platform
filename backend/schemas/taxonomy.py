@@ -1,7 +1,7 @@
 # schemas/taxonomy.py
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 class TaxonomyCreate(BaseModel):
     name: str  # display name
@@ -18,3 +18,5 @@ class TaxonomyOut(BaseModel):
 class UserTaxonomyOut(BaseModel):
     user_id: int
     taxonomy: TaxonomyOut | None
+class TaxonomyRequestBody(BaseModel):
+    taxonomy_ids: List[int] 

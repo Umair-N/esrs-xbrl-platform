@@ -951,4 +951,6 @@ async def switch_my_taxonomy(taxonomy_id: int, db = Depends(get_db), current_use
     """
     user_id = current_user.id  # Extract user_id from the logged-in user
 
-    return taxonomy_service.switch_taxonomy(user_id=user_id, taxonomy_id=taxonomy_id, db=db)
+    taxonomy_service.switch_taxonomy(user_id=user_id, taxonomy_id=taxonomy_id, db=db)
+
+    return {"message": "Taxonomy switched successfully."}
