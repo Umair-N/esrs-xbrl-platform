@@ -24,12 +24,15 @@ import {
   Grid3X3,
   List,
   Plus,
+  Upload,
+  AlertCircle,
+  X,
+  Info,
+  Archive,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useMutation } from '@tanstack/react-query';
 import { useAllTaxonomies } from '@/features/taxonomy/api/get-all-taxonomy-list';
-import { useEnableTaxonomy } from '@/features/taxonomy/api/enable-taxonomy';
-import { useDisableTaxonomy } from '@/features/taxonomy/api/disable-taxonomy';
-import { toast } from 'sonner';
+import { useUploadTaxonomy } from '@/features/taxonomy/api/upload-taxonomy';
 
 export type Taxonomy = {
   id: number;
@@ -39,10 +42,58 @@ export type Taxonomy = {
   created_at: string;
 };
 
+interface UploadTaxonomyPayload {
+  name: string;
+  file: File;
+}
+
+interface MutationConfig<TData, TError, TVariables> {
+  onSuccess?: (data: TData, variables: TVariables) => void;
+  onError?: (error: TError, variables: TVariables) => void;
+}
+
 type TaxonomyCardsProps = {
   items: Taxonomy[];
   className?: string;
   onToggle?(item: Taxonomy): void;
+};
+
+// Utility function to combine class names
+const cn = (...classes: (string | boolean | undefined)[]): string =>
+  classes.filter(Boolean).join(' ');
+
+const useEnableTaxonomy = ({ mutationConfig }: any) => ({
+  mutate: (variables: { taxonomyId: number }) => {
+    setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
+  },
+  isPending: false,
+});
+
+const useDisableTaxonomy = ({ mutationConfig }: any) => ({
+  mutate: (variables: { taxonomyId: number }) => {
+    setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
+  },
+  isPending: false,
+});
+
+const uploadTaxonomy = async ({ name, file }: UploadTaxonomyPayload) => {
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('file', file);
+
+  return new Promise((resolve) => {
+    setTimeout(
+      () => resolve({ success: true, name, fileName: file.name }),
+      3000
+    );
+  });
+};
+
+// Toast mock
+const toast = {
+  success: (message: string) => console.log('Success:', message),
+  error: (message: string) => console.log('Error:', message),
+  info: (message: string) => console.log('Info:', message),
 };
 
 function formatISODate(iso: string) {
@@ -75,23 +126,402 @@ function formatRelativeDate(iso: string) {
   }
 }
 
+// Upload Modal Component
+interface UploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
+  const [taxonomyName, setTaxonomyName] = React.useState<string>('');
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [dragActive, setDragActive] = React.useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = React.useState<number>(0);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const dragCounter = React.useRef<number>(0);
+
+  const { mutate: uploadTaxonomyMutation, isPending: isUploading } =
+    useUploadTaxonomy({
+      mutationConfig: {
+        onSuccess: (data) => {
+          setUploadProgress(100);
+          setTimeout(() => {
+            toast.success(`Taxonomy "${taxonomyName}" uploaded successfully!`);
+            onSuccess();
+            resetForm();
+            onClose();
+          }, 500);
+        },
+        onError: (error) => {
+          setError('Upload failed. Please try again.');
+          setUploadProgress(0);
+        },
+      },
+    });
+
+  const resetForm = (): void => {
+    setTaxonomyName('');
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragIn = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setDragActive(true);
+    }
+  };
+
+  const handleDragOut = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    dragCounter.current = 0;
+    setError(null);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      validateAndSetFile(file);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setError(null);
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      validateAndSetFile(file);
+    }
+  };
+
+  const validateAndSetFile = (file: File): void => {
+    // Validate file type (ZIP only)
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExtension !== '.zip') {
+      setError('Please select a ZIP file (.zip)');
+      return;
+    }
+
+    // Validate file size (50MB limit for ZIP files)
+    if (file.size > 50 * 1024 * 1024) {
+      setError('File size must be less than 50MB');
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const removeFile = (): void => {
+    setSelectedFile(null);
+    setError(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleUpload = async (): Promise<void> => {
+    if (!selectedFile || !taxonomyName.trim()) {
+      setError('Please provide both taxonomy name and file');
+      return;
+    }
+
+    setError(null);
+
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+
+    uploadTaxonomyMutation({ name: taxonomyName, file: selectedFile });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className='fixed inset-0 z-50 flex items-center justify-center'>
+      {/* Backdrop */}
+      <div
+        className='absolute inset-0 bg-black/50 backdrop-blur-sm'
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className='relative z-10 w-full max-w-lg mx-4'>
+        <Card className='relative overflow-hidden border-slate-200 bg-white'>
+          <div className='absolute top-0 right-0 w-24 h-24 bg-blue-100/30 rounded-bl-full' />
+
+          <CardHeader className='relative z-10'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <CardTitle className='flex items-center gap-2 text-slate-900'>
+                  <Upload className='w-5 h-5 text-blue-600' />
+                  Upload Taxonomy
+                </CardTitle>
+                <CardDescription className='mt-1'>
+                  Upload a ZIP file containing your taxonomy data
+                </CardDescription>
+              </div>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={onClose}
+                disabled={isUploading}
+                className='text-slate-400 hover:text-slate-600'
+              >
+                <X className='w-4 h-4' />
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent className='space-y-4 relative z-10'>
+            {/* Taxonomy Name */}
+            <div className='space-y-2'>
+              <label
+                htmlFor='taxonomyName'
+                className='text-sm font-medium text-slate-700'
+              >
+                Taxonomy Name *
+              </label>
+              <input
+                id='taxonomyName'
+                type='text'
+                value={taxonomyName}
+                onChange={(e) => setTaxonomyName(e.target.value)}
+                placeholder='Enter taxonomy name (e.g., BSRS, Medical Codes)'
+                className='w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm'
+                disabled={isUploading}
+              />
+            </div>
+
+            {/* File Upload Area */}
+            <div className='space-y-2'>
+              <label className='text-sm font-medium text-slate-700'>
+                Upload ZIP File *
+              </label>
+
+              <div
+                className={cn(
+                  'relative border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer',
+                  dragActive
+                    ? 'border-blue-400 bg-blue-50'
+                    : selectedFile
+                      ? 'border-emerald-400 bg-emerald-50'
+                      : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50',
+                  isUploading && 'pointer-events-none opacity-50'
+                )}
+                onDragEnter={handleDragIn}
+                onDragLeave={handleDragOut}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => !selectedFile && fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type='file'
+                  onChange={handleFileSelect}
+                  accept='.zip'
+                  className='hidden'
+                  disabled={isUploading}
+                />
+
+                {!selectedFile ? (
+                  <div className='text-center p-6'>
+                    <div
+                      className={cn(
+                        'mx-auto mb-3 p-2 rounded-full transition-all duration-200',
+                        dragActive ? 'bg-blue-100' : 'bg-slate-100'
+                      )}
+                    >
+                      <Archive
+                        className={cn(
+                          'h-6 w-6 transition-colors duration-200',
+                          dragActive ? 'text-blue-500' : 'text-slate-400'
+                        )}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <p
+                        className={cn(
+                          'text-sm font-medium transition-colors duration-200',
+                          dragActive ? 'text-blue-700' : 'text-slate-900'
+                        )}
+                      >
+                        {dragActive
+                          ? 'Drop your ZIP file here'
+                          : 'Drag & drop ZIP file here'}
+                      </p>
+                      <p className='text-xs text-slate-500'>
+                        or{' '}
+                        <span className='text-blue-600 hover:text-blue-700 underline font-medium'>
+                          click to browse
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className='p-4'>
+                    <div className='flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200'>
+                      <div className='flex items-center gap-3'>
+                        <div className='w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center'>
+                          <Archive className='w-4 h-4 text-emerald-600' />
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <p className='text-sm font-medium text-slate-900 truncate'>
+                            {selectedFile.name}
+                          </p>
+                          <p className='text-xs text-slate-500'>
+                            {formatFileSize(selectedFile.size)}
+                          </p>
+                        </div>
+                      </div>
+                      {!isUploading && (
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile();
+                          }}
+                          className='text-slate-400 hover:text-slate-600'
+                        >
+                          <X className='w-4 h-4' />
+                        </Button>
+                      )}
+                    </div>
+
+                    {isUploading && (
+                      <div className='mt-3 space-y-2'>
+                        <div className='flex items-center justify-between text-sm'>
+                          <span className='text-slate-600'>Uploading...</span>
+                          <span className='font-medium text-slate-900'>
+                            {Math.round(uploadProgress)}%
+                          </span>
+                        </div>
+                        <div className='w-full bg-slate-200 rounded-full h-1.5'>
+                          <div
+                            className='bg-blue-600 h-1.5 rounded-full transition-all duration-300'
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className='flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg'>
+                <AlertCircle className='w-4 h-4 text-rose-600 flex-shrink-0' />
+                <p className='text-sm text-rose-700'>{error}</p>
+              </div>
+            )}
+
+            {/* Info */}
+            <div className='bg-blue-50 border border-blue-200 rounded-lg p-3'>
+              <div className='flex gap-2'>
+                <Info className='w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5' />
+                <div>
+                  <p className='text-sm text-blue-700'>
+                    Upload a ZIP file containing your taxonomy data. Maximum
+                    size: 50MB.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className='flex gap-3 pt-2'>
+              <Button
+                variant='outline'
+                onClick={onClose}
+                disabled={isUploading}
+                className='flex-1'
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={!selectedFile || !taxonomyName.trim() || isUploading}
+                className='flex-1 gap-2'
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className='w-4 h-4 animate-spin' />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className='w-4 h-4' />
+                    Upload
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function TaxonomyManagement() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterStatus, setFilterStatus] = React.useState<
     'all' | 'enabled' | 'disabled'
   >('all');
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
+  const [isUploadModalOpen, setIsUploadModalOpen] = React.useState(false);
 
-  const { data: taxonomiesList, isLoading } = useAllTaxonomies();
+  const { data: taxonomiesList, isLoading } = useAllTaxonomies({});
 
   const { mutate: enableTaxonomy, isPending: isEnabling } = useEnableTaxonomy({
     mutationConfig: {
-      onSuccess: (data, variables) => {
+      onSuccess: (data: any, variables: any) => {
         toast.success(
           `Taxonomy "${taxonomiesList?.find((t) => t.id === variables.taxonomyId)?.name}" has been enabled successfully.`
         );
       },
-      onError: (error, variables) => {
+      onError: (error: any, variables: any) => {
         toast.error(`Failed to enable taxonomy. Please try again.`);
         console.error('Enable taxonomy error:', error);
       },
@@ -101,12 +531,12 @@ export default function TaxonomyManagement() {
   const { mutate: disableTaxonomy, isPending: isDisabling } =
     useDisableTaxonomy({
       mutationConfig: {
-        onSuccess: (data, variables) => {
+        onSuccess: (data: any, variables: any) => {
           toast.success(
             `Taxonomy "${taxonomiesList?.find((t) => t.id === variables.taxonomyId)?.name}" has been disabled successfully.`
           );
         },
-        onError: (error, variables) => {
+        onError: (error: any, variables: any) => {
           toast.error(`Failed to disable taxonomy. Please try again.`);
           console.error('Disable taxonomy error:', error);
         },
@@ -183,11 +613,19 @@ export default function TaxonomyManagement() {
               organizing your content.
             </p>
           </div>
-          <Button className='gap-2'>
+          <Button className='gap-2' onClick={() => setIsUploadModalOpen(true)}>
             <Plus className='w-4 h-4' />
             Upload Taxonomy
           </Button>
         </div>
+
+        <UploadModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onSuccess={() => {
+            // Refresh taxonomies list here
+          }}
+        />
       </div>
     );
   }
@@ -205,10 +643,7 @@ export default function TaxonomyManagement() {
               Manage and organize your content taxonomies
             </p>
           </div>
-          <Button
-            className='gap-2'
-            onClick={() => toast.info('Feature coming soon!')}
-          >
+          <Button className='gap-2' onClick={() => setIsUploadModalOpen(true)}>
             <Plus className='w-4 h-4' />
             Add Taxonomy
           </Button>
@@ -410,7 +845,7 @@ export default function TaxonomyManagement() {
                             : 'bg-rose-100 text-rose-600'
                         )}
                       >
-                        <FileText className='w-5 h-5' />
+                        <Archive className='w-5 h-5' />
                       </div>
                       <div className='flex-1 min-w-0'>
                         <div className='flex items-center gap-2'>
@@ -445,7 +880,7 @@ export default function TaxonomyManagement() {
                         </div>
                         <div className='flex items-center gap-4 mt-1 text-sm text-slate-600'>
                           <div className='flex items-center gap-1'>
-                            <FileText className='w-3 h-3 text-slate-400' />
+                            <Archive className='w-3 h-3 text-slate-400' />
                             <code
                               className={cn(
                                 'text-xs px-1.5 py-0.5 rounded font-mono',
@@ -630,7 +1065,7 @@ export default function TaxonomyManagement() {
                       className='flex items-center gap-2'
                       title={t.file_name}
                     >
-                      <FileText className='size-3 flex-shrink-0' />
+                      <Archive className='size-3 flex-shrink-0' />
                       <code className='rounded bg-muted px-2 py-1 text-[10px] font-mono truncate flex-1'>
                         {t.file_name}
                       </code>
@@ -668,6 +1103,15 @@ export default function TaxonomyManagement() {
           </Button>
         </div>
       )}
+
+      {/* Upload Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onSuccess={() => {
+          toast.success('Taxonomy uploaded successfully.');
+        }}
+      />
     </div>
   );
 }

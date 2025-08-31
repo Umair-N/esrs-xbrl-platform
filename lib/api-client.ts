@@ -8,7 +8,7 @@ type RequestOptions = {
   params?: Record<string, string | number | boolean | undefined | null>;
   cache?: RequestCache;
   next?: NextFetchRequestConfig;
-  serviceType?: 'coreBackend' | 'aiRecommender'; // Optional serviceType
+  serviceType?: 'coreBackend' | 'aiRecommender';
 };
 
 const CONFIG = {
@@ -39,6 +39,17 @@ function buildUrlWithParams(
   return `${url}?${queryString}`;
 }
 
+function isFormDataBody(body: any): body is FormData {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+function isBinaryBody(body: any): body is Blob | ArrayBuffer | Uint8Array {
+  return (
+    body instanceof Blob ||
+    body instanceof ArrayBuffer ||
+    body instanceof Uint8Array
+  );
+}
+
 async function fetchApi<T>(
   url: string,
   options: RequestOptions = {}
@@ -51,48 +62,91 @@ async function fetchApi<T>(
     params,
     cache = 'no-store',
     next,
-    serviceType = 'coreBackend', // Default to coreBackend if not provided
+    serviceType = 'coreBackend',
   } = options;
 
-  // Automatically determine the environment
   const isLocal =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
-  const env = isLocal ? 'local' : 'gcp'; // Set to local or gcp based on the hostname
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1');
+  const env = isLocal ? 'local' : 'gcp';
 
-  // Dynamically select base URL based on serviceType and env
   const baseUrls = CONFIG[serviceType];
   const API_URL = baseUrls[env];
 
   const fullUrl = buildUrlWithParams(`${API_URL}${url}`, params);
 
+  // Decide how to send the body
+  const sendingFormData = isFormDataBody(body);
+  const sendingBinary = isBinaryBody(body);
+  const shouldSendJson =
+    body !== undefined &&
+    body !== null &&
+    !sendingFormData &&
+    !sendingBinary &&
+    typeof body !== 'string'; // strings are sent as-is
+
+  const finalHeaders = new Headers({
+    Accept: 'application/json',
+    ...headers,
+    ...(cookie ? { Cookie: cookie } : {}),
+  });
+
+  // Only set Content-Type for JSON. For FormData or binary, let the browser set it.
+  if (shouldSendJson && !finalHeaders.has('Content-Type')) {
+    finalHeaders.set('Content-Type', 'application/json');
+  }
+  if (sendingFormData || sendingBinary) {
+    // Ensure we DO NOT force JSON content-type
+    finalHeaders.delete('Content-Type');
+  }
+
+  const finalBody =
+    body === undefined || body === null
+      ? undefined
+      : shouldSendJson
+        ? JSON.stringify(body)
+        : body; // FormData, Blob, ArrayBuffer, string pass through
+
   const response = await fetch(fullUrl, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...headers,
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: finalHeaders,
+    body: method === 'GET' || method === 'HEAD' ? undefined : finalBody,
     credentials: 'include',
     cache,
     next,
   });
 
+  // Handle non-OK with safer parsing (could be text/html or empty)
   if (!response.ok) {
-    const message = (await response.json()).message || response.statusText;
+    let message: string;
+    try {
+      const data = await response.json();
+      message = (data && (data.message || data.detail)) || response.statusText;
+    } catch {
+      try {
+        message = await response.text();
+      } catch {
+        message = response.statusText;
+      }
+    }
     if (typeof window !== 'undefined') {
-      showError({
-        title: 'Error!',
-        message: message,
-        duration: 2000,
-      });
+      showError({ title: 'Error!', message, duration: 2000 });
     }
     throw new Error(message);
   }
 
-  return response.json();
+  // No content
+  if (response.status === 204) return undefined as unknown as T;
+
+  // Try JSON first, fall back to text
+  const ct = response.headers.get('content-type') || '';
+  if (ct.includes('application/json')) {
+    return response.json() as Promise<T>;
+  }
+  const text = await response.text();
+  // @ts-expect-error – caller expects T; if not JSON, return text
+  return text;
 }
 
 export const api = {

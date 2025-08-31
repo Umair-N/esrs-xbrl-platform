@@ -507,9 +507,9 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     if (!rawData) return null;
     if (rawData?.children) return rawData as TaxonomyData;
     if (Array.isArray(rawData))
-      return { children: rawData, label: 'ESRS Taxonomy', id: 'root' };
+      return { children: rawData, label: 'Taxonomy', id: 'root' };
     if (rawData?.data?.children) return rawData?.data as TaxonomyData;
-    return { children: [rawData], label: 'ESRS Taxonomy', id: 'root' };
+    return { children: [rawData], label: 'Taxonomy', id: 'root' };
   }, [data]);
 
   // Reset state when switching block or tab
