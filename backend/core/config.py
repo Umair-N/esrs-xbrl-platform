@@ -1,4 +1,15 @@
+"""
+Extended Settings configuration for FastAPI application.  In addition to
+standard application and database configuration, this settings class
+detects whether the application is running on Google Cloud Platform (GCP)
+via environment variables such as ``GOOGLE_CLOUD_PROJECT`` and ``GAE_ENV``.
+This allows other components (e.g. file storage services) to adjust
+behaviour for production versus local development.  It also exposes a
+convenience property to determine if the environment is production.
+"""
+
 import os
+import logging
 from typing import List, Set, Optional
 from functools import lru_cache
 
@@ -6,7 +17,6 @@ from pydantic import validator, Field
 from pydantic_settings import BaseSettings
 import psycopg2
 from psycopg2 import pool
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -22,23 +32,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Neon DB (PostgreSQL) - Individual components
+    # Database connection pieces
     NEON_HOST: str
     NEON_DATABASE: str
     NEON_USER: str
     NEON_PASSWORD: str
     NEON_PORT: int = 5432
-    
+
     # SSL Configuration - Fixed for Neon
     PGSSLMODE: str = "require"
     PGCHANNELBINDING: str = "prefer"  # Changed from 'require' to 'prefer'
-    
+
     # Connection Pool Settings
     DB_POOL_MIN_CONN: int = 1
     DB_POOL_MAX_CONN: int = 10
     DB_CONNECT_TIMEOUT: int = 10
     DB_COMMAND_TIMEOUT: int = 30
-    
+
     # Database URL (constructed)
     DATABASE_URL: Optional[str] = None
 
@@ -57,52 +67,67 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".doc"}
     ALLOWED_FILE_TYPES: List[str] = [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"]
-    
+
+    # Taxonomy storage backend configuration
+    STORAGE_BACKEND: str = Field(
+        default="local",
+        description="Storage backend for taxonomies: 'local' or 'gcs'. If 'gcs', uploaded files are stored in a Google Cloud Storage bucket."
+    )
+    GCS_BUCKET: Optional[str] = Field(
+        default=None,
+        description="Name of the GCS bucket used when STORAGE_BACKEND is 'gcs'.",
+    )
+    GCS_PREFIX: Optional[str] = Field(
+        default="",
+        description="Optional prefix within the GCS bucket for storing taxonomy files (e.g. 'taxonomies/').",
+    )
+
     # Environment
     ENVIRONMENT: str = Field(default="development")
     DEBUG: bool = Field(default=False)
-    
-    # GCP Configuration
+
+    # GCP environment variables for deployment detection
     GOOGLE_CLOUD_PROJECT: Optional[str] = Field(default=None, description="GCP Project ID for deployment detection")
     GAE_ENV: Optional[str] = Field(default=None, description="App Engine environment")
-    
-    # Computed properties for GCP detection
+
     @property
     def is_gcp_deployment(self) -> bool:
-        """Detect if running on GCP"""
+        """
+        Detect if the application is running on Google Cloud Platform.  Returns
+        True if environment variables indicate App Engine standard environment
+        or a GCP project ID is present.
+        """
         return (
-            (self.GAE_ENV and self.GAE_ENV.startswith('standard')) or
-            (self.GOOGLE_CLOUD_PROJECT is not None) or
-            (os.getenv('GAE_ENV', '').startswith('standard')) or
-            (os.getenv('GOOGLE_CLOUD_PROJECT') is not None)
+            (self.GAE_ENV and self.GAE_ENV.startswith("standard"))
+            or (self.GOOGLE_CLOUD_PROJECT is not None)
+            or (os.getenv("GAE_ENV", "").startswith("standard"))
+            or (os.getenv("GOOGLE_CLOUD_PROJECT") is not None)
         )
-    
+
     @property
     def is_production(self) -> bool:
-        """Check if running in production"""
+        """Check if running in a production environment."""
         return self.ENVIRONMENT.lower() == "production"
 
     @validator("DATABASE_URL", pre=True, always=True)
     def build_database_url(cls, v, values):
-        """Build DATABASE_URL from individual components if not provided"""
+        """Construct DATABASE_URL from individual components if not provided."""
         if v:
             return v
-        
-        # Build from components
         host = values.get("NEON_HOST")
         database = values.get("NEON_DATABASE")
         user = values.get("NEON_USER")
         password = values.get("NEON_PASSWORD")
         port = values.get("NEON_PORT", 5432)
         sslmode = values.get("PGSSLMODE", "require")
-        
+        channel_binding = values.get("PGCHANNELBINDING", "prefer")
         if all([host, database, user, password]):
-            return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}"
+            return f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}&channel_binding={channel_binding}"
         return None
 
     @validator("SECRET_KEY")
     def validate_secret_key(cls, v):
-        """Ensure secret key is secure in production"""
+        """Warn if the secret key is left at its default."""
         if v == "your-secret-key-change-in-production":
             logger.warning("Using default SECRET_KEY! Change this in production!")
         return v
@@ -114,117 +139,104 @@ class Settings(BaseSettings):
 
 
 class DatabaseManager:
-    """Enhanced database manager with connection pooling and error handling"""
-    
+    """Database manager with connection pooling and retry logic."""
+
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._pool = None
+        self._pool: Optional[psycopg2.pool.ThreadedConnectionPool] = None
         self._connection_params = self._get_connection_params()
-    
+
     def _get_connection_params(self) -> dict:
-        """Get psycopg2 connection parameters"""
         return {
-            'host': self.settings.NEON_HOST,
-            'database': self.settings.NEON_DATABASE,
-            'user': self.settings.NEON_USER,
-            'password': self.settings.NEON_PASSWORD,
-            'port': self.settings.NEON_PORT,
-            'sslmode': self.settings.PGSSLMODE,
-            'connect_timeout': self.settings.DB_CONNECT_TIMEOUT,
-            'options': f'-c statement_timeout={self.settings.DB_COMMAND_TIMEOUT * 1000}',  # milliseconds
+            "host": self.settings.NEON_HOST,
+            "database": self.settings.NEON_DATABASE,
+            "user": self.settings.NEON_USER,
+            "password": self.settings.NEON_PASSWORD,
+            "port": self.settings.NEON_PORT,
+            "sslmode": self.settings.PGSSLMODE,
+            "connect_timeout": self.settings.DB_CONNECT_TIMEOUT,
+            "options": f"-c statement_timeout={self.settings.DB_COMMAND_TIMEOUT * 1000}",
         }
-    
+
     def create_pool(self):
-        """Create connection pool with error handling"""
         try:
             self._pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=self.settings.DB_POOL_MIN_CONN,
                 maxconn=self.settings.DB_POOL_MAX_CONN,
-                **self._connection_params
+                **self._connection_params,
             )
             logger.info("Database connection pool created successfully")
             return self._pool
         except Exception as e:
             logger.error(f"Failed to create connection pool: {e}")
             raise
-    
+
     def get_connection(self):
-        """Get connection from pool with retry logic"""
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 if not self._pool:
                     self.create_pool()
-                
                 conn = self._pool.getconn()
-                
                 # Test connection
                 with conn.cursor() as cur:
-                    cur.execute('SELECT 1')
-                
+                    cur.execute("SELECT 1")
                 return conn
-                
             except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
                 logger.warning(f"Connection attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
                     raise
-                
-                # Reset pool on connection failure
+                # Reset pool on failure
                 if self._pool:
                     try:
                         self._pool.closeall()
-                    except:
+                    except Exception:
                         pass
                     self._pool = None
-    
+
     def return_connection(self, conn):
-        """Return connection to pool"""
         if self._pool and conn:
             self._pool.putconn(conn)
-    
+
     def close_pool(self):
-        """Close all connections in pool"""
         if self._pool:
             self._pool.closeall()
             self._pool = None
             logger.info("Database connection pool closed")
 
 
-# Context manager for database operations
 class DatabaseConnection:
-    """Context manager for database connections"""
-    
+    """Context manager for database connections."""
+
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
-        self.conn = None
-    
+        self.conn: Optional[psycopg2.extensions.connection] = None
+
     def __enter__(self):
         self.conn = self.db_manager.get_connection()
         return self.conn
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.conn:
             if exc_type:
                 try:
                     self.conn.rollback()
-                except:
+                except Exception:
                     pass
             else:
                 try:
                     self.conn.commit()
-                except:
+                except Exception:
                     pass
-            
             self.db_manager.return_connection(self.conn)
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Get a cached settings instance."""
     return Settings()
 
 
-# Initialize settings and database manager
 settings = get_settings()
 
 # Ensure upload directory exists
@@ -233,52 +245,13 @@ os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
 # Initialize database manager
 db_manager = DatabaseManager(settings)
 
-# Environment-specific configuration
+
 def configure_logging():
-    """Configure logging based on environment"""
-    if settings.is_gcp_deployment:
-        # GCP structured logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='{"severity": "%(levelname)s", "message": "%(message)s", "timestamp": "%(asctime)s"}'
-        )
-    else:
-        # Local development logging
-        level = logging.DEBUG if settings.DEBUG else logging.INFO
-        logging.basicConfig(
-            level=level,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+    level = logging.DEBUG if settings.DEBUG else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
 
 configure_logging()
-
-# Log deployment info
-logger.info(f"Application starting - Environment: {settings.ENVIRONMENT}, GCP: {settings.is_gcp_deployment}")
-
-# Usage examples:
-def example_database_usage():
-    """Example of how to use the database connection"""
-    
-    # Method 1: Using context manager (recommended)
-    with DatabaseConnection(db_manager) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM your_table LIMIT 1")
-            result = cur.fetchall()
-            return result
-    
-    # Method 2: Manual connection handling
-    conn = None
-    try:
-        conn = db_manager.get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM your_table LIMIT 1")
-            result = cur.fetchall()
-            conn.commit()
-            return result
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        raise e
-    finally:
-        if conn:
-            db_manager.return_connection(conn)
