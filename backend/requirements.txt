@@ -16,5 +16,5 @@ pydantic-settings==2.2.1
 alembic==1.16.4
 rich==14.1.0
 SQLAlchemy==2.0.42
-google-cloud-storage==2.11.0
+google-cloud-storage==3.3.0
 
