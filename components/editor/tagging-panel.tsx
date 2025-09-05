@@ -48,6 +48,7 @@ import { useTaxonomyData } from '@/features/tagging/api';
 import useDebounceSearch from '@/hooks/use-search';
 import { useMyTaxonomies } from '@/features/taxonomy/api/get-user-taxonomies';
 import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
+import { useTaxonomyStore } from '@/store/taxonomoy-store';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -616,7 +617,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   /* --------------------------------- UI ---------------------------------- */
 
   const ActiveIcon = TAB_META[activeTab].icon;
-  const { data: myTaxonomies } = useMyTaxonomies();
+  const { data: myTaxonomies, isSuccess } = useMyTaxonomies();
   const {
     mutate: switchTaxonomy,
     isPending: isSwitchLoading,
@@ -642,12 +643,27 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   };
 
   // Handle value change and automatically switch taxonomy
+
   const handleValueChange = (newValue: string) => {
     setValue(newValue);
-    if (newValue) {
-      switchTaxonomy({ taxonomyId: Number(newValue) });
+
+    const selected = myTaxonomies?.find(
+      (item) => item.id.toString() === newValue
+    );
+    if (selected) {
+      switchTaxonomy({ taxonomyId: selected.id });
+      setSelectedTaxonomy(selected);
     }
   };
+
+  const { setSelectedTaxonomy } = useTaxonomyStore();
+
+  useEffect(() => {
+    if (isSuccess) {
+      setValue(myTaxonomies[0].id.toString());
+      setSelectedTaxonomy(myTaxonomies[0]);
+    }
+  }, [isSuccess]);
 
   return (
     <div className='space-y-6 w-full'>

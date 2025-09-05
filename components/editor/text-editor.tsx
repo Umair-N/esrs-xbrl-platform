@@ -20,6 +20,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { UseRecommendations } from '@/features/recommender/api/get-recommendations';
+import { useTaxonomyStore } from '@/store/taxonomoy-store';
 
 /**
  * Tag structure in a ReportBlock:
@@ -61,6 +62,7 @@ export function TextEditor({
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const selectedTaxonomy = useTaxonomyStore((state) => state.selectedTaxonomy);
 
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
@@ -159,7 +161,7 @@ export function TextEditor({
             {
               data: {
                 query: selectedText,
-                taxonomy: 'sghg',
+                taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
                 k: 5,
                 rerank: true,
               },

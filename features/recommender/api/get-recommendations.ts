@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { api } from '@/lib/api-client';
 import { MutationConfig } from '@/lib/react-query';
 import { QueryRecommendations } from '@/types/api';
+import { showError } from '@/components/heads-up';
 
 export const QueryRecommendationsBodySchema = z.object({
     query: z.string().min(1, 'Required'),
@@ -36,6 +37,9 @@ export const UseRecommendations = ({
     return useMutation({
         onSuccess: (...args) => {
             onSuccess?.(...args);
+        },
+        onError: (err) => {
+            showError({ title: 'Failed to get recommendation', message: '' });
         },
         ...restConfig,
         mutationFn: getQueryRecommendations,
