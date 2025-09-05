@@ -13,12 +13,12 @@ type RequestOptions = {
 
 const CONFIG = {
   coreBackend: {
-    local: 'http://localhost:8000/api/v1',
+    local: 'https://api.briskbold.ai/api/v1',
     gcp: 'https://api.briskbold.ai/api/v1',
   },
   aiRecommender: {
-    local: 'http://localhost:8090',
-    gcp: 'https://ai-recommender.gcp.com',
+    local: 'https://api.recommender.briskflow.ai/api/v1',
+    gcp: 'https://api.recommender.briskflow.ai/api/v1',
   },
 };
 

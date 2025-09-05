@@ -6,12 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X } from 'lucide-react';
+import { Edit2, Check, X, Lightbulb } from 'lucide-react';
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { UseRecommendations } from '@/features/recommender/api/get-recommendations';
@@ -57,14 +62,11 @@ export function TextEditor({
   const [editedContent, setEditedContent] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  // State for recommendations popover
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [popoverPos, setPopoverPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
   const [showPopover, setShowPopover] = useState(false);
   const [highlightedText, setHighlightedText] = useState('');
+  const [popoverTriggerElement, setPopoverTriggerElement] =
+    useState<HTMLElement | null>(null);
 
   // Track the highlighted range (blockId, startIndex, endIndex)
   const [highlightRange, setHighlightRange] = useState<{
@@ -139,12 +141,17 @@ export function TextEditor({
             setHighlightRange({ blockId, startIndex, endIndex });
           }
 
-          // Position the popover
           const rect = range.getBoundingClientRect();
-          setPopoverPos({
-            top: rect.bottom + window.scrollY,
-            left: rect.left + window.scrollX,
-          });
+          const virtualElement = document.createElement('div');
+          virtualElement.style.position = 'absolute';
+          virtualElement.style.top = `${rect.bottom + window.scrollY}px`;
+          virtualElement.style.left = `${rect.left + window.scrollX}px`;
+          virtualElement.style.width = `${rect.width}px`;
+          virtualElement.style.height = '1px';
+          virtualElement.style.pointerEvents = 'none';
+          document.body.appendChild(virtualElement);
+
+          setPopoverTriggerElement(virtualElement);
           setHighlightedText(selectedText);
 
           // Query recommendations
@@ -152,7 +159,7 @@ export function TextEditor({
             {
               data: {
                 query: selectedText,
-                taxonomy: 'brsr',
+                taxonomy: 'sghg',
                 k: 5,
                 rerank: true,
               },
@@ -202,7 +209,7 @@ export function TextEditor({
       context: {}, // add context if needed; can reuse context from another tag/block
     };
 
-    // Update the report’s blocks with the new tag
+    // Update the report's blocks with the new tag
     const updatedReport: ReportDocument = {
       ...report,
       blocks: report.blocks.map((blk) =>
@@ -214,11 +221,29 @@ export function TextEditor({
     onReportChange(updatedReport);
     setShowPopover(false);
     setHighlightRange(null);
+
+    if (popoverTriggerElement) {
+      document.body.removeChild(popoverTriggerElement);
+      setPopoverTriggerElement(null);
+    }
+  };
+
+  const closePopover = () => {
+    setShowPopover(false);
+    setHighlightRange(null);
+    if (popoverTriggerElement) {
+      document.body.removeChild(popoverTriggerElement);
+      setPopoverTriggerElement(null);
+    }
   };
 
   const renderTaggedContent = (block: ReportBlock) => {
     if (!block.tags || block.tags.length === 0) {
-      return <p className='whitespace-pre-wrap'>{block.content}</p>;
+      return (
+        <p className='whitespace-pre-wrap font-medium leading-relaxed'>
+          {block.content}
+        </p>
+      );
     }
 
     const sortedTags = [...block.tags].sort(
@@ -233,7 +258,7 @@ export function TextEditor({
 
       if (startIndex > lastIndex) {
         segments.push(
-          <span key={`text-${index}`}>
+          <span key={`text-${index}`} className='font-medium leading-relaxed'>
             {block.content.substring(lastIndex, startIndex)}
           </span>
         );
@@ -242,24 +267,28 @@ export function TextEditor({
       segments.push(
         <HoverCard key={`tag-${tag.id}`}>
           <HoverCardTrigger asChild>
-            <span className='bg-primary/20 px-0.5 rounded cursor-help border-b border-dashed border-primary'>
+            <span className='bg-primary/20 px-1 py-0.5 rounded cursor-help border-b border-dashed border-primary font-medium'>
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
           <HoverCardContent className='w-80'>
-            <div className='space-y-2'>
-              <h4 className='font-medium'>{tag.concept.label}</h4>
-              <p className='text-sm text-muted-foreground'>
+            <div className='space-y-3'>
+              <h4 className='font-semibold text-base'>{tag.concept.label}</h4>
+              <p className='text-sm text-muted-foreground leading-relaxed'>
                 {tag.concept.definition}
               </p>
               <div className='flex flex-wrap gap-2 pt-1'>
-                <Badge variant='outline'>{tag.concept.type}</Badge>
-                <Badge variant='outline'>{tag.concept.periodType}</Badge>
+                <Badge variant='outline' className='font-medium'>
+                  {tag.concept.type}
+                </Badge>
+                <Badge variant='outline' className='font-medium'>
+                  {tag.concept.periodType}
+                </Badge>
               </div>
               <Separator />
-              <div className='text-xs'>
-                <p className='font-medium'>Context: {tag?.context?.label}</p>
-                <p className='text-muted-foreground mt-1'>
+              <div className='text-xs space-y-1'>
+                <p className='font-semibold'>Context: {tag?.context?.label}</p>
+                <p className='text-muted-foreground'>
                   Entity: {tag?.context?.entityName} (
                   {tag?.context?.entityIdentifier})
                 </p>
@@ -282,7 +311,9 @@ export function TextEditor({
 
     if (lastIndex < block.content.length) {
       segments.push(
-        <span key='text-last'>{block.content.substring(lastIndex)}</span>
+        <span key='text-last' className='font-medium leading-relaxed'>
+          {block.content.substring(lastIndex)}
+        </span>
       );
     }
 
@@ -373,7 +404,7 @@ export function TextEditor({
             key={block.id}
             data-block-id={block.id}
             className={cn(
-              'p-3 rounded-md border transition-colors h-full',
+              'p-4 rounded-lg border transition-colors h-full',
               selectedBlockId === block.id && !editingBlockId
                 ? 'border-primary bg-primary/5'
                 : 'border-border hover:border-primary/50',
@@ -385,12 +416,12 @@ export function TextEditor({
             }
           >
             {editingBlockId === block.id ? (
-              <div className='flex flex-col space-y-2 w-full h-full'>
+              <div className='flex flex-col space-y-3 w-full h-full'>
                 <Textarea
                   ref={textAreaRef}
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
-                  className='w-full resize-none pr-0 text max-h-[calc(100dvh-9rem)] overflow-y-auto custom-scrollbar h-full'
+                  className='w-full resize-none text-base font-medium leading-relaxed max-h-[calc(100dvh-9rem)] overflow-y-auto custom-scrollbar h-full'
                   autoFocus
                 />
                 <div className='flex justify-end space-x-2'>
@@ -412,7 +443,7 @@ export function TextEditor({
                       e.stopPropagation();
                       startEditing(block);
                     }}
-                    className='rounded-full shadow-md'
+                    className='rounded-full shadow-md font-medium'
                   >
                     Edit
                     <Edit2 className='h-4 w-4' />
@@ -422,12 +453,12 @@ export function TextEditor({
                   {renderTaggedContent(block)}
                 </div>
                 {block.tags && block.tags.length > 0 && (
-                  <div className='mt-2 flex flex-wrap gap-2 clear-both'>
+                  <div className='mt-3 flex flex-wrap gap-2 clear-both'>
                     {block.tags.map((tag) => (
                       <Badge
                         key={tag.id}
                         variant='outline'
-                        className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary'
+                        className='inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary'
                       >
                         {tag.concept.label}
                       </Badge>
@@ -440,50 +471,73 @@ export function TextEditor({
         ))}
       </div>
 
-      {/* Popover with recommendations and apply buttons */}
-      {showPopover && popoverPos && (
-        <div
-          style={{
-            position: 'absolute',
-            top: popoverPos.top,
-            left: popoverPos.left,
-            zIndex: 50,
-            maxWidth: '20rem',
-            backgroundColor: '#fff',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '0.75rem',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-          }}
+      <Popover open={showPopover} onOpenChange={setShowPopover}>
+        <PopoverTrigger asChild>
+          <div style={{ display: 'none' }} />
+        </PopoverTrigger>
+        <PopoverContent
+          className='w-80 p-0'
+          side='bottom'
+          align='start'
+          sideOffset={8}
+          style={
+            popoverTriggerElement
+              ? {
+                  position: 'fixed',
+                  top: popoverTriggerElement.offsetTop,
+                  left: popoverTriggerElement.offsetLeft,
+                }
+              : undefined
+          }
         >
-          <div className='flex justify-between items-center mb-2'>
-            <span className='font-medium'>
-              Suggestions for “{highlightedText}”
-            </span>
-            <button
-              onClick={() => setShowPopover(false)}
-              className='ml-2 text-sm'
-            >
-              ×
-            </button>
+          <div className='p-4'>
+            <div className='flex items-center justify-between mb-3'>
+              <div className='flex items-center gap-2'>
+                <Lightbulb className='h-4 w-4 text-primary' />
+                <span className='font-semibold text-sm'>
+                  Suggestions for "{highlightedText}"
+                </span>
+              </div>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={closePopover}
+                className='h-6 w-6 p-0 hover:bg-muted'
+              >
+                <X className='h-3 w-3' />
+              </Button>
+            </div>
+
+            {recommendations.length > 0 ? (
+              <div className='space-y-1 max-h-64 overflow-y-auto custom-scrollbar'>
+                {recommendations.map((item, index) => (
+                  <Button
+                    key={item.tag}
+                    variant='ghost'
+                    className='w-full justify-start h-auto p-3 text-left hover:bg-muted/50'
+                    onClick={() => applyTag(item)}
+                  >
+                    <div className='space-y-1'>
+                      <div className='font-semibold text-sm text-foreground'>
+                        {item.reference}
+                      </div>
+                      <div className='text-xs text-muted-foreground font-mono'>
+                        {item.tag}
+                      </div>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <div className='text-center py-6 text-muted-foreground'>
+                <Lightbulb className='h-8 w-8 mx-auto mb-2 opacity-50' />
+                <p className='text-sm font-medium'>No suggestions found</p>
+                <p className='text-xs'>Try selecting different text</p>
+              </div>
+            )}
           </div>
-          <ul className='space-y-1'>
-            {recommendations.map((item) => (
-              <li key={item.tag}>
-                <button
-                  className='w-full text-left hover:bg-gray-100 rounded p-1'
-                  onClick={() => applyTag(item)}
-                >
-                  <strong>{item.reference}</strong>
-                  <div className='text-xs text-muted-foreground'>
-                    {item.tag}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
