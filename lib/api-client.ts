@@ -17,8 +17,8 @@ const CONFIG = {
     gcp: 'https://api.briskbold.ai/api/v1',
   },
   aiRecommender: {
-    local: 'https://api.recommender.briskflow.ai/api/v1',
-    gcp: 'https://api.recommender.briskflow.ai/api/v1',
+    local: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
+    gcp: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
   },
 };
 
