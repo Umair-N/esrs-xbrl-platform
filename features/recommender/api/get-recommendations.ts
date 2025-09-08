@@ -27,7 +27,7 @@ type UseQueryRecommendationsOptions = {
     mutationConfig?: MutationConfig<typeof getQueryRecommendations>;
 };
 
-export const UseRecommendations = ({
+export const useRecommendations = ({
     mutationConfig,
 }: UseQueryRecommendationsOptions = {}) => {
     const queryClient = useQueryClient();

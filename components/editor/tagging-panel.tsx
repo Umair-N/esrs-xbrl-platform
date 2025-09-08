@@ -71,17 +71,17 @@ type TabKey = 'presentations' | 'dimensions' | 'formulae' | 'calculations';
 const LoadingBlock = ({ lines = 3 }: { lines?: number }) => (
   <div className='space-y-2'>
     {Array.from({ length: lines }).map((_, i) => (
-      <Skeleton key={i} className='h-4 w-full' />
+      <Skeleton key={i} className='w-full h-4' />
     ))}
   </div>
 );
 
 const TreeRowSkeleton = () => (
   <div className='flex items-center gap-2 py-1.5 px-2'>
-    <Skeleton className='h-4 w-4 rounded' />
-    <Skeleton className='h-4 w-4 rounded' />
+    <Skeleton className='w-4 h-4 rounded' />
+    <Skeleton className='w-4 h-4 rounded' />
     <Skeleton className='h-4 w-28' />
-    <Skeleton className='h-4 w-40' />
+    <Skeleton className='w-40 h-4' />
   </div>
 );
 
@@ -100,7 +100,7 @@ const SearchInput = ({
     <Search className='absolute left-3 top-2.5 h-4 w-4 text-muted-foreground' />
     <Input
       placeholder={placeholder}
-      className='pl-10 h-9 outline-none'
+      className='pl-10 outline-none h-9'
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
@@ -137,12 +137,12 @@ const TaxonomyTreeNode = ({
   const getIcon = () =>
     hasChildren ? (
       isExpanded ? (
-        <FolderOpen className='h-3 w-3' />
+        <FolderOpen className='w-3 h-3' />
       ) : (
-        <Folder className='h-3 w-3' />
+        <Folder className='w-3 h-3' />
       )
     ) : (
-      <FileText className='h-3 w-3' />
+      <FileText className='w-3 h-3' />
     );
 
   const getBadgeColor = (labelType?: string) => {
@@ -176,7 +176,7 @@ const TaxonomyTreeNode = ({
         onClick={() => onSelect(node)}
       >
         {isSelected && (
-          <div className='absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-green-500 rounded-l-lg' />
+          <div className='absolute top-0 bottom-0 left-0 w-1 rounded-l-lg bg-gradient-to-b from-emerald-500 to-green-500' />
         )}
 
         {hasChildren ? (
@@ -191,16 +191,16 @@ const TaxonomyTreeNode = ({
             aria-label={isExpanded ? 'Collapse node' : 'Expand node'}
           >
             {isExpanded ? (
-              <ChevronDown className='h-2 w-2' />
+              <ChevronDown className='w-2 h-2' />
             ) : (
-              <ChevronRight className='h-2 w-2' />
+              <ChevronRight className='w-2 h-2' />
             )}
           </Button>
         ) : (
-          <div className='h-4 w-4 mr-2' />
+          <div className='w-4 h-4 mr-2' />
         )}
 
-        <div className='flex items-start min-w-0 flex-1 gap-2'>
+        <div className='flex items-start flex-1 min-w-0 gap-2'>
           <div
             className={`p-1 rounded ${isSelected ? 'bg-emerald-100 dark:bg-emerald-900/50' : 'bg-muted/50 group-hover:bg-muted'}`}
           >
@@ -211,7 +211,7 @@ const TaxonomyTreeNode = ({
             </span>
           </div>
 
-          <div className='min-w-0 flex-1'>
+          <div className='flex-1 min-w-0'>
             <div className='flex items-start justify-between gap-2 mb-1'>
               <span
                 className={`font-medium text-xs break-words leading-tight ${isSelected ? 'text-emerald-900 dark:text-emerald-100' : 'text-foreground'}`}
@@ -220,12 +220,12 @@ const TaxonomyTreeNode = ({
                 {node.label}
               </span>
 
-              <div className='flex items-center gap-1 flex-shrink-0'>
+              <div className='flex items-center flex-shrink-0 gap-1'>
                 {hasCalculations && (
                   <div
                     className={`p-0.5 rounded ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50' : 'bg-blue-50 dark:bg-blue-950/30'}`}
                   >
-                    <Calculator className='h-2 w-2 text-blue-500' />
+                    <Calculator className='w-2 h-2 text-blue-500' />
                   </div>
                 )}
                 {isSelected && (
@@ -234,7 +234,7 @@ const TaxonomyTreeNode = ({
               </div>
             </div>
 
-            <div className='flex items-start gap-1 mt-1 min-w-0 flex-wrap'>
+            <div className='flex flex-wrap items-start min-w-0 gap-1 mt-1'>
               <code
                 className={`text-xs font-mono px-1.5 py-0.5 rounded break-all leading-tight ${
                   isSelected
@@ -325,26 +325,26 @@ const TaxonomyBrowser = ({
 
   return (
     <Card
-      className='border-0 shadow-sm mt-1 p-0'
+      className='p-0 mt-1 border-0 shadow-sm'
       aria-busy={showSkeleton || showUpdatingChip}
     >
       <CardHeader className='p-0'>
-        <CardTitle className='flex items-center gap-2 text-base p-2'>
-          <Tag className='h-4 w-4 text-emerald-600' />
+        <CardTitle className='flex items-center gap-2 p-2 text-base'>
+          <Tag className='w-4 h-4 text-emerald-600' />
           {label}
           {showUpdatingChip && (
-            <span className='ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground'>
-              <Loader2 className='h-3 w-3 animate-spin' /> updating…
+            <span className='inline-flex items-center gap-1 ml-2 text-xs text-muted-foreground'>
+              <Loader2 className='w-3 h-3 animate-spin' /> updating…
             </span>
           )}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className='space-y-4 p-0'>
-        <div className='space-y-3 mt-1 p-2'>
+      <CardContent className='p-0 space-y-4'>
+        <div className='p-2 mt-1 space-y-3'>
           {/* Search */}
           {showSkeleton ? (
-            <Skeleton className='h-9 w-full' />
+            <Skeleton className='w-full h-9' />
           ) : (
             <SearchInput
               value={searchQuery}
@@ -381,8 +381,8 @@ const TaxonomyBrowser = ({
                     </div>
                   ) : isSearching ? (
                     allNodes.length === 0 ? (
-                      <div className='text-center py-6 text-muted-foreground'>
-                        <Search className='h-8 w-8 mx-auto mb-3 opacity-50' />
+                      <div className='py-6 text-center text-muted-foreground'>
+                        <Search className='w-8 h-8 mx-auto mb-3 opacity-50' />
                         <p className='text-sm'>
                           No results found for “{searchQuery}”.
                         </p>
@@ -404,7 +404,7 @@ const TaxonomyBrowser = ({
                               onClick={() => setSelectedConcept(concept)}
                             >
                               {isSelected && (
-                                <div className='absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-green-500 rounded-l-lg' />
+                                <div className='absolute top-0 bottom-0 left-0 w-1 rounded-l-lg bg-gradient-to-b from-emerald-500 to-green-500' />
                               )}
                               <div className='flex items-start gap-2.5'>
                                 <div
@@ -420,7 +420,7 @@ const TaxonomyBrowser = ({
                                   >
                                     {concept.label}
                                   </h4>
-                                  <code className='text-xs font-mono px-2 py-1 rounded block mt-1'>
+                                  <code className='block px-2 py-1 mt-1 font-mono text-xs rounded'>
                                     {concept.id}
                                   </code>
                                 </div>
@@ -444,8 +444,8 @@ const TaxonomyBrowser = ({
                           />
                         ))
                       ) : (
-                        <div className='text-center py-6 text-muted-foreground'>
-                          <Info className='h-8 w-8 mx-auto mb-3 opacity-50' />
+                        <div className='py-6 text-center text-muted-foreground'>
+                          <Info className='w-8 h-8 mx-auto mb-3 opacity-50' />
                           <p className='text-sm'>No items available.</p>
                         </div>
                       )}
@@ -650,34 +650,34 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
   /* ------------------------------- Error UI ------------------------------- */
 
-  if (isError) {
-    return (
-      <div className='space-y-4'>
-        <Card className='border-0 shadow-sm'>
-          <CardContent className='p-6'>
-            <Alert variant='destructive' className='flex items-start gap-2'>
-              <AlertCircle className='h-4 w-4 shrink-0 mt-0.5' />
-              <div>
-                <AlertTitle>Failed to load taxonomy</AlertTitle>
-                <AlertDescription className='space-y-2'>
-                  <p>
-                    There was a problem fetching{' '}
-                    <code className='font-mono text-xs'>
-                      /taxonomy/{activeTab}
-                    </code>
-                    .
-                  </p>
-                  <p className='text-xs text-muted-foreground'>
-                    {(error as any)?.message ?? 'Unknown error'}
-                  </p>
-                </AlertDescription>
-              </div>
-            </Alert>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // if (isError) {
+  //   return (
+  //     <div className='space-y-4'>
+  //       <Card className='border-0 shadow-sm'>
+  //         <CardContent className='p-6'>
+  //           <Alert variant='destructive' className='flex items-start gap-2'>
+  //             <AlertCircle className='h-4 w-4 shrink-0 mt-0.5' />
+  //             <div>
+  //               <AlertTitle>Failed to load taxonomy</AlertTitle>
+  //               <AlertDescription className='space-y-2'>
+  //                 <p>
+  //                   There was a problem fetching{' '}
+  //                   <code className='font-mono text-xs'>
+  //                     /taxonomy/{activeTab}
+  //                   </code>
+  //                   .
+  //                 </p>
+  //                 <p className='text-xs text-muted-foreground'>
+  //                   {(error as any)?.message ?? 'Unknown error'}
+  //                 </p>
+  //               </AlertDescription>
+  //             </div>
+  //           </Alert>
+  //         </CardContent>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
 
   /* --------------------------------- UI ---------------------------------- */
 
@@ -725,20 +725,20 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
   useEffect(() => {
     if (isSuccess) {
-      setValue(myTaxonomies[0].id.toString());
+      setValue(myTaxonomies[0]?.id.toString());
       setSelectedTaxonomy(myTaxonomies[0]);
     }
   }, [isSuccess]);
 
   return (
-    <div className='space-y-6 w-full'>
+    <div className='w-full space-y-6'>
       {!selectedBlock ? (
         <Card className='border-0 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900'>
           <CardContent className='p-8 text-center'>
-            <div className='mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4'>
-              <Target className='h-8 w-8 text-primary' />
+            <div className='flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10'>
+              <Target className='w-8 h-8 text-primary' />
             </div>
-            <h3 className='text-lg font-semibold mb-2'>Select Text to Tag</h3>
+            <h3 className='mb-2 text-lg font-semibold'>Select Text to Tag</h3>
             <p className='text-sm text-muted-foreground'>
               Choose a block of text from the document to start adding tags
             </p>
@@ -747,27 +747,27 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
       ) : (
         <>
           {/* Selected Text */}
-          <Card className='border-0 shadow-sm mt-0'>
-            <CardHeader className='pb-1 pt-1'>
+          <Card className='mt-0 border-0 shadow-sm'>
+            <CardHeader className='pt-1 pb-1'>
               <CardTitle className='flex items-center gap-2 text-base'>
-                <FileText className='h-4 w-4 text-blue-600' />
+                <FileText className='w-4 h-4 text-blue-600' />
                 Selected Text
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-3'>
               {isInitialLoading ? (
-                <div className='p-3 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-lg'>
-                  <Skeleton className='h-5 w-28 mb-2' />
+                <div className='p-3 border-2 border-blue-200 border-dashed rounded-lg dark:border-blue-800'>
+                  <Skeleton className='h-5 mb-2 w-28' />
                   <LoadingBlock lines={2} />
                 </div>
               ) : (
-                <div className='p-3 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/20'>
+                <div className='p-3 border-2 border-blue-200 border-dashed rounded-lg dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20'>
                   {highlightedText?.text ? (
                     <div className='space-y-2'>
                       <Badge variant='secondary' className='text-xs'>
                         Highlighted Selection
                       </Badge>
-                      <p className='text-sm bg-primary/20 px-2 py-1 rounded break-words'>
+                      <p className='px-2 py-1 text-sm break-words rounded bg-primary/20'>
                         {highlightedText.text}
                       </p>
                     </div>
@@ -790,13 +790,13 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
           {/* Tabs */}
           <Card className='border-0 shadow-sm'>
-            <CardHeader className='pb-2 flex items-center flex-row justify-between'>
+            <CardHeader className='flex flex-row items-center justify-between pb-2'>
               <div className='flex items-center gap-2'>
-                <ActiveIcon className='h-4 w-4 text-muted-foreground' />
+                <ActiveIcon className='w-4 h-4 text-muted-foreground' />
                 <CardTitle className='text-base'>Taxonomy</CardTitle>
                 {isUpdating && (
-                  <span className='ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground'>
-                    <Loader2 className='h-3 w-3 animate-spin' /> updating…
+                  <span className='inline-flex items-center gap-1 ml-1 text-xs text-muted-foreground'>
+                    <Loader2 className='w-3 h-3 animate-spin' /> updating…
                   </span>
                 )}
               </div>
@@ -830,7 +830,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                         value={tab}
                         className='flex items-center gap-1'
                       >
-                        <Icon className='h-3 w-3' />
+                        <Icon className='w-3 h-3' />
                         <span className='hidden sm:inline'>
                           {TAB_META[tab].label}
                         </span>
@@ -863,9 +863,9 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
           </Card>
 
           {/* Context Selection */}
-          <Card className='border-t shadow-sm p-0 mt-0'>
+          <Card className='p-0 mt-0 border-t shadow-sm'>
             <CardHeader>
-              <CardTitle className='text-base flex items-center gap-2'>
+              <CardTitle className='flex items-center gap-2 text-base'>
                 Context Selection{' '}
                 <Badge variant='secondary' className='text-xs'>
                   Optional
@@ -874,7 +874,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
             </CardHeader>
             <CardContent className='space-y-3'>
               {isInitialLoading ? (
-                <Skeleton className='h-10 w-full' />
+                <Skeleton className='w-full h-10' />
               ) : (
                 <Select
                   value={selectedContextId || ''}
@@ -901,9 +901,9 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
           </Card>
 
           {/* Selected Concept */}
-          <Card className='border-t shadow-sm p-0 mt-0'>
+          <Card className='p-0 mt-0 border-t shadow-sm'>
             <CardHeader>
-              <CardTitle className='text-base flex items-center gap-2'>
+              <CardTitle className='flex items-center gap-2 text-base'>
                 Selected Tag
               </CardTitle>
             </CardHeader>
@@ -938,7 +938,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                 onClick={handleAddTag}
                 size='lg'
               >
-                <Plus className='mr-2 h-5 w-5' />
+                <Plus className='w-5 h-5 mr-2' />
                 Add Tag
               </Button>
             </CardContent>

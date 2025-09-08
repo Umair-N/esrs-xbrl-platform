@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
-import { UseRecommendations } from '@/features/recommender/api/get-recommendations';
+import { useRecommendations } from '@/features/recommender/api/get-recommendations';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { sampleContexts } from '@/lib/sample-data';
@@ -86,7 +86,7 @@ export function TextEditor({
     endIndex: number;
   } | null>(null);
 
-  const { mutate } = UseRecommendations();
+  const { mutate } = useRecommendations();
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
@@ -260,7 +260,7 @@ export function TextEditor({
   const renderTaggedContent = (block: ReportBlock) => {
     if (!block.tags || block.tags.length === 0) {
       return (
-        <p className='whitespace-pre-wrap font-medium leading-relaxed'>
+        <p className='font-medium leading-relaxed whitespace-pre-wrap'>
           {block.content}
         </p>
       );
@@ -293,8 +293,8 @@ export function TextEditor({
           </HoverCardTrigger>
           <HoverCardContent className='w-80'>
             <div className='space-y-3'>
-              <h4 className='font-semibold text-base'>{tag.concept.label}</h4>
-              <p className='text-sm text-muted-foreground leading-relaxed'>
+              <h4 className='text-base font-semibold'>{tag.concept.label}</h4>
+              <p className='text-sm leading-relaxed text-muted-foreground'>
                 {tag.concept.definition}
               </p>
               <div className='flex flex-wrap gap-2 pt-1'>
@@ -306,7 +306,7 @@ export function TextEditor({
                 </Badge>
               </div>
               <Separator />
-              <div className='text-xs space-y-1'>
+              <div className='space-y-1 text-xs'>
                 <p className='font-semibold'>Context: {tag?.context?.label}</p>
                 <p className='text-muted-foreground'>
                   Entity: {tag?.context?.entityName} (
@@ -418,7 +418,7 @@ export function TextEditor({
       />
 
       {/* Blocks container */}
-      <div className='flex-1 space-y-4 p-1'>
+      <div className='flex-1 p-1 space-y-4'>
         {report.blocks.map((block) => (
           <div
             key={block.id}
@@ -436,7 +436,7 @@ export function TextEditor({
             }
           >
             {editingBlockId === block.id ? (
-              <div className='flex flex-col space-y-3 w-full h-full'>
+              <div className='flex flex-col w-full h-full space-y-3'>
                 <Textarea
                   ref={textAreaRef}
                   value={editedContent}
@@ -446,16 +446,16 @@ export function TextEditor({
                 />
                 <div className='flex justify-end space-x-2'>
                   <Button size='sm' variant='outline' onClick={cancelEditing}>
-                    <X className='h-4 w-4 mr-1' /> Cancel
+                    <X className='w-4 h-4 mr-1' /> Cancel
                   </Button>
                   <Button size='sm' onClick={saveEditing}>
-                    <Check className='h-4 w-4 mr-1' /> Save
+                    <Check className='w-4 h-4 mr-1' /> Save
                   </Button>
                 </div>
               </div>
             ) : (
               <div className='relative group max-h-[calc(100dvh-12rem)] overflow-y-auto custom-scrollbar'>
-                <div className='sticky border rounded-full top-0 right-0 float-right group-hover:opacity-100 transition-opacity z-10 ml-2 mb-2'>
+                <div className='sticky top-0 right-0 z-10 float-right mb-2 ml-2 transition-opacity border rounded-full group-hover:opacity-100'>
                   <Button
                     size='sm'
                     variant='ghost'
@@ -463,22 +463,22 @@ export function TextEditor({
                       e.stopPropagation();
                       startEditing(block);
                     }}
-                    className='rounded-full shadow-md font-medium'
+                    className='font-medium rounded-full shadow-md'
                   >
                     Edit
-                    <Edit2 className='h-4 w-4' />
+                    <Edit2 className='w-4 h-4' />
                   </Button>
                 </div>
-                <div className='prose dark:prose-invert max-w-none leading-relaxed'>
+                <div className='leading-relaxed prose dark:prose-invert max-w-none'>
                   {renderTaggedContent(block)}
                 </div>
                 {block.tags && block.tags.length > 0 && (
-                  <div className='mt-3 flex flex-wrap gap-2 clear-both'>
+                  <div className='flex flex-wrap clear-both gap-2 mt-3'>
                     {block.tags.map((tag) => (
                       <Badge
                         key={tag.id}
                         variant='outline'
-                        className='inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary'
+                        className='inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary'
                       >
                         {tag.concept.label}
                       </Badge>
@@ -496,7 +496,7 @@ export function TextEditor({
           <div style={{ display: 'none' }} />
         </PopoverTrigger>
         <PopoverContent
-          className='w-80 p-0'
+          className='p-0 w-80'
           side='bottom'
           align='start'
           sideOffset={8}
@@ -513,8 +513,8 @@ export function TextEditor({
           <div className='p-4'>
             <div className='flex items-center justify-between mb-3'>
               <div className='flex items-center gap-2'>
-                <Lightbulb className='h-4 w-4 text-primary' />
-                <span className='font-semibold text-sm'>
+                <Lightbulb className='w-4 h-4 text-primary' />
+                <span className='text-sm font-semibold'>
                   Suggestions for "{highlightedText}"
                 </span>
               </div>
@@ -522,26 +522,26 @@ export function TextEditor({
                 variant='ghost'
                 size='sm'
                 onClick={closePopover}
-                className='h-6 w-6 p-0 hover:bg-muted'
+                className='w-6 h-6 p-0 hover:bg-muted'
               >
-                <X className='h-3 w-3' />
+                <X className='w-3 h-3' />
               </Button>
             </div>
 
             {recommendations.length > 0 ? (
-              <div className='space-y-1 max-h-64 overflow-y-auto custom-scrollbar'>
+              <div className='space-y-1 overflow-y-auto max-h-64 custom-scrollbar'>
                 {recommendations.map((item, index) => (
                   <Button
                     key={item.tag}
                     variant='ghost'
-                    className='w-full justify-start h-auto p-3 text-left hover:bg-muted/50'
+                    className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
                     onClick={() => applyTag(item)}
                   >
                     <div className='space-y-1'>
-                      <div className='font-semibold text-sm text-foreground'>
+                      <div className='text-sm font-semibold text-foreground'>
                         {item.reference}
                       </div>
-                      <div className='text-xs text-muted-foreground font-mono'>
+                      <div className='font-mono text-xs text-muted-foreground'>
                         {item.tag}
                       </div>
                     </div>
@@ -549,8 +549,8 @@ export function TextEditor({
                 ))}
               </div>
             ) : (
-              <div className='text-center py-6 text-muted-foreground'>
-                <Lightbulb className='h-8 w-8 mx-auto mb-2 opacity-50' />
+              <div className='py-6 text-center text-muted-foreground'>
+                <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
                 <p className='text-sm font-medium'>No suggestions found</p>
                 <p className='text-xs'>Try selecting different text</p>
               </div>
