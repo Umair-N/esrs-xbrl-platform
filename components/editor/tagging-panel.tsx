@@ -49,6 +49,7 @@ import useDebounceSearch from '@/hooks/use-search';
 import { useMyTaxonomies } from '@/features/taxonomy/api/get-user-taxonomies';
 import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
+import { useTaggingStore } from '@/store/tagging-store';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -484,8 +485,22 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   const [selectedConcept, setSelectedConcept] = useState<TaxonomyNode | null>(
     null
   );
+  // Pull state and actions from the global tagging store. The store keeps
+  // track of a pending concept (selected via the recommendation popover) and
+  // the globally selected context ID. When the tagging panel is mounted or
+  // the store values change, we synchronise our local state with the store.
+  const {
+    pendingConcept,
+    setPendingConcept,
+    selectedContextId: globalContextId,
+    setSelectedContextId: setGlobalContextId,
+  } = useTaggingStore();
+
+  // Local context selection. Initialise with the global context if one has
+  // been chosen previously. This value will be mirrored back to the
+  // tagging store whenever it changes.
   const [selectedContextId, setSelectedContextId] = useState<string | null>(
-    null
+    globalContextId
   );
   const [value, setValue] = useState<string>('');
 
@@ -513,12 +528,62 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     return { children: [rawData], label: 'Taxonomy', id: 'root' };
   }, [data]);
 
-  // Reset state when switching block or tab
+  // Reset concept selection and search query when switching block or tab. Do
+  // not reset the context globally; instead initialise the local context with
+  // the current global context so the user's last selected context remains
+  // available for subsequent tags created via recommendations. This effect
+  // should not run when only the context changes, otherwise it clears the
+  // selected concept and disables the Add Tag button.
   useEffect(() => {
     setSelectedConcept(null);
-    setSelectedContextId(null);
+    // Restore the local context from the global store (if any)
+    setSelectedContextId(globalContextId ?? null);
     setSearchQuery('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBlockId, activeTab]);
+
+  // When a concept is selected from the recommendation popover, it is stored
+  // in the global tagging store as a pending concept. Detect this change and
+  // preselect the concept in the tagging panel, then clear the pending
+  // concept so it is not reused. The minimal fields required by the
+  // taxonomy browser are mapped from the recommendation object.
+  useEffect(() => {
+    if (pendingConcept) {
+      setSelectedConcept({
+        id: pendingConcept.id,
+        label: pendingConcept.label,
+        type: pendingConcept.type,
+        periodType: pendingConcept.periodType as any,
+        // Use definition as the original label/definition. This ensures the
+        // definition appears in the hover card.
+        originalLabel: pendingConcept.definition,
+      } as any);
+      // Clear the pending concept so it is only applied once
+      setPendingConcept(null);
+    }
+    // Only run this effect when the pending concept changes
+  }, [pendingConcept, setPendingConcept]);
+
+  // Keep the global context ID in sync with the local state. Whenever the
+  // selected context changes in the tagging panel, update the global store.
+  useEffect(() => {
+    const normalisedLocal = selectedContextId ?? null;
+    const normalisedGlobal = globalContextId ?? null;
+    if (normalisedLocal !== normalisedGlobal) {
+      setGlobalContextId(normalisedLocal);
+    }
+  }, [selectedContextId, globalContextId, setGlobalContextId]);
+
+  // Mirror updates from the global context back to the local state. This is
+  // required when a context is selected outside of the tagging panel and
+  // ensures the UI reflects the current selection.
+  useEffect(() => {
+    const normalisedLocal = selectedContextId ?? null;
+    const normalisedGlobal = globalContextId ?? null;
+    if (normalisedLocal !== normalisedGlobal) {
+      setSelectedContextId(normalisedGlobal);
+    }
+  }, [globalContextId]);
 
   const selectedBlock = useMemo(
     () =>
@@ -831,6 +896,33 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Selected Concept */}
+          <Card className='border-t shadow-sm p-0 mt-0'>
+            <CardHeader>
+              <CardTitle className='text-base flex items-center gap-2'>
+                Selected Tag
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-2'>
+              {selectedConcept ? (
+                <div className='space-y-1'>
+                  <Badge variant='secondary' className='text-xs'>
+                    {selectedConcept.label}
+                  </Badge>
+                  {selectedConcept.originalLabel && (
+                    <p className='text-xs text-muted-foreground'>
+                      {selectedConcept.originalLabel}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className='text-sm text-muted-foreground'>
+                  No tag selected yet
+                </p>
               )}
             </CardContent>
           </Card>

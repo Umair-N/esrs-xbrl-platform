@@ -21,6 +21,8 @@ import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { UseRecommendations } from '@/features/recommender/api/get-recommendations';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
+import { useTaggingStore } from '@/store/tagging-store';
+import { sampleContexts } from '@/lib/sample-data';
 
 /**
  * Tag structure in a ReportBlock:
@@ -63,6 +65,13 @@ export function TextEditor({
   const [editedContent, setEditedContent] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const selectedTaxonomy = useTaxonomyStore((state) => state.selectedTaxonomy);
+
+  // Bring in the tagging store actions. When a recommendation is chosen, we
+  // place the corresponding concept into the global store via setPendingConcept.
+  // The tagging panel reads this and preselects the concept for context
+  // assignment. We also expose the currently selected context ID should we
+  // choose to automatically create tags when a context is already selected.
+  const { setPendingConcept, selectedContextId } = useTaggingStore();
 
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
@@ -190,40 +199,49 @@ export function TextEditor({
     reference: string;
     datatype: string;
   }) => {
+    // Guard against applying a tag when no text has been selected. Only
+    // proceed if there is an active selection.
     if (!highlightRange) return;
-    const { blockId, startIndex, endIndex } = highlightRange;
-
-    // Create a minimal concept from the recommendation.  If you have a taxonomy
-    // lookup available, enrich this object accordingly.
+    // Create a minimal concept object from the recommendation. Additional
+    // metadata (e.g. definition, period type) may be resolved by the
+    // taxonomy lookup within the tagging panel.
     const concept = {
       id: item.tag,
       label: item.reference,
-      definition: '', // fill with taxonomy definition if available
+      definition: '',
       type: item.datatype,
-      periodType: '', // fill if known
+      periodType: '',
     };
-
-    const newTag = {
-      id: `${Date.now()}`, // simple unique id; replace with uuid if you have one
-      concept,
-      startIndex,
-      endIndex,
-      context: {}, // add context if needed; can reuse context from another tag/block
-    };
-
-    // Update the report's blocks with the new tag
-    const updatedReport: ReportDocument = {
-      ...report,
-      blocks: report.blocks.map((blk) =>
-        blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
-      ),
-      updatedAt: new Date().toISOString(),
-    };
-
-    onReportChange(updatedReport);
+    // If a context has already been selected in the tagging tools, we can
+    // immediately create the tag with that context. Otherwise, we defer
+    // creation by storing a pending concept for the tagging panel.
+    if (selectedContextId) {
+      const { blockId, startIndex, endIndex } = highlightRange;
+      const context = sampleContexts.find((c) => c.id === selectedContextId);
+      const newTag = {
+        id: `${Date.now()}`,
+        concept,
+        startIndex,
+        endIndex,
+        ...(context ? { context } : {}),
+      };
+      const updatedReport: ReportDocument = {
+        ...report,
+        blocks: report.blocks.map((blk) =>
+          blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+      onReportChange(updatedReport);
+    } else {
+      // Place the pending concept into the global tagging store. The tagging
+      // panel will detect this value and preselect it for context assignment.
+      setPendingConcept(concept);
+    }
+    // Hide the suggestion popover and clear the highlight range. Tag
+    // creation (if deferred) will happen within the tagging panel.
     setShowPopover(false);
     setHighlightRange(null);
-
     if (popoverTriggerElement) {
       document.body.removeChild(popoverTriggerElement);
       setPopoverTriggerElement(null);

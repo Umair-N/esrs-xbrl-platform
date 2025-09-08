@@ -9,7 +9,7 @@ const createEnv = () => {
             .refine((s) => s === 'true' || s === 'false')
             .transform((s) => s === 'true')
             .optional(),
-        APP_URL: z.string().optional().default('http://localhost:8000/api/v1'),
+        APP_URL: z.string().optional().default('https://api.briskbold.ai/api/v1'),
         APP_MOCK_API_PORT: z.string().optional().default('8080'),
     });
 
