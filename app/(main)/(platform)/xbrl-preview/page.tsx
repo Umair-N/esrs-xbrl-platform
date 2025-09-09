@@ -494,7 +494,6 @@ const IXBRLViewer: React.FC = () => {
           <div className='grid grid-cols-1 lg:grid-cols-4 gap-4'>
             {/* Main Document */}
             <div className='lg:col-span-3'>
-              bbr
               <div className='bg-white rounded-lg shadow-lg overflow-hidden'>
                 <div className='p-3 border-b bg-gray-50 flex items-center justify-between'>
                   <h3 className='font-bold text-gray-800 text-sm'>
