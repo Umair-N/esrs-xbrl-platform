@@ -20,7 +20,6 @@ import {
   Info,
   Loader2,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,24 +31,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import type { ReportDocument, XbrlTag } from '@/types/report';
+import type { ReportDocument, XbrlContext, XbrlTag } from '@/types/report';
 import type { TaxonomyData, TaxonomyNode } from '@/types/taxonomy';
 
 import { sampleContexts } from '@/lib/sample-data';
 import { generateUniqueId } from '@/lib/utils';
-import { searchTaxonomy, flattenTree } from '@/lib/taxomony-data';
+import { flattenTree } from '@/lib/taxomony-data';
 import { useTaxonomyData } from '@/features/tagging/api';
 import useDebounceSearch from '@/hooks/use-search';
 import { useMyTaxonomies } from '@/features/taxonomy/api/get-user-taxonomies';
 import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
+import { ContextOut, useContexts } from '@/features/contexts/api/list-contexts';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -343,7 +342,7 @@ const TaxonomyBrowser = ({
       <CardContent className='p-0 space-y-4'>
         <div className='p-2 mt-1 space-y-3'>
           {/* Search */}
-          {showSkeleton ? (
+          {/* {showSkeleton ? (
             <Skeleton className='w-full h-9' />
           ) : (
             <SearchInput
@@ -352,7 +351,7 @@ const TaxonomyBrowser = ({
               placeholder={`Search ${label}`}
               disabled={showSkeleton}
             />
-          )}
+          )} */}
 
           <Card className='border-2'>
             <CardHeader className='py-2 bg-muted/30'>
@@ -495,6 +494,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     selectedContextId: globalContextId,
     setSelectedContextId: setGlobalContextId,
   } = useTaggingStore();
+  const { data: contexts } = useContexts({});
 
   // Local context selection. Initialise with the global context if one has
   // been chosen previously. This value will be mirrored back to the
@@ -596,46 +596,84 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   const isInitialLoading = isLoading || (!data && isFetching);
   const isUpdating = !!data && isFetching;
 
+  function convertContextOutToXbrlContext(contextOut: ContextOut): XbrlContext {
+    return {
+      id: contextOut.context_id, // Use context_id as the ID
+      label:
+        contextOut.entity_name ||
+        contextOut.entity_identifier ||
+        'Unnamed Context', // Fallback label
+      entityName: contextOut.entity_name || 'Unknown Entity', // Default name
+      entityIdentifier: contextOut.entity_identifier, // `entity_identifier` is crucial for unique identification
+      periodType: contextOut.period_type, // `period_type` is directly available
+      // Convert string dates to Date objects if not already Date objects
+      startDate: contextOut.start_date
+        ? new Date(contextOut.start_date)
+        : new Date('2023-01-01'),
+      endDate: contextOut.end_date
+        ? new Date(contextOut.end_date)
+        : new Date('2023-12-31'),
+      instantDate: contextOut.instant_date
+        ? new Date(contextOut.instant_date)
+        : new Date('2023-12-31'),
+      entityScheme: contextOut.entity_scheme || 'http://www.sec.gov/CIK', // Fallback to default entity scheme
+      createdAt: contextOut.created_at, // Use created_at from the API data
+      updatedAt: contextOut.updated_at, // Optional updated_at field
+    };
+  }
   const handleAddTag = useCallback(() => {
+    // Ensure both selectedBlockId and selectedConcept are set before proceeding
     if (!selectedBlockId || !selectedConcept) return;
+
+    // Get the selected context by contextId, or undefined if no context is selected
     const contextToUse = selectedContextId
-      ? sampleContexts.find((c) => c.id === selectedContextId)
+      ? contexts?.find((c) => c.context_id === selectedContextId)
       : undefined;
 
+    // Convert the context (if available) from ContextOut to XbrlContext
+    const convertedContext = contextToUse
+      ? convertContextOutToXbrlContext(contextToUse) // Convert ContextOut to XbrlContext
+      : undefined;
+
+    // Creating the new tag object
     const newTag: XbrlTag = {
-      id: generateUniqueId(),
+      id: generateUniqueId(), // Generate a unique ID for the tag
       concept: {
         id: selectedConcept.id,
         label: selectedConcept.label,
-        type: selectedConcept.type || 'string',
-        definition: selectedConcept.originalLabel || selectedConcept.label,
+        type: selectedConcept.type || 'string', // Default to 'string' if no type is set
+        definition: selectedConcept.originalLabel || selectedConcept.label, // Use the original label as the definition if available
         periodType:
-          (selectedConcept.periodType as 'instant' | 'duration') || 'duration',
-        dataType: selectedConcept.type || 'xbrli:stringItemType',
+          (selectedConcept.periodType as 'instant' | 'duration') || 'duration', // Default to 'duration' if no periodType is specified
+        dataType: selectedConcept.type || 'xbrli:stringItemType', // Default to 'xbrli:stringItemType'
         balance: undefined,
-        abstract: selectedConcept.abstract === 'true',
+        abstract: selectedConcept.abstract === 'true', // Ensure abstract is correctly handled
         labels: selectedConcept.originalLabel
-          ? [{ value: selectedConcept.originalLabel, role: 'label' }]
+          ? [{ value: selectedConcept.originalLabel, role: 'label' }] // Assign the original label to the concept
           : undefined,
-        references: undefined,
+        references: undefined, // Handle references if needed
       },
-      ...(contextToUse && { context: contextToUse }),
-      createdAt: new Date().toISOString(),
-      startIndex: highlightedText?.startIndex || 0,
-      endIndex: highlightedText?.endIndex || 0,
+      ...(convertedContext && { context: convertedContext }), // Attach converted context if it's available
+      createdAt: new Date().toISOString(), // Record creation timestamp
+      startIndex: highlightedText?.startIndex || 0, // Use the start index from the highlighted text
+      endIndex: highlightedText?.endIndex || 0, // Use the end index from the highlighted text
     };
 
+    // Update the report with the new tag added to the correct block
     const updatedReport: ReportDocument = {
       ...report,
       blocks: report.blocks.map((block) =>
         block.id === selectedBlockId
-          ? { ...block, tags: [...block.tags, newTag] }
+          ? { ...block, tags: [...block.tags, newTag] } // Add the new tag to the block's tags
           : block
       ),
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(), // Update the report's last modified timestamp
     };
 
+    // Apply the updated report to the global state (or parent component)
     onReportChange(updatedReport);
+
+    // Reset the selected concept and search query after applying the tag
     setSelectedConcept(null);
     setSearchQuery('');
   }, [
@@ -646,6 +684,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     highlightedText?.endIndex,
     onReportChange,
     report,
+    contexts, // Make sure to include contexts here for conversion
   ]);
 
   /* ------------------------------- Error UI ------------------------------- */
@@ -683,12 +722,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
   const ActiveIcon = TAB_META[activeTab].icon;
   const { data: myTaxonomies, isSuccess } = useMyTaxonomies();
-  const {
-    mutate: switchTaxonomy,
-    isPending: isSwitchLoading,
-    isError: isSwitchError,
-    error: switchError,
-  } = useSwitchTaxonomy({});
+  const { mutate: switchTaxonomy } = useSwitchTaxonomy({});
 
   const handleSwitchTaxonomy = () => {
     if (!value) return;
@@ -884,12 +918,20 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                     <SelectValue placeholder='Select a reporting context (optional)' />
                   </SelectTrigger>
                   <SelectContent>
-                    {sampleContexts.map((context) => (
-                      <SelectItem key={context.id} value={context.id}>
-                        <div className='flex flex-col items-start'>
-                          <span className='font-medium'>{context.label}</span>
-                          <span className='text-xs text-muted-foreground'>
-                            {context.entityName} • {context.periodType}
+                    {contexts?.map((context) => (
+                      <SelectItem key={context.id} value={context.context_id}>
+                        <div className='flex items-end '>
+                          <div className='flex flex-col items-start'>
+                            <span className='font-medium'>
+                              {context.entity_name || 'Unnamed Entity'}
+                            </span>
+                            <span className='text-xs text-muted-foreground'>
+                              {context.entity_identifier} •{' '}
+                              {context.period_type}
+                            </span>
+                          </div>
+                          <span className='text-[10px] text-muted-foreground'>
+                            Context ID: {context.context_id}
                           </span>
                         </div>
                       </SelectItem>
