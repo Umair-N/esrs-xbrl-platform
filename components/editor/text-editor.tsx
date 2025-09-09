@@ -61,6 +61,12 @@ export function TextEditor({
   onReportChange,
   onTextHighlight,
 }: TextEditorProps) {
+  // Bring in the tagging store actions. When a recommendation is chosen, we
+  // place the corresponding concept into the global store via setPendingConcept.
+  // The tagging panel reads this and preselects the concept for context
+  // assignment. We also expose the currently selected context ID should we
+  // choose to automatically create tags when a context is already selected.
+
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -108,6 +114,8 @@ export function TextEditor({
       ),
       updatedAt: new Date().toISOString(),
     };
+
+    console.log('Saving edited block:', updatedReport);
     onReportChange(updatedReport);
     setEditingBlockId(null);
 
@@ -199,8 +207,7 @@ export function TextEditor({
     reference: string;
     datatype: string;
   }) => {
-    // Guard against applying a tag when no text has been selected. Only
-    // proceed if there is an active selection.
+    // Guard against applying a tag when no text has been selected
     if (!highlightRange) return;
     // Create a minimal concept object from the recommendation. Additional
     // metadata (e.g. definition, period type) may be resolved by the
@@ -291,10 +298,12 @@ export function TextEditor({
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
-          <HoverCardContent className='w-80'>
+          <HoverCardContent className='w-80  '>
             <div className='space-y-3'>
-              <h4 className='text-base font-semibold'>{tag.concept.label}</h4>
-              <p className='text-sm leading-relaxed text-muted-foreground'>
+              <h4 className='text-base font-semibold break-words'>
+                {tag.concept.label}
+              </h4>
+              <p className='text-sm leading-relaxed text-muted-foreground break-words'>
                 {tag.concept.definition}
               </p>
               <div className='flex flex-wrap gap-2 pt-1'>
