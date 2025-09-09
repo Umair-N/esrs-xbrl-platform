@@ -373,26 +373,6 @@ const IXBRLViewer: React.FC = () => {
                   📁 Upload New
                 </button>
               </div>
-
-              {viewMode === 'document' && (
-                <div className='flex gap-1 items-center'>
-                  <button
-                    onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
-                    className='p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors'
-                  >
-                    <ZoomOut className='h-4 w-4' />
-                  </button>
-                  <span className='text-sm font-medium text-gray-600 min-w-[50px] text-center'>
-                    {zoomLevel}%
-                  </span>
-                  <button
-                    onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))}
-                    className='p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors'
-                  >
-                    <ZoomIn className='h-4 w-4' />
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -400,13 +380,13 @@ const IXBRLViewer: React.FC = () => {
         {/* Upload Section - Improved UI design */}
         {viewMode === 'upload' && (
           <div className='bg-white rounded-xl shadow-xl overflow-hidden max-w-4xl mx-auto'>
-            <div className='bg-gradient-to-r from-blue-600 to-indigo-700 p-8'>
+            <div className='bg-gradient-to-r from-emerald-600 to-teal-700 p-8'>
               <div className='text-center mb-6'>
                 <Upload className='mx-auto h-12 w-12 text-white/90 mb-3' />
                 <h3 className='text-2xl font-bold text-white mb-2'>
                   Upload iXBRL Document
                 </h3>
-                <p className='text-blue-100'>
+                <p className='text-emerald-100'>
                   Drag and drop your file or click to browse
                 </p>
               </div>
@@ -514,6 +494,7 @@ const IXBRLViewer: React.FC = () => {
           <div className='grid grid-cols-1 lg:grid-cols-4 gap-4'>
             {/* Main Document */}
             <div className='lg:col-span-3'>
+              bbr
               <div className='bg-white rounded-lg shadow-lg overflow-hidden'>
                 <div className='p-3 border-b bg-gray-50 flex items-center justify-between'>
                   <h3 className='font-bold text-gray-800 text-sm'>
