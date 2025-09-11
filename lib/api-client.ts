@@ -131,7 +131,8 @@ async function fetchApi<T>(
       }
     }
     if (typeof window !== 'undefined') {
-      showError({ title: 'Error!', message, duration: 2000 });
+      // showError({ title: 'Error!', message, duration: 2000 });
+      throw new Error(message);
     }
     throw new Error(message);
   }

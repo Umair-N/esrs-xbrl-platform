@@ -43,14 +43,14 @@ const navigation = [
     icon: Calendar,
     platform_access_needed: true,
   },
+  // {
+  //   name: 'Taxonomy',
+  //   href: '/taxonomy',
+  //   icon: BookOpen,
+  //   platform_access_needed: true,
+  // },
   {
-    name: 'Taxonomy',
-    href: '/taxonomy',
-    icon: BookOpen,
-    platform_access_needed: true,
-  },
-  {
-    name: 'XBRL Preview',
+    name: 'XBRL Viewer',
     href: '/xbrl-preview',
     icon: FileCode,
     platform_access_needed: true,
@@ -69,21 +69,21 @@ export function SiteHeader() {
   const { data: user } = useUser();
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-300 dark:border-slate-700/50">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
+    <header className='sticky top-0 z-50 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-300 dark:border-slate-700/50'>
+      <div className='container mx-auto px-6 py-4'>
+        <div className='flex items-center justify-between'>
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+          <Link href='/' className='flex items-center gap-3'>
+            <div className='w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center'>
+              <Sparkles className='w-5 h-5 text-white' />
             </div>
-            <span className="font-bold text-xl text-slate-900 dark:text-white">
+            <span className='font-bold text-xl text-slate-900 dark:text-white'>
               Brisk Flow
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          <nav className='hidden md:flex items-center space-x-8'>
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -105,42 +105,42 @@ export function SiteHeader() {
                     : 'text-slate-600 dark:text-slate-400'
                 )}
               >
-                {item.icon && <item.icon className="h-4 w-4" />}
+                {item.icon && <item.icon className='h-4 w-4' />}
                 {item.name}
               </Link>
             ))}
           </nav>
 
           {/* Right Side - Auth & Theme */}
-          <div className="flex items-center gap-4">
+          <div className='flex items-center gap-4'>
             {/* Auth Section */}
             <AdminAccess>
               <Link
-                href="/admin"
+                href='/admin'
                 className={`${buttonVariants(
                   {}
                 )} bg-gradient-to-r from-blue-600 to-purple-600 flex items-center gap-2 text-sm font-medium hover:scale-95 hover:bg-gradient-to-br hover:from-blue-600 hover:to-purple-600 duration-200 transition-all`}
               >
-                <Sparkles className="size-4" />
+                <Sparkles className='size-4' />
                 Admin
               </Link>
             </AdminAccess>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="relative rounded-full">
-                  <Avatar className="size-10">
+                <button className='relative rounded-full'>
+                  <Avatar className='size-10'>
                     <AvatarImage
                     // src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.username}`}
                     />
-                    <AvatarFallback className="text-lg font-medium bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    <AvatarFallback className='text-lg font-medium bg-gradient-to-br from-blue-500 to-purple-600 text-white'>
                       {getInitials(user?.full_name || user?.username)}
                     </AvatarFallback>
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel className="capitalize">
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel className='capitalize'>
                   {user?.full_name || user?.username}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -151,13 +151,13 @@ export function SiteHeader() {
                   {' '}
                   <Button
                     onClick={() => logoutMutation.mutate()}
-                    variant="ghost"
-                    size="sm"
+                    variant='ghost'
+                    size='sm'
                     disabled={logoutMutation.isPending}
-                    className="text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 disabled:opacity-50 py-1 h-5 w-full"
+                    className='text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 disabled:opacity-50 py-1 h-5 w-full'
                   >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">
+                    <LogOut className='w-4 h-4 mr-2' />
+                    <span className='hidden sm:inline'>
                       {logoutMutation.isPending ? 'Signing Out...' : 'Sign Out'}
                     </span>
                   </Button>
@@ -171,12 +171,12 @@ export function SiteHeader() {
             {/* Mobile Menu Trigger */}
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle menu</span>
+                <Button variant='ghost' size='icon' className='md:hidden'>
+                  <Menu className='h-5 w-5' />
+                  <span className='sr-only'>Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="pr-0">
+              <SheetContent side='left' className='pr-0'>
                 {/* <MobileNav
                   pathname={pathname}
                   setOpen={setOpen}
