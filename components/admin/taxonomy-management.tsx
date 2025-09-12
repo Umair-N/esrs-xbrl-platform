@@ -33,6 +33,9 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useAllTaxonomies } from '@/features/taxonomy/api/get-all-taxonomy-list';
 import { useUploadTaxonomy } from '@/features/taxonomy/api/upload-taxonomy';
+import { toast } from 'sonner';
+import { useEnableTaxonomy } from '@/features/taxonomy/api/enable-taxonomy';
+import { useDisableTaxonomy } from '@/features/taxonomy/api/disable-taxonomy';
 
 export type Taxonomy = {
   id: number;
@@ -62,19 +65,19 @@ type TaxonomyCardsProps = {
 const cn = (...classes: (string | boolean | undefined)[]): string =>
   classes.filter(Boolean).join(' ');
 
-const useEnableTaxonomy = ({ mutationConfig }: any) => ({
-  mutate: (variables: { taxonomyId: number }) => {
-    setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
-  },
-  isPending: false,
-});
+// const useEnableTaxonomy = ({ mutationConfig }: any) => ({
+//   mutate: (variables: { taxonomyId: number }) => {
+//     setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
+//   },
+//   isPending: false,
+// });
 
-const useDisableTaxonomy = ({ mutationConfig }: any) => ({
-  mutate: (variables: { taxonomyId: number }) => {
-    setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
-  },
-  isPending: false,
-});
+// const useDisableTaxonomy = ({ mutationConfig }: any) => ({
+//   mutate: (variables: { taxonomyId: number }) => {
+//     setTimeout(() => mutationConfig?.onSuccess?.({}, variables), 1000);
+//   },
+//   isPending: false,
+// });
 
 const uploadTaxonomy = async ({ name, file }: UploadTaxonomyPayload) => {
   const formData = new FormData();
@@ -90,11 +93,11 @@ const uploadTaxonomy = async ({ name, file }: UploadTaxonomyPayload) => {
 };
 
 // Toast mock
-const toast = {
-  success: (message: string) => console.log('Success:', message),
-  error: (message: string) => console.log('Error:', message),
-  info: (message: string) => console.log('Info:', message),
-};
+// const toast = {
+//   // success: (message: string) => console.log('Success:', message),
+//   error: (message: string) => console.log('Error:', message),
+//   info: (message: string) => console.log('Info:', message),
+// };
 
 function formatISODate(iso: string) {
   try {
@@ -550,12 +553,11 @@ export default function TaxonomyManagement() {
     [enableTaxonomy]
   );
 
-  const handleDisableTaxonomy = React.useCallback(
-    (taxonomyId: number) => {
-      disableTaxonomy({ taxonomyId });
-    },
-    [disableTaxonomy]
-  );
+  const handleDisableTaxonomy = (taxonomyId: number) => {
+    console.log(taxonomyId, 'id i here');
+
+    disableTaxonomy({ taxonomyId });
+  };
 
   // Filter and search logic
   const filteredTaxonomies = React.useMemo(() => {
