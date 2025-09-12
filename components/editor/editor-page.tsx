@@ -26,6 +26,16 @@ import {
   Sparkles,
   GripVertical,
 } from 'lucide-react';
+import { axiosInstance } from '@/lib/axios';
+import { toast } from 'sonner';
+
+// Lightweight definition of a saved session summary returned from the backend.
+interface SessionSummary {
+  id: string;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 /**
  * Merge multiple blocks of a report into a single block. This combines the
@@ -84,6 +94,10 @@ export default function EditorPage() {
     endIndex: number;
   } | null>(null);
 
+  // List of saved sessions for the current user. `null` means they haven't been loaded yet.
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
   /**
    * When the editor first mounts, attempt to restore any previously saved
    * session from localStorage. If a saved report exists and there is no
@@ -132,6 +146,31 @@ export default function EditorPage() {
     }
   }, [report]);
 
+  // Fetch saved sessions when no report is loaded. This effect runs once on mount
+  // and whenever the report changes to null. Errors are surfaced via toast.
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (sessions !== null || report) return;
+      setLoadingSessions(true);
+      try {
+        const res = await axiosInstance.get<SessionSummary[]>('/sessions');
+        setSessions(res.data);
+      } catch (err: any) {
+        console.error('Failed to fetch sessions', err);
+        toast.error('Failed to load saved sessions');
+        setSessions([]);
+      } finally {
+        setLoadingSessions(false);
+      }
+    };
+    if (!report) {
+      fetchSessions();
+    }
+    // We deliberately leave `sessions` and `report` out of the dependency array to avoid
+    // unnecessary re-fetching. eslint-disable-next-line is used to silence warnings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
+
   const handleReportLoaded = (newReport: ReportDocument) => {
     // Merge multiple blocks into a single block to avoid rendering
     // separate scrollable sections for each block. This preserves the
@@ -159,19 +198,156 @@ export default function EditorPage() {
     setHighlightedText({ text: selectedText, startIndex, endIndex });
   };
 
-  const handleSave = (savedReport: ReportDocument) => {
-    console.log('Report saved:', savedReport.title);
+  const handleSave = async (savedReport: ReportDocument) => {
+    try {
+      // Prompt the user for a name. Use the report title as a sensible default.
+      let sessionName =
+        prompt(
+          'Enter a name for this session',
+          savedReport.title ?? 'Untitled session'
+        ) ||
+        savedReport.title ||
+        'Untitled session';
+      if (!sessionName) {
+        sessionName = savedReport.title || 'Untitled session';
+      }
+      const sessionId = localStorage.getItem('xbrl-session-id');
+      if (sessionId) {
+        await axiosInstance.put(`/sessions/${sessionId}`, {
+          name: sessionName,
+          data: savedReport,
+        });
+        toast.success('Session updated successfully');
+      } else {
+        const res = await axiosInstance.post('/sessions', {
+          name: sessionName,
+          data: savedReport,
+        });
+        const newId = res.data?.id;
+        if (newId) {
+          localStorage.setItem('xbrl-session-id', newId);
+        }
+        toast.success('Session saved successfully');
+      }
+    } catch (err) {
+      console.error('Failed to save session', err);
+      toast.error('Failed to save session');
+    }
   };
 
   const handleReportChange = (updatedReport: ReportDocument) => {
     setReport(updatedReport);
   };
 
+  // Load an existing session by its ID. The report state and localStorage are updated.
+  const handleSessionSelect = async (sessionId: string) => {
+    try {
+      const res = await axiosInstance.get(`/sessions/${sessionId}`);
+      const session = res.data;
+      const reportData = session?.data as ReportDocument;
+      // Persist sessionId so future saves update instead of creating new
+      localStorage.setItem('xbrl-session-id', sessionId);
+      // Merge blocks to maintain consistency
+      const merged = mergeReportBlocks(reportData);
+      setReport(merged);
+      if (merged.blocks && merged.blocks.length > 0) {
+        setSelectedBlockId(merged.blocks[0].id);
+      }
+      // Persist to local storage as well
+      localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
+    } catch (err) {
+      console.error('Failed to load session', err);
+      toast.error('Failed to load session');
+    }
+  };
+
   // Upload state - no document loaded
   if (!report) {
+    // If sessions are still loading, display a loading indicator
+    if (sessions === null || loadingSessions) {
+      return (
+        <div
+          className='flex items-center justify-center flex-1 mt-1 mb-1'
+          style={{ height: 'calc(100vh - 80px)' }}
+        >
+          <p className='text-sm text-muted-foreground'>
+            Loading your sessions…
+          </p>
+        </div>
+      );
+    }
+    // Present a list of saved sessions, if any exist
+    if (sessions.length > 0) {
+      return (
+        <div
+          className='flex items-center justify-center flex-1 mt-1 mb-1'
+          style={{ height: 'calc(100vh - 80px)' }}
+        >
+          <div className='w-full max-w-4xl space-y-4'>
+            <Card className='border shadow-none bg-white/80 dark:bg-slate-800/80'>
+              <CardHeader>
+                <CardTitle className='flex items-center justify-between text-lg'>
+                  <span>Your Sessions</span>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => {
+                      // Clear any persisted session state and show file uploader
+                      localStorage.removeItem('xbrl-editor-session');
+                      localStorage.removeItem('xbrl-session-id');
+                      setReport(null);
+                      setSelectedBlockId(null);
+                      // Set sessions to an empty array rather than null to avoid
+                      // triggering the "Loading your sessions…" state. When
+                      // sessions is null the effect hook skips fetching due to a
+                      // stale closure and the UI shows loading indefinitely. Use
+                      // an empty list to indicate no saved sessions and fall back
+                      // to the file uploader.
+                      setSessions([]);
+                    }}
+                  >
+                    New Document
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-2'>
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className='flex items-center justify-between p-2 border rounded cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700'
+                    onClick={() => handleSessionSelect(s.id)}
+                  >
+                    <div>
+                      <p className='font-medium'>{s.name}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Last updated&nbsp;
+                        {s.updated_at
+                          ? new Date(s.updated_at).toLocaleString()
+                          : 'n/a'}
+                      </p>
+                    </div>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSessionSelect(s.id);
+                      }}
+                    >
+                      Open
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+    // Otherwise, there are no sessions. Show the file uploader.
     return (
       <div
-        className='flex-1 flex items-center justify-center mt-1 mb-1'
+        className='flex items-center justify-center flex-1 mt-1 mb-1'
         style={{ height: 'calc(100vh - 80px)' }}
       >
         <div className='w-full max-w-4xl'>
@@ -195,7 +371,7 @@ export default function EditorPage() {
 
   return (
     <div
-      className='bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col'
+      className='flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'
       style={{ height: 'calc(100vh - 80px)' }}
     >
       {/* Main Content with Resizable Panels - NO PADDING */}
@@ -205,23 +381,23 @@ export default function EditorPage() {
       >
         {/* Left Panel - Document Editor */}
         <ResizablePanel defaultSize={50} minSize={40}>
-          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
-            <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-1 pt-1 pl-3'>
+          <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'>
+            <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20'>
               <CardTitle className='flex items-center gap-3 text-lg'>
                 <div className='p-2 bg-blue-500 rounded-lg'>
-                  <BookOpen className='h-5 w-5 text-white' />
+                  <BookOpen className='w-5 h-5 text-white' />
                 </div>
                 <div>
-                  <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
+                  <span className='p-0 text-transparent bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text'>
                     Document Content
                   </span>
-                  <p className='text-sm text-muted-foreground font-normal mt-1'>
+                  <p className='mt-1 text-sm font-normal text-muted-foreground'>
                     Select text to add tags
                   </p>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className='flex-1 p-0 mt-2 h-screen'>
+            <CardContent className='flex-1 h-screen p-0 mt-2'>
               <TextEditor
                 report={report}
                 selectedBlockId={selectedBlockId}
@@ -236,10 +412,10 @@ export default function EditorPage() {
         {/* Resizable Handle */}
         <ResizableHandle
           withHandle
-          className='bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors'
+          className='transition-colors bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
         >
           <div className='flex items-center justify-center h-full'>
-            <GripVertical className='h-4 w-4 text-slate-500' />
+            <GripVertical className='w-4 h-4 text-slate-500' />
           </div>
         </ResizableHandle>
 
@@ -248,18 +424,18 @@ export default function EditorPage() {
           <ResizablePanelGroup direction='vertical' className='h-full'>
             {/* Top Panel - Tagging Tools */}
             <ResizablePanel defaultSize={45} minSize={30}>
-              <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
-                <CardHeader className='flex-shrink-0 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 pb-1 pt-1 pl-3'>
+              <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'>
+                <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20'>
                   <CardTitle className='flex items-center justify-between gap-3 text-lg'>
                     <div className='flex items-center gap-3'>
-                      <div className='p-2 bg-emerald-500 rounded-lg'>
-                        <Tags className='h-5 w-5 text-white' />
+                      <div className='p-2 rounded-lg bg-emerald-500'>
+                        <Tags className='w-5 h-5 text-white' />
                       </div>
                       <div>
-                        <span className='bg-gradient-to-r from-emerald-700 to-green-700 dark:from-emerald-300 dark:to-green-300 bg-clip-text text-transparent p-0'>
+                        <span className='p-0 text-transparent bg-gradient-to-r from-emerald-700 to-green-700 dark:from-emerald-300 dark:to-green-300 bg-clip-text'>
                           XBRL Tagging Tools
                         </span>
-                        <p className='text-sm text-muted-foreground font-normal mt-1'>
+                        <p className='mt-1 text-sm font-normal text-muted-foreground'>
                           Tag selected text with XBRL elements
                         </p>
                       </div>
@@ -271,49 +447,55 @@ export default function EditorPage() {
                         // Clear any persisted editor state before starting a new document
                         if (typeof window !== 'undefined') {
                           localStorage.removeItem('xbrl-editor-session');
+                          localStorage.removeItem('xbrl-session-id');
                         }
                         setReport(null);
                         setSelectedBlockId(null);
+                        // Reset sessions to an empty array rather than null. When
+                        // sessions is null the effect hook skips fetching due to a stale closure
+                        // and the UI shows "Loading your sessions…" indefinitely. Use an
+                        // empty list to indicate no saved sessions.
+                        setSessions([]);
                       }}
-                      className='gap-2 h-9 px-4 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0'
+                      className='flex-shrink-0 gap-2 px-4 transition-colors h-9 hover:bg-slate-100 dark:hover:bg-slate-700'
                     >
-                      <Upload className='h-4 w-4' />
+                      <Upload className='w-4 h-4' />
                       New Document
                     </Button>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className='flex-1 p-0 min-h-0 mt-1'>
+                <CardContent className='flex-1 min-h-0 p-0 mt-1'>
                   <Tabs
                     defaultValue='tagging'
-                    className='w-full h-full flex flex-col'
+                    className='flex flex-col w-full h-full'
                   >
-                    <TabsList className='grid w-full grid-cols-3 mx-4 my-2  bg-slate-100 dark:bg-slate-700 flex-shrink-0'>
+                    <TabsList className='grid flex-shrink-0 w-full grid-cols-3 mx-4 my-2 bg-slate-100 dark:bg-slate-700'>
                       <TabsTrigger
                         value='tagging'
                         className='gap-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white'
                       >
-                        <Tags className='h-3 w-3' />
+                        <Tags className='w-3 h-3' />
                         Tag
                       </TabsTrigger>
                       <TabsTrigger
                         value='export'
                         className='gap-2 text-xs data-[state=active]:bg-blue-500 data-[state=active]:text-white'
                       >
-                        <Save className='h-3 w-3' />
+                        <Save className='w-3 h-3' />
                         Export
                       </TabsTrigger>
                       <TabsTrigger
                         value='settings'
                         className='gap-2 text-xs data-[state=active]:bg-purple-500 data-[state=active]:text-white'
                       >
-                        <Settings className='h-3 w-3' />
+                        <Settings className='w-3 h-3' />
                         Settings
                       </TabsTrigger>
                     </TabsList>
 
                     <TabsContent
                       value='tagging'
-                      className='mx-2 mt-0 mb-0 flex-1 min-h-0'
+                      className='flex-1 min-h-0 mx-2 mt-0 mb-0'
                     >
                       <div className='h-full overflow-y-auto'>
                         <TaggingPanel
@@ -327,7 +509,7 @@ export default function EditorPage() {
 
                     <TabsContent
                       value='export'
-                      className='mx-4 mt-0 mb-4 flex-1 min-h-0'
+                      className='flex-1 min-h-0 mx-4 mt-0 mb-4'
                     >
                       <div className='h-full overflow-y-auto'>
                         <SaveExportPanel report={report} onSave={handleSave} />
@@ -336,16 +518,16 @@ export default function EditorPage() {
 
                     <TabsContent
                       value='settings'
-                      className='mx-4 mt-0 mb-4 flex-1 min-h-0'
+                      className='flex-1 min-h-0 mx-4 mt-0 mb-4'
                     >
-                      <div className='h-full flex flex-col justify-center items-center text-center'>
-                        <div className='p-4 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-full mb-4 shadow-lg'>
-                          <Settings className='h-6 w-6 text-purple-600' />
+                      <div className='flex flex-col items-center justify-center h-full text-center'>
+                        <div className='p-4 mb-4 rounded-full shadow-lg bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20'>
+                          <Settings className='w-6 h-6 text-purple-600' />
                         </div>
-                        <h3 className='font-semibold mb-3 text-base'>
+                        <h3 className='mb-3 text-base font-semibold'>
                           Configure Context
                         </h3>
-                        <p className='text-sm text-muted-foreground mb-4 max-w-sm leading-relaxed'>
+                        <p className='max-w-sm mb-4 text-sm leading-relaxed text-muted-foreground'>
                           Set up tagging contexts and AI models to improve
                           accuracy.
                         </p>
@@ -353,10 +535,10 @@ export default function EditorPage() {
                           variant='outline'
                           size='sm'
                           asChild
-                          className='hover:bg-purple-50 hover:border-purple-300 bg-transparent'
+                          className='bg-transparent hover:bg-purple-50 hover:border-purple-300'
                         >
                           <a href='/contexts' className='gap-2'>
-                            <Settings className='h-4 w-4' />
+                            <Settings className='w-4 h-4' />
                             Manage Contexts
                           </a>
                         </Button>
@@ -370,32 +552,32 @@ export default function EditorPage() {
             {/* Vertical Resizable Handle */}
             <ResizableHandle
               withHandle
-              className='bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors'
+              className='transition-colors bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
             >
               <div className='flex items-center justify-center w-full'>
-                <div className='w-4 h-1 bg-slate-400 rounded-full'></div>
+                <div className='w-4 h-1 rounded-full bg-slate-400'></div>
               </div>
             </ResizableHandle>
 
             {/* Bottom Panel - Tagged Facts */}
             <ResizablePanel defaultSize={55} minSize={30}>
-              <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none '>
-                <CardHeader className='flex-shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 pb-1 pt-1 pl-3'>
+              <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm '>
+                <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20'>
                   <CardTitle className='flex items-center gap-3 text-lg'>
                     <div className='p-2 bg-purple-500 rounded-lg'>
-                      <Sparkles className='h-5 w-5 text-white' />
+                      <Sparkles className='w-5 h-5 text-white' />
                     </div>
                     <div className='flex-1'>
-                      <span className='bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-300 dark:to-pink-300 bg-clip-text text-transparent p-0'>
+                      <span className='p-0 text-transparent bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-300 dark:to-pink-300 bg-clip-text'>
                         Tagged Facts
                       </span>
-                      <p className='text-sm text-muted-foreground font-normal mt-1'>
+                      <p className='mt-1 text-sm font-normal text-muted-foreground'>
                         Review and manage tagged elements
                       </p>
                       {totalTags > 0 && (
                         <Badge
                           variant='secondary'
-                          className='ml-0 mt-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                          className='mt-1 ml-0 text-purple-800 bg-purple-100 dark:bg-purple-900 dark:text-purple-200'
                         >
                           {totalTags} facts
                         </Badge>
@@ -403,9 +585,9 @@ export default function EditorPage() {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className='flex-1 p-0 min-h-0 mt-2'>
+                <CardContent className='flex-1 min-h-0 p-0 mt-2'>
                   <div className='h-full mx-4 mb-4'>
-                    <div className='h-full bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10 rounded-xl border-2 border-dashed border-purple-200 dark:border-purple-800 p-4 overflow-hidden shadow-inner'>
+                    <div className='h-full p-4 overflow-hidden border-2 border-purple-200 border-dashed shadow-inner bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10 rounded-xl dark:border-purple-800'>
                       <div className='h-full overflow-y-auto'>
                         <TaggedFactsList
                           report={report}
