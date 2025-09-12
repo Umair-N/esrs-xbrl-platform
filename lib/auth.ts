@@ -64,10 +64,12 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: userQueryKey });
       localStorage.removeItem('xbrl-editor-session')
+      localStorage.removeItem('xbrl-session-id')
       onSuccess?.();
     },
     onSettled: () => {
       localStorage.removeItem('xbrl-editor-session')
+      localStorage.removeItem('xbrl-session-id')
     }
   });
 };

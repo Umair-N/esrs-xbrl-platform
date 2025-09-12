@@ -1,4 +1,4 @@
-from api.v1.endpoints import auth, reports, users, stats, taxonomy_admin, taxonomy, context
+from api.v1.endpoints import auth, reports, users, stats, taxonomy_admin, taxonomy, context, session
 from fastapi import APIRouter
 
 
@@ -11,4 +11,5 @@ api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
 api_router.include_router(taxonomy.taxonomy_router, prefix="/taxonomy", tags=["taxonomy"])
 api_router.include_router(taxonomy_admin.taxonomy_admin, tags=["taxonomy-admin"])
 api_router.include_router(context.router, prefix="/contexts", tags=["context"])
+api_router.include_router(session.router, prefix="/sessions", tags=["sessions"])
 
