@@ -275,7 +275,7 @@ export default function EditorPage() {
     if (sessions === null || loadingSessions) {
       return (
         <div
-          className='flex items-center justify-center flex-1 mt-1 mb-1'
+          className='flex-1 flex items-center justify-center mt-1 mb-1'
           style={{ height: 'calc(100vh - 80px)' }}
         >
           <p className='text-sm text-muted-foreground'>
@@ -288,7 +288,7 @@ export default function EditorPage() {
     if (sessions.length > 0) {
       return (
         <div
-          className='flex items-center justify-center flex-1 mt-1 mb-1'
+          className='flex-1 flex items-center justify-center mt-1 mb-1'
           style={{ height: 'calc(100vh - 80px)' }}
         >
           <div className='w-full max-w-4xl space-y-4'>
@@ -355,7 +355,7 @@ export default function EditorPage() {
     // Otherwise, there are no sessions. Show the file uploader.
     return (
       <div
-        className='flex items-center justify-center flex-1 mt-1 mb-1'
+        className='flex-1 flex items-center justify-center mt-1 mb-1'
         style={{ height: 'calc(100vh - 80px)' }}
       >
         <div className='w-full max-w-4xl'>
@@ -379,7 +379,7 @@ export default function EditorPage() {
 
   return (
     <div
-      className='flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'
+      className='bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col'
       style={{ height: 'calc(100vh - 80px)' }}
     >
       {/* Main Content with Resizable Panels - NO PADDING */}
@@ -389,23 +389,23 @@ export default function EditorPage() {
       >
         {/* Left Panel - Document Editor */}
         <ResizablePanel defaultSize={50} minSize={40}>
-          <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'>
-            <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20'>
+          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
+            <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-1 pt-1 pl-3'>
               <CardTitle className='flex items-center gap-3 text-lg'>
                 <div className='p-2 bg-blue-500 rounded-lg'>
-                  <BookOpen className='w-5 h-5 text-white' />
+                  <BookOpen className='h-5 w-5 text-white' />
                 </div>
                 <div>
-                  <span className='p-0 text-transparent bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text'>
+                  <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
                     Document Content
                   </span>
-                  <p className='mt-1 text-sm font-normal text-muted-foreground'>
+                  <p className='text-sm text-muted-foreground font-normal mt-1'>
                     Select text to add tags
                   </p>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className='flex-1 h-screen p-0 mt-2'>
+            <CardContent className='flex-1 p-0 mt-2 h-screen'>
               <TextEditor
                 report={report}
                 selectedBlockId={selectedBlockId}
@@ -420,27 +420,27 @@ export default function EditorPage() {
         {/* Resizable Handle */}
         <ResizableHandle
           withHandle
-          className='transition-colors bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
+          className='bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors'
         >
           <div className='flex items-center justify-center h-full'>
-            <GripVertical className='w-4 h-4 text-slate-500' />
+            <GripVertical className='h-4 w-4 text-slate-500' />
           </div>
         </ResizableHandle>
 
         {/* Right Panel - Tools Only (no more vertical split) */}
         <ResizablePanel defaultSize={50} minSize={30}>
-          <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm'>
-            <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20'>
+          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
+            <CardHeader className='flex-shrink-0 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 pb-1 pt-1 pl-3'>
               <CardTitle className='flex items-center justify-between gap-3 text-lg'>
                 <div className='flex items-center gap-3'>
-                  <div className='p-2 rounded-lg bg-emerald-500'>
-                    <Tags className='w-5 h-5 text-white' />
+                  <div className='p-2 bg-emerald-500 rounded-lg'>
+                    <Tags className='h-5 w-5 text-white' />
                   </div>
                   <div>
-                    <span className='p-0 text-transparent bg-gradient-to-r from-emerald-700 to-green-700 dark:from-emerald-300 dark:to-green-300 bg-clip-text'>
+                    <span className='bg-gradient-to-r from-emerald-700 to-green-700 dark:from-emerald-300 dark:to-green-300 bg-clip-text text-transparent p-0'>
                       XBRL Tagging Tools
                     </span>
-                    <p className='mt-1 text-sm font-normal text-muted-foreground'>
+                    <p className='text-sm text-muted-foreground font-normal mt-1'>
                       Tag selected text with XBRL elements
                     </p>
                   </div>
@@ -454,14 +454,14 @@ export default function EditorPage() {
                       <Button
                         variant='outline'
                         size='sm'
-                        className='flex-shrink-0 gap-2 px-4 transition-colors h-9 hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-900/20'
+                        className='gap-2 h-9 px-4 hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-900/20 transition-colors flex-shrink-0'
                       >
-                        <Sparkles className='w-4 h-4' />
+                        <Sparkles className='h-4 w-4' />
                         View Tagged Facts
                         {totalTags > 0 && (
                           <Badge
                             variant='secondary'
-                            className='ml-1 text-purple-800 bg-purple-100 dark:bg-purple-900 dark:text-purple-200'
+                            className='ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                           >
                             {totalTags}
                           </Badge>
@@ -472,16 +472,16 @@ export default function EditorPage() {
                       <DialogHeader>
                         <DialogTitle className='flex items-center gap-3'>
                           <div className='p-2 bg-purple-500 rounded-lg'>
-                            <Sparkles className='w-5 h-5 text-white' />
+                            <Sparkles className='h-5 w-5 text-white' />
                           </div>
                           <div>
-                            <span className='text-transparent bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-300 dark:to-pink-300 bg-clip-text'>
+                            <span className='bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-300 dark:to-pink-300 bg-clip-text text-transparent'>
                               Tagged Facts
                             </span>
                             {totalTags > 0 && (
                               <Badge
                                 variant='secondary'
-                                className='ml-2 text-purple-800 bg-purple-100 dark:bg-purple-900 dark:text-purple-200'
+                                className='ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                               >
                                 {totalTags} facts
                               </Badge>
@@ -520,46 +520,46 @@ export default function EditorPage() {
                       // empty list to indicate no saved sessions.
                       setSessions([]);
                     }}
-                    className='flex-shrink-0 gap-2 px-4 transition-colors h-9 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    className='gap-2 h-9 px-4 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0'
                   >
-                    <Upload className='w-4 h-4' />
+                    <Upload className='h-4 w-4' />
                     New Document
                   </Button>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className='flex-1 min-h-0 p-0 mt-1'>
+            <CardContent className='flex-1 p-0 min-h-0 mt-1'>
               <Tabs
                 defaultValue='tagging'
-                className='flex flex-col w-full h-full'
+                className='w-full h-full flex flex-col'
               >
-                <TabsList className='grid flex-shrink-0 w-full grid-cols-2 mx-4 my-2 bg-slate-100 dark:bg-slate-700'>
+                <TabsList className='grid w-full grid-cols-2 mx-4 my-2  bg-slate-100 dark:bg-slate-700 flex-shrink-0'>
                   <TabsTrigger
                     value='tagging'
                     className='gap-2 text-xs data-[state=active]:bg-emerald-500 data-[state=active]:text-white'
                   >
-                    <Tags className='w-3 h-3' />
+                    <Tags className='h-3 w-3' />
                     Tag
                   </TabsTrigger>
                   <TabsTrigger
                     value='export'
                     className='gap-2 text-xs data-[state=active]:bg-blue-500 data-[state=active]:text-white'
                   >
-                    <Save className='w-3 h-3' />
+                    <Save className='h-3 w-3' />
                     Export
                   </TabsTrigger>
                   {/* <TabsTrigger
                     value='settings'
                     className='gap-2 text-xs data-[state=active]:bg-purple-500 data-[state=active]:text-white'
                   >
-                    <Settings className='w-3 h-3' />
+                    <Settings className='h-3 w-3' />
                     Settings
                   </TabsTrigger> */}
                 </TabsList>
 
                 <TabsContent
                   value='tagging'
-                  className='flex-1 min-h-0 mx-2 mt-0 mb-0'
+                  className='mx-2 mt-0 mb-0 flex-1 min-h-0'
                 >
                   <div className='h-full overflow-y-auto'>
                     <TaggingPanel
@@ -573,7 +573,7 @@ export default function EditorPage() {
 
                 <TabsContent
                   value='export'
-                  className='flex-1 min-h-0 mx-4 mt-0 mb-4'
+                  className='mx-4 mt-0 mb-4 flex-1 min-h-0'
                 >
                   <div className='h-full overflow-y-auto'>
                     <SaveExportPanel report={report} onSave={handleSave} />
@@ -582,26 +582,26 @@ export default function EditorPage() {
 
                 <TabsContent
                   value='settings'
-                  className='flex-1 min-h-0 mx-4 mt-0 mb-4'
+                  className='mx-4 mt-0 mb-4 flex-1 min-h-0'
                 >
-                  <div className='flex flex-col items-center justify-center h-full text-center'>
-                    <div className='p-4 mb-4 rounded-full shadow-lg bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20'>
-                      <Settings className='w-6 h-6 text-purple-600' />
+                  <div className='h-full flex flex-col justify-center items-center text-center'>
+                    <div className='p-4 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-full mb-4 shadow-lg'>
+                      <Settings className='h-6 w-6 text-purple-600' />
                     </div>
-                    <h3 className='mb-3 text-base font-semibold'>
+                    <h3 className='font-semibold mb-3 text-base'>
                       Configure Context
                     </h3>
-                    <p className='max-w-sm mb-4 text-sm leading-relaxed text-muted-foreground'>
+                    <p className='text-sm text-muted-foreground mb-4 max-w-sm leading-relaxed'>
                       Set up tagging contexts and AI models to improve accuracy.
                     </p>
                     <Button
                       variant='outline'
                       size='sm'
                       asChild
-                      className='bg-transparent hover:bg-purple-50 hover:border-purple-300'
+                      className='hover:bg-purple-50 hover:border-purple-300 bg-transparent'
                     >
                       <a href='/contexts' className='gap-2'>
-                        <Settings className='w-4 h-4' />
+                        <Settings className='h-4 w-4' />
                         Manage Contexts
                       </a>
                     </Button>
@@ -611,63 +611,6 @@ export default function EditorPage() {
             </CardContent>
           </Card>
         </ResizablePanel>
-
-        {/* Vertical Resizable Handle */}
-        <ResizableHandle
-          withHandle
-          className='transition-colors bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'
-        >
-          <div className='flex items-center justify-center w-full'>
-            <div className='w-4 h-1 rounded-full bg-slate-400'></div>
-          </div>
-        </ResizableHandle>
-
-        {/* Bottom Panel - Tagged Facts */}
-        <ResizablePanel defaultSize={55} minSize={30}>
-          <Card className='flex flex-col h-full border-0 rounded-none shadow-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm '>
-            <CardHeader className='flex-shrink-0 pt-1 pb-1 pl-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20'>
-              <CardTitle className='flex items-center gap-3 text-lg'>
-                <div className='p-2 bg-purple-500 rounded-lg'>
-                  <Sparkles className='w-5 h-5 text-white' />
-                </div>
-                <div className='flex-1'>
-                  <span className='p-0 text-transparent bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-300 dark:to-pink-300 bg-clip-text'>
-                    Tagged Facts
-                  </span>
-                  <p className='mt-1 text-sm font-normal text-muted-foreground'>
-                    Review and manage tagged elements
-                  </p>
-                  {totalTags > 0 && (
-                    <Badge
-                      variant='secondary'
-                      className='mt-1 ml-0 text-purple-800 bg-purple-100 dark:bg-purple-900 dark:text-purple-200'
-                    >
-                      {totalTags} facts
-                    </Badge>
-                  )}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className='flex-1 min-h-0 p-0 mt-2'>
-              <div className='h-full mx-4 mb-4'>
-                <div className='h-full p-4 overflow-hidden border-2 border-purple-200 border-dashed shadow-inner bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10 rounded-xl dark:border-purple-800'>
-                  <div className='h-full overflow-y-auto'>
-                    <TaggedFactsList
-                      report={report}
-                      onBlockSelect={(blockId: string) => {
-                        setSelectedBlockId(blockId);
-                        setHighlightedText(null);
-                      }}
-                      onReportChange={handleReportChange}
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </ResizablePanel>
-        {/* </ResizablePanelGroup>
-        </ResizablePanel> */}
       </ResizablePanelGroup>
     </div>
   );

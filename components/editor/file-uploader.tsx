@@ -2,20 +2,9 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
-import {
-  Upload,
-  FileText,
-  Clipboard,
-  Loader2,
-  CloudUpload,
-  File,
-  CheckCircle,
-} from 'lucide-react';
+import { FileText, CloudUpload, File, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Card,
   CardContent,
@@ -33,10 +22,12 @@ interface FileUploaderProps {
 }
 
 export function FileUploader({ onReportLoaded }: FileUploaderProps) {
-  const [rawText, setRawText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [processingStage, setProcessingStage] = useState<
+    'uploading' | 'processing' | 'complete'
+  >('uploading');
 
   const getAuthToken = () => {
     return localStorage.getItem('access_token') || '';
@@ -62,8 +53,6 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     }
   };
 
-  // Ensure you import the fetchApi correctly
-
   const handleFileProcess = async (file: File) => {
     const allowedTypes = [
       'application/pdf',
@@ -78,41 +67,22 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       return;
     }
 
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize = 60 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error('File too large', {
-        description: 'File size must be less than 10MB',
+        description: 'File size must be less than 60MB',
       });
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
+    setProcessingStage('uploading');
 
-    // Create a new FormData object and append the file
     const formData = new FormData();
     formData.append('file', file);
 
-    // Simulating progress for the file upload
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev < 30) return prev + 5;
-        if (prev < 70) return prev + 2;
-        if (prev < 90) return prev + 1;
-        return prev;
-      });
-    }, 500);
-
-    // Show processing message after 5 seconds
-    const messageTimeout = setTimeout(() => {
-      toast.info('Still processing...', {
-        description: 'Large documents may take up to 2 minutes to process',
-        duration: 5000,
-      });
-    }, 5000);
-
     try {
-      // Make the request using fetchApi
       const response = await axiosInstance.post('/reports/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -122,16 +92,18 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            setUploadProgress(Math.min(percentCompleted, 95)); // Update progress bar
+            setUploadProgress(percentCompleted);
+
+            if (percentCompleted === 100) {
+              setProcessingStage('processing');
+            }
           }
         },
       });
 
-      clearInterval(progressInterval);
-      clearTimeout(messageTimeout);
+      setProcessingStage('complete');
       setUploadProgress(100);
 
-      // Assuming the response data is the report object
       const reportData = response.data;
 
       toast.success('Upload successful!', {
@@ -174,6 +146,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      setProcessingStage('uploading');
     }
   };
 
@@ -187,95 +160,16 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     event.target.value = '';
   };
 
-  const handleTextSubmit = async () => {
-    if (!rawText.trim()) {
-      toast.error('Empty text', {
-        description: 'Please enter some text',
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    // Create AbortController for request cancellation
-    const controller = new AbortController();
-
-    try {
-      // Progress simulation for text processing
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev < 50) return prev + 8;
-          if (prev < 85) return prev + 3;
-          return prev;
-        });
-      }, 300);
-
-      // Show processing message for long operations
-      const messageTimeout = setTimeout(() => {
-        toast.info('Processing text...', {
-          description: 'Analyzing content for compliance',
-          duration: 3000,
-        });
-      }, 3000);
-
-      const response = await axiosInstance.post(
-        '/reports/text',
-        {
-          text: rawText,
-          title: 'Pasted Report',
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${getAuthToken()}`,
-          },
-          timeout: 60000, // 1 minute timeout for text processing
-          signal: controller.signal,
-        }
-      );
-
-      clearInterval(progressInterval);
-      clearTimeout(messageTimeout);
-      setUploadProgress(100);
-
-      const reportData: ReportDocument = response.data;
-
-      toast.success('Processing complete!', {
-        description: 'Successfully processed pasted text',
-        icon: <CheckCircle className='h-4 w-4' />,
-      });
-
-      onReportLoaded(reportData);
-      setRawText('');
-    } catch (error: any) {
-      console.error('Text processing error:', error);
-
-      let message = 'Processing failed';
-      let description = 'Please try again';
-
-      if (error.name === 'AbortError') {
-        message = 'Processing cancelled';
-        description = 'The processing was cancelled';
-      } else if (
-        error.code === 'ECONNABORTED' ||
-        error.message.includes('timeout')
-      ) {
-        message = 'Processing timeout';
-        description =
-          'The text processing took too long. Try with shorter text';
-      } else {
-        const serverMessage =
-          error.response?.data?.detail || error.response?.data?.message;
-        if (serverMessage) {
-          description = serverMessage;
-        }
-      }
-
-      toast.error(message, { description });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
+  const getProgressMessage = () => {
+    switch (processingStage) {
+      case 'uploading':
+        return 'Uploading your document...';
+      case 'processing':
+        return 'Processing and analyzing content...';
+      case 'complete':
+        return 'Processing complete!';
+      default:
+        return 'Processing your document...';
     }
   };
 
@@ -283,42 +177,46 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
     <div className='h-full'>
       <Card className='border-0 shadow-lg h-full'>
         <CardHeader className='text-center pb-6'>
-          <div className='mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4'>
+          <div className='mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center mb-4 shadow-lg'>
             <CloudUpload className='h-8 w-8 text-white' />
           </div>
-          <CardTitle className='text-2xl'>Upload Your Report</CardTitle>
-          <CardDescription className='text-base'>
-            Upload a PDF or DOCX file to extract content for tagging
+          <CardTitle className='text-2xl font-bold text-slate-900 dark:text-slate-100'>
+            Upload Your Report
+          </CardTitle>
+          <CardDescription className='text-base text-slate-600 dark:text-slate-400'>
+            Upload a PDF or DOCX file for analysis
           </CardDescription>
         </CardHeader>
 
         <CardContent className='flex-1'>
           <div
-            className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 h-64 ${
+            className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 h-64 cursor-pointer ${
               dragActive
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                ? 'border-blue-600 bg-blue-100 dark:bg-blue-900/50'
                 : isUploading
-                  ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
-                  : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  ? 'border-emerald-600 bg-emerald-100 dark:bg-emerald-900/50'
+                  : 'border-slate-400 dark:border-slate-500 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
+            onClick={() =>
+              !isUploading && document.getElementById('file-upload')?.click()
+            }
           >
             {isUploading ? (
               <div className='space-y-4 w-full max-w-xs'>
-                <div className='animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent mx-auto' />
+                <div className='animate-spin rounded-full h-12 w-12 border-4 border-green-600 border-t-transparent mx-auto' />
                 <div className='space-y-2'>
-                  <p className='text-sm font-medium text-green-700 dark:text-green-400'>
-                    Processing your document...
+                  <p className='text-sm font-semibold text-green-700 dark:text-green-300'>
+                    {getProgressMessage()}
                   </p>
                   <Progress value={uploadProgress} className='h-2' />
-                  <p className='text-xs text-muted-foreground'>
-                    {uploadProgress}% complete
-                  </p>
-                  <p className='text-xs text-muted-foreground'>
-                    Large files may take up to 2 minutes
+                  <p className='text-xs text-slate-600 dark:text-slate-400'>
+                    {processingStage === 'uploading'
+                      ? `${uploadProgress}% uploaded`
+                      : 'Processing...'}
                   </p>
                 </div>
               </div>
@@ -327,24 +225,22 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
                 <div
                   className={`p-4 rounded-full mb-4 transition-colors ${
                     dragActive
-                      ? 'bg-blue-100 dark:bg-blue-900'
-                      : 'bg-slate-100 dark:bg-slate-800'
+                      ? 'bg-blue-200 dark:bg-blue-800'
+                      : 'bg-slate-200 dark:bg-slate-700'
                   }`}
                 >
                   <File
-                    className={`h-8 w-8 ${
-                      dragActive ? 'text-blue-600' : 'text-slate-500'
-                    }`}
+                    className={`h-8 w-8 ${dragActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}
                   />
                 </div>
-                <h3 className='text-lg font-semibold mb-2'>
+                <h3 className='text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200'>
                   {dragActive
                     ? 'Drop your file here'
                     : 'Choose a file or drag it here'}
                 </h3>
-                <p className='text-muted-foreground mb-6 max-w-sm'>
-                  Supports PDF and DOCX files up to 10MB. Processing may take
-                  1-2 minutes for large documents.
+                <p className='text-slate-600 dark:text-slate-400 mb-6 max-w-sm'>
+                  Supports PDF and DOCX files up to 60MB. Processing typically
+                  takes 30-60 seconds.
                 </p>
                 <input
                   type='file'
@@ -356,11 +252,8 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
                 />
                 <Button
                   size='lg'
-                  onClick={() =>
-                    document.getElementById('file-upload')?.click()
-                  }
                   disabled={isUploading}
-                  className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 py-2'
+                  className='bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 py-2 shadow-xl font-bold text-white border-0'
                 >
                   <FileText className='mr-2 h-5 w-5' />
                   Select File
@@ -371,14 +264,14 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
         </CardContent>
 
         <CardFooter className='justify-center'>
-          <div className='flex items-center gap-4 text-xs text-muted-foreground'>
+          <div className='flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400'>
             <div className='flex items-center gap-1'>
               <div className='w-2 h-2 bg-green-500 rounded-full'></div>
               <span>PDF, DOCX supported</span>
             </div>
             <div className='flex items-center gap-1'>
               <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
-              <span>Max 10MB</span>
+              <span>Max 60MB</span>
             </div>
             <div className='flex items-center gap-1'>
               <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
@@ -387,89 +280,6 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
           </div>
         </CardFooter>
       </Card>
-      {/* <Tabs defaultValue='upload' className='h-full flex flex-col'>
-        <TabsList className='grid w-full grid-cols-1 mb-6 flex-shrink-0'>
-          <TabsTrigger value='upload' className='gap-2'>
-            <Upload className='h-4 w-4' />
-            Upload File
-          </TabsTrigger> 
-           <TabsTrigger value="paste" className="gap-2">
-            <Clipboard className="h-4 w-4" />
-            Paste Text
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value='upload' className='flex-1 mt-0'>
-         
-        </TabsContent>
-
-        <TabsContent value='paste' className='flex-1 mt-0'>
-          <Card className='border-0 shadow-lg h-full'>
-            <CardHeader className='text-center pb-6'>
-              <div className='mx-auto w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center mb-4'>
-                <Clipboard className='h-8 w-8 text-white' />
-              </div>
-              <CardTitle className='text-2xl'>Paste Report Text</CardTitle>
-              <CardDescription className='text-base'>
-                Paste the raw text of your report for immediate processing
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className='space-y-4 flex-1'>
-              {isUploading && (
-                <div className='space-y-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800'>
-                  <div className='flex items-center gap-3'>
-                    <div className='animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent' />
-                    <span className='text-sm font-medium text-emerald-700 dark:text-emerald-400'>
-                      Processing your text...
-                    </span>
-                  </div>
-                  <Progress value={uploadProgress} className='h-2' />
-                  <p className='text-xs text-emerald-600 dark:text-emerald-400'>
-                    {uploadProgress}% complete
-                  </p>
-                </div>
-              )}
-
-              <Textarea
-                placeholder="Paste your report text here... 
-
-Example: Our company's greenhouse gas emissions for 2023 totaled 1,250 tonnes CO2 equivalent, representing a 15% reduction from the previous year..."
-                className='min-h-[200px] text-sm leading-relaxed resize-none border-2 focus:border-emerald-500'
-                value={rawText}
-                onChange={(e) => setRawText(e.target.value)}
-                disabled={isUploading}
-              />
-
-              <div className='flex items-center justify-between text-xs text-muted-foreground'>
-                <span>{rawText.length} characters</span>
-                <span>Minimum 50 characters recommended</span>
-              </div>
-            </CardContent>
-
-            <CardFooter>
-              <Button
-                onClick={handleTextSubmit}
-                className='w-full h-12 text-base bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                disabled={isUploading || !rawText.trim() || rawText.length < 10}
-                size='lg'
-              >
-                {isUploading ? (
-                  <>
-                    <div className='animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2' />
-                    Processing Text...
-                  </>
-                ) : (
-                  <>
-                    <Clipboard className='mr-2 h-5 w-5' />
-                    Process Text
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs> */}
     </div>
   );
 }
