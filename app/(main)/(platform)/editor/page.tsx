@@ -330,8 +330,8 @@ export default function EditorPage() {
                     size='sm'
                     onClick={() => {
                       if (typeof window !== 'undefined') {
-                        localStorage.removeItem('xbrl-editor-session');
-                        localStorage.removeItem('xbrl-session-id');
+                        // localStorage.removeItem('xbrl-editor-session');
+                        // localStorage.removeItem('xbrl-session-id');
                       }
                       router.push('/upload');
                     }}

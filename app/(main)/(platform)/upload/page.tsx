@@ -10,6 +10,8 @@ import { useCallback } from 'react';
 import { FileUploader } from '@/components/editor/file-uploader';
 import type { ReportDocument } from '@/types/report';
 import type { ReportBlock, XbrlTag } from '@/types/report';
+import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button';
 
 /**
  * Merge multiple blocks of a report into a single block. This combines the
@@ -61,19 +63,29 @@ export default function UploadPage() {
 
   // Once a report is uploaded, merge its blocks, persist to localStorage
   // and navigate to the editor page.
-  const handleReportLoaded = useCallback((report: ReportDocument) => {
-    const merged = mergeReportBlocks(report);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
-      // also clear any session id since this is a brand‑new upload
-      localStorage.removeItem('xbrl-session-id');
-    }
-    router.push('/editor');
-  }, [router]);
+  const handleReportLoaded = useCallback(
+    (report: ReportDocument) => {
+      const merged = mergeReportBlocks(report);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
+        // also clear any session id since this is a brand‑new upload
+        localStorage.removeItem('xbrl-session-id');
+      }
+      router.push('/editor');
+    },
+    [router]
+  );
 
   return (
     <div className='flex items-center justify-center py-8'>
       <div className='w-full max-w-3xl'>
+        <div className='flex justify-center items-center gap-5'>
+          <Link className={buttonVariants()} href='/sessions'>
+            View my files
+          </Link>
+          <Link href='/editor'>Continue previous session</Link>
+        </div>
+
         <FileUploader onReportLoaded={handleReportLoaded} />
       </div>
     </div>
