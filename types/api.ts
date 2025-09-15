@@ -77,3 +77,8 @@ export type QueryRecommendations = {
         rank: number
     }[]
 }
+
+export type GenerateChatBot = {
+    text: string
+    session_id: string
+}

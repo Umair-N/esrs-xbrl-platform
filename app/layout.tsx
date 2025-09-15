@@ -9,6 +9,7 @@ import {
   NotificationContainer,
   NotificationProvider,
 } from '@/components/heads-up';
+import { BriskyAIBot } from '@/components/briskyai-bot';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -37,6 +38,7 @@ export default function RootLayout({
             <Toaster richColors position='top-right' closeButton />
             <div className='relative flex min-h-screen flex-col'>
               {children}
+              <BriskyAIBot />
             </div>
           </QueryClientProvider>
         </NotificationProvider>
