@@ -35,7 +35,7 @@ async def upload_file(
     content = await file.read()
 
     if not validate_file_size(len(content)):
-        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+        raise HTTPException(status_code=400, detail="File too large (max 70MB)")
 
     try:
         report = report_service.create_report_from_file(

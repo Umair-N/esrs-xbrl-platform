@@ -2,17 +2,17 @@ import Axios, {
   AxiosError,
   AxiosResponse,
   InternalAxiosRequestConfig,
-} from "axios";
+} from 'axios';
 function authRequestInterceptor(config: InternalAxiosRequestConfig) {
   if (config?.params) {
     Object.keys(config?.params).forEach((key) => {
-      if (config?.params[key] === "") {
+      if (config?.params[key] === '') {
         delete config?.params[key];
       }
     });
   }
   if (config.headers) {
-    config.headers.Accept = "application/json";
+    config.headers.Accept = 'application/json';
   }
 
   config.withCredentials = true;
@@ -20,7 +20,7 @@ function authRequestInterceptor(config: InternalAxiosRequestConfig) {
 }
 
 export const axiosInstance = Axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.briskbold.ai/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
 });
 
 axiosInstance.interceptors.request.use(authRequestInterceptor);

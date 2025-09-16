@@ -64,7 +64,7 @@ class Settings(BaseSettings):
 
     # File Upload
     UPLOAD_DIRECTORY: str = "uploads"
-    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_FILE_SIZE: int = 70 * 1024 * 1024  # 10MB
     ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".doc"}
     ALLOWED_FILE_TYPES: List[str] = [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"]
 

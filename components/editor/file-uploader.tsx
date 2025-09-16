@@ -67,7 +67,7 @@ export function FileUploader({ onReportLoaded }: FileUploaderProps) {
       return;
     }
 
-    const maxSize = 60 * 1024 * 1024;
+    const maxSize = 70 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error('File too large', {
         description: 'File size must be less than 60MB',
