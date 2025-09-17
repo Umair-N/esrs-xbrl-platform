@@ -2,6 +2,10 @@
 
 import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -14,6 +18,8 @@ import {
   X,
   History,
   Plus,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useGenerateChatbot } from '@/features/recommender/api/generate-chatbot';
@@ -32,6 +38,111 @@ interface ChatSession {
   timestamp: Date;
   messages: Message[];
 }
+
+// Custom markdown components
+const MarkdownComponents = {
+  code({ node, inline, className, children, ...props }: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+      await navigator.clipboard.writeText(String(children));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    return !inline && match ? (
+      <div className='relative group'>
+        <button
+          onClick={handleCopy}
+          className='absolute right-2 top-2 p-1.5 rounded bg-gray-700 hover:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity z-10'
+          title='Copy code'
+        >
+          {copied ? (
+            <Check className='h-3 w-3 text-green-400' />
+          ) : (
+            <Copy className='h-3 w-3 text-gray-300' />
+          )}
+        </button>
+        <SyntaxHighlighter
+          style={oneDark}
+          language={match[1]}
+          PreTag='div'
+          className='rounded-md text-sm'
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      </div>
+    ) : (
+      <code
+        className='bg-muted px-1.5 py-0.5 rounded text-sm font-mono'
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+  h1: ({ children }: any) => (
+    <h1 className='text-xl font-bold mb-2 text-foreground'>{children}</h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 className='text-lg font-semibold mb-2 text-foreground'>{children}</h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className='text-base font-semibold mb-1 text-foreground'>{children}</h3>
+  ),
+  p: ({ children }: any) => (
+    <p className='mb-2 leading-relaxed text-foreground'>{children}</p>
+  ),
+  ul: ({ children }: any) => (
+    <ul className='list-disc list-inside mb-2 space-y-1 text-foreground'>
+      {children}
+    </ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className='list-decimal list-inside mb-2 space-y-1 text-foreground'>
+      {children}
+    </ol>
+  ),
+  li: ({ children }: any) => <li className='text-foreground'>{children}</li>,
+  blockquote: ({ children }: any) => (
+    <blockquote className='border-l-4 border-primary pl-4 my-2 italic text-muted-foreground'>
+      {children}
+    </blockquote>
+  ),
+  table: ({ children }: any) => (
+    <div className='overflow-x-auto my-2'>
+      <table className='min-w-full border-collapse border border-border'>
+        {children}
+      </table>
+    </div>
+  ),
+  th: ({ children }: any) => (
+    <th className='border border-border px-2 py-1 bg-muted font-semibold text-left'>
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className='border border-border px-2 py-1'>{children}</td>
+  ),
+  a: ({ children, href }: any) => (
+    <a
+      href={href}
+      className='text-primary underline hover:text-primary/80'
+      target='_blank'
+      rel='noopener noreferrer'
+    >
+      {children}
+    </a>
+  ),
+  strong: ({ children }: any) => (
+    <strong className='font-semibold text-foreground'>{children}</strong>
+  ),
+  em: ({ children }: any) => (
+    <em className='italic text-foreground'>{children}</em>
+  ),
+};
 
 export function BriskyAIBot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -341,7 +452,7 @@ export function BriskyAIBot() {
               >
                 <Avatar
                   className={cn(
-                    'h-6 w-6 flex-shrink-0',
+                    'h-6 w-6 flex-shrink-0 mt-1',
                     message.isUser ? 'bg-accent' : 'bg-primary'
                   )}
                 >
@@ -358,16 +469,27 @@ export function BriskyAIBot() {
                 </Avatar>
                 <div
                   className={cn(
-                    'rounded-lg p-3 max-w-[80%]',
+                    'rounded-lg p-3 max-w-[85%] min-w-0',
                     message.isUser
                       ? 'bg-accent text-accent-foreground'
                       : 'bg-muted'
                   )}
                 >
-                  <p className='leading-relaxed whitespace-pre-wrap'>
-                    {message.text}
-                  </p>
-                  <time className='text-xs opacity-70 mt-1 block'>
+                  {message.isUser ? (
+                    <p className='leading-relaxed whitespace-pre-wrap'>
+                      {message.text}
+                    </p>
+                  ) : (
+                    <div className='prose prose-sm max-w-none'>
+                      <ReactMarkdown
+                        components={MarkdownComponents}
+                        remarkPlugins={[remarkGfm]}
+                      >
+                        {message.text}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                  <time className='text-xs opacity-70 mt-2 block'>
                     {message.timestamp.toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -379,7 +501,7 @@ export function BriskyAIBot() {
 
             {isLoading && (
               <div className='flex gap-2 text-sm'>
-                <Avatar className='h-6 w-6 bg-primary'>
+                <Avatar className='h-6 w-6 bg-primary mt-1'>
                   <AvatarFallback className='bg-primary text-primary-foreground text-xs'>
                     B
                   </AvatarFallback>
