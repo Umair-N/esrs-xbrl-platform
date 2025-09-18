@@ -53,6 +53,12 @@ class UserService:
 
     def grant_access(self, user_id: int, db) -> Optional[User]:
         return user_crud.grant_access(user_id, db)
+    def revoke_access(self, user_id: int, db) -> Optional[User]:
+        return user_crud.revoke_access(user_id, db)
+    def enable(self, user_id: int, db) -> Optional[User]:
+        return user_crud.enable(user_id, db)
+    def disable(self, user_id: int, db) -> Optional[User]:
+        return user_crud.disable(user_id, db)
 
 
 user_service = UserService()

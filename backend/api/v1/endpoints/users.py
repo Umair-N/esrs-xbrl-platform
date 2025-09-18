@@ -149,3 +149,16 @@ async def update_user(
 @router.put("/{user_id}/grant-access", response_model=UserResponse)
 async def grant_platform_access(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
     return user_service.grant_access(user_id, db)
+
+@router.put("/{user_id}/revoke-access", response_model=UserResponse)
+async def revoke_platform_access(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
+    return user_service.revoke_access(user_id, db)
+
+@router.put("/{user_id}/enable", response_model=UserResponse)
+async def enable_user(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
+    return user_service.revoke_access(user_id, db)
+
+@router.put("/{user_id}/disable", response_model=UserResponse)
+async def disable_user(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
+    return user_service.disable(user_id, db)
+

@@ -267,6 +267,45 @@ class UserCRUD:
             raise error
         finally:
             cursor.close()
+    def revoke_access(self, user_id: int, db) -> Optional[User]:
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            query = "UPDATE users SET platform_access = false WHERE id = %(id)s RETURNING *"
+            cursor.execute(query, {"id": user_id})
+            result = cursor.fetchone()
+            db.commit()
+            return User(**result) if result else None
+        except Exception as error:
+            db.rollback()
+            raise error
+        finally:
+            cursor.close()
+    def enable(self, user_id: int, db) -> Optional[User]:
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            query = "UPDATE users SET is_active = true WHERE id = %(id)s RETURNING *"
+            cursor.execute(query, {"id": user_id})
+            result = cursor.fetchone()
+            db.commit()
+            return User(**result) if result else None
+        except Exception as error:
+            db.rollback()
+            raise error
+        finally:
+            cursor.close()
+    def disable(self, user_id: int, db) -> Optional[User]:
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        try:
+            query = "UPDATE users SET is_active = false WHERE id = %(id)s RETURNING *"
+            cursor.execute(query, {"id": user_id})
+            result = cursor.fetchone()
+            db.commit()
+            return User(**result) if result else None
+        except Exception as error:
+            db.rollback()
+            raise error
+        finally:
+            cursor.close()
 
 
 user_crud = UserCRUD()
