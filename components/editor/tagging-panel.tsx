@@ -771,8 +771,10 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   const { setSelectedTaxonomy } = useTaxonomyStore();
 
   useEffect(() => {
+    // console.log(isSuccess, 'success');
     if (isSuccess) {
       setValue(myTaxonomies[0]?.id.toString());
+      console.log(isSuccess, 'success');
       setSelectedTaxonomy(myTaxonomies[0]);
     }
   }, [isSuccess]);

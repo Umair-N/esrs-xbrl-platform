@@ -15,11 +15,25 @@ export const QueryRecommendationsBodySchema = z.object({
 
 export type QueryRecommendationsBody = z.infer<typeof QueryRecommendationsBodySchema>;
 
+type QueryResult = {
+    tag: string;
+    datatype: string;
+    reference: string;
+    score: number;
+    rank: number;
+};
+
+type QueryDataAPI = {
+    query: string;
+    taxonomy: string;
+    results: QueryResult[];
+};
+
 export const getQueryRecommendations = ({
     data,
 }: {
     data: QueryRecommendationsBody;
-}): Promise<Comment> => {
+}): Promise<QueryDataAPI> => {
     return api.post('/query', data, { serviceType: 'aiRecommender' });
 };
 
@@ -42,6 +56,6 @@ export const useRecommendations = ({
             showError({ title: 'Failed to get recommendation', message: '' });
         },
         ...restConfig,
-        mutationFn: getQueryRecommendations,
+        mutationFn: getQueryRecommendations
     });
 };

@@ -30,6 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
+import { showError } from '../heads-up';
 
 /**
  * Tag structure in a ReportBlock:
@@ -86,13 +87,12 @@ export function TextEditor({
   // choose to automatically create tags when a context is already selected.
   const { setPendingConcept, selectedContextId } = useTaggingStore();
 
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  // const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
   const [highlightedText, setHighlightedText] = useState('');
   const [popoverTriggerElement, setPopoverTriggerElement] =
     useState<HTMLElement | null>(null);
 
-  const [openInfo, setOpenInfo] = useState(false);
   // Track the highlighted range (blockId, startIndex, endIndex)
   const [highlightRange, setHighlightRange] = useState<{
     blockId: string;
@@ -100,7 +100,9 @@ export function TextEditor({
     endIndex: number;
   } | null>(null);
 
-  const { mutate } = useRecommendations();
+  const { mutate, data: recommendations } = useRecommendations({
+    mutationConfig: {},
+  });
   // Hook for submitting feedback to the AI recommender. When a user selects
   // a suggestion, we will use this to notify the service about the choice.
   const { mutate: sendFeedback } = usePostFeedback();
@@ -184,27 +186,35 @@ export function TextEditor({
           setPopoverTriggerElement(virtualElement);
           setHighlightedText(selectedText);
 
+          if (!selectedTaxonomy?.name) {
+            return showError({
+              title: 'Please select a taxonomy',
+              message: '',
+            });
+          }
           // Query recommendations
-          mutate(
-            {
-              data: {
-                query: selectedText,
-                taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
-                k: 5,
-                rerank: true,
+          if (selectedTaxonomy?.name) {
+            mutate(
+              {
+                data: {
+                  query: selectedText,
+                  taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+                  k: 5,
+                  rerank: true,
+                },
               },
-            },
-            {
-              onSuccess: (res: any) => {
-                setRecommendations(res?.results ?? []);
-                setShowPopover(true);
-              },
-              onError: () => {
-                setRecommendations([]);
-                setShowPopover(true);
-              },
-            }
-          );
+              {
+                onSuccess: (res: any) => {
+                  // setRecommendations(res?.results ?? []);
+                  setShowPopover(true);
+                },
+                onError: () => {
+                  // setRecommendations([]);
+                  setShowPopover(true);
+                },
+              }
+            );
+          }
         }
       }
     }
@@ -571,13 +581,6 @@ export function TextEditor({
           side='bottom'
           align='start'
           sideOffset={8}
-          /*
-           * Make the suggestion popover resizable by the user. We preserve
-           * positioning when anchored to the highlighted text but always
-           * include CSS resize and overflow properties so users can drag
-           * the corner to adjust width and height. Without specifying
-           * overflow: auto the resize handle would be hidden.
-           */
           style={
             popoverTriggerElement
               ? {
@@ -611,9 +614,9 @@ export function TextEditor({
               </Button>
             </div>
 
-            {recommendations.length > 0 ? (
+            {recommendations && recommendations.results?.length > 0 ? (
               <div className='space-y-1 overflow-y-auto max-h-64 custom-scrollbar'>
-                {recommendations.map((item, index) => (
+                {recommendations?.results?.map((item, index) => (
                   <Button
                     key={item.tag}
                     variant='ghost'
@@ -629,20 +632,23 @@ export function TextEditor({
                       </div>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger className='absolute z-50 invisible p-0 -translate-y-1/2 bg-white rounded-full size-6 hover:bg-muted right-2 group-hover:visible top-1/2'>
-                            <LucideInfo className='text-indigo-500' />
+                          <TooltipTrigger
+                            asChild
+                            className='absolute z-50 invisible p-0 -translate-y-1/2 bg-white rounded-full size-6 hover:bg-muted right-2 group-hover:visible top-1/2'
+                          >
+                            <div className='absolute z-50 invisible p-0 -translate-y-1/2 bg-white rounded-full size-6 hover:bg-muted right-2 group-hover:visible top-1/2'>
+                              <LucideInfo className='text-indigo-500' />
+                            </div>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <div className='space-y-1'>
-                              <div className='text-sm font-semibold text-foreground'>
-                                {item.reference}
-                              </div>
-                              <div className='font-mono text-xs text-muted-foreground'>
-                                {item.tag}
-                              </div>
-                              <div className='text-xs text-muted-foreground'>
-                                {item.datatype}
-                              </div>
+                          <TooltipContent className='space-y-1 max-w-[100ch]'>
+                            <div className='text-sm font-semibold text-foreground'>
+                              {item.reference}
+                            </div>
+                            <div className='font-mono text-xs text-muted-foreground'>
+                              {item.tag}
+                            </div>
+                            <div className='text-xs text-muted-foreground'>
+                              {item.datatype}
                             </div>
                           </TooltipContent>
                         </Tooltip>
