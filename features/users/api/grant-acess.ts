@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { api } from '@/lib/api-client';
 import { MutationConfig } from '@/lib/react-query';
 import { User } from '@/types/api';
+import { toast } from 'sonner';
 // import { Comment } from '@/types/api';
-
 
 // export const createCommentInputSchema = z.object({
 //   discussionId: z.string().min(1, 'Required'),
@@ -15,30 +15,34 @@ import { User } from '@/types/api';
 // export type CreateCommentInput = z.infer<typeof createCommentInputSchema>;
 
 export const grantAccess = (user_id: string): Promise<User> => {
-    return api.put(`/users/${user_id}/grant-access`);
+  return api.put(`/users/${user_id}/grant-access`);
 };
 
 type UseGrantAccess = {
-    userId?: string;
-    mutationConfig?: MutationConfig<typeof grantAccess>;
+  userId?: string;
+  mutationConfig?: MutationConfig<typeof grantAccess>;
 };
 
 export const useGrantAccess = ({
-    mutationConfig,
-    // userId,
+  mutationConfig,
+  // userId,
 }: UseGrantAccess = {}) => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    const { onSuccess, ...restConfig } = mutationConfig || {};
+  const { onSuccess, ...restConfig } = mutationConfig || {};
 
-    return useMutation({
-        onSuccess: (...args) => {
-            // queryClient.invalidateQueries({
-            //     queryKey: getInfiniteCommentsQueryOptions(discussionId).queryKey,
-            // });
-            onSuccess?.(...args);
-        },
-        ...restConfig,
-        mutationFn: grantAccess,
-    });
+  return useMutation({
+    onSuccess: (...args) => {
+      // queryClient.invalidateQueries({
+      //     queryKey: getInfiniteCommentsQueryOptions(discussionId).queryKey,
+      // });
+
+      toast.success('Access granted successfully.');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+
+      onSuccess?.(...args);
+    },
+    ...restConfig,
+    mutationFn: grantAccess,
+  });
 };

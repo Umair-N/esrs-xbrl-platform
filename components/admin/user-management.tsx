@@ -96,6 +96,11 @@ import { useAllTaxonomies } from '@/features/taxonomy/api/get-all-taxonomy-list'
 import { TaxonomyList } from '@/types/taxonomy';
 import { useSetActiveUserTaxonomy } from '@/features/taxonomy/api/assign-taxonomies';
 import { toast } from 'sonner';
+import { useRevokeAccess } from '@/features/admin/revoke-access';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGrantAccess } from '@/features/users/api/grant-acess';
+import { useEnableUser } from '@/features/admin/enable-user';
+import { useDisableUser } from '@/features/admin/disable-user';
 
 // const mockUsers: User[] = [
 //   {
@@ -170,7 +175,13 @@ export function UserManagement() {
       sort_order: 'desc',
     },
   });
+  const queryClient = useQueryClient();
   const users = data?.users;
+  const { mutate: revokeAccess } = useRevokeAccess();
+
+  const { mutate: grantAccess } = useGrantAccess();
+  const { mutate: enableUser } = useEnableUser();
+  const { mutate: disableUser } = useDisableUser();
 
   const updateUserStatus = (userId: string, newStatus: User['status']) => {
     // setUsers(
@@ -193,16 +204,16 @@ export function UserManagement() {
 
     switch (actionType) {
       case 'disable':
-        updateUserStatus(actionUser.id, 'disabled');
+        disableUser({ user_id: Number(actionUser.id) });
         break;
       case 'enable':
-        updateUserStatus(actionUser.id, 'active');
+        enableUser({ user_id: Number(actionUser.id) });
         break;
       case 'grant':
-        updateUserAccess(actionUser.id, true);
+        grantAccess(actionUser.id);
         break;
       case 'revoke':
-        updateUserAccess(actionUser.id, false);
+        revokeAccess({ user_id: Number(actionUser.id) });
         break;
     }
 
@@ -468,7 +479,9 @@ export function UserManagement() {
 
                           <DropdownMenuSeparator />
 
-                          {user.status === 'active' ? (
+                          {(user.status === 'active' ||
+                            user.status === 'pending') &&
+                          user.is_active ? (
                             <DropdownMenuItem
                               onSelect={(e) => {
                                 e.preventDefault();
