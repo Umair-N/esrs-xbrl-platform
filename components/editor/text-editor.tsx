@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Lightbulb } from 'lucide-react';
+import { Edit2, Check, X, Lightbulb, LucideInfo } from 'lucide-react';
 import {
   HoverCard,
   HoverCardContent,
@@ -24,6 +24,12 @@ import { usePostFeedback } from '@/features/recommender/api/post-feedback';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { sampleContexts } from '@/lib/sample-data';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 
 /**
  * Tag structure in a ReportBlock:
@@ -86,6 +92,7 @@ export function TextEditor({
   const [popoverTriggerElement, setPopoverTriggerElement] =
     useState<HTMLElement | null>(null);
 
+  const [openInfo, setOpenInfo] = useState(false);
   // Track the highlighted range (blockId, startIndex, endIndex)
   const [highlightRange, setHighlightRange] = useState<{
     blockId: string;
@@ -353,12 +360,12 @@ export function TextEditor({
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
-          <HoverCardContent className='w-80  '>
+          <HoverCardContent className='w-80 '>
             <div className='space-y-3'>
               <h4 className='text-base font-semibold break-words'>
                 {tag.concept.label}
               </h4>
-              <p className='text-sm leading-relaxed text-muted-foreground break-words'>
+              <p className='text-sm leading-relaxed break-words text-muted-foreground'>
                 {tag.concept.definition}
               </p>
               <div className='flex flex-wrap gap-2 pt-1'>
@@ -591,7 +598,7 @@ export function TextEditor({
               <div className='flex items-center gap-2'>
                 <Lightbulb className='w-4 h-4 text-primary' />
                 <span className='text-sm font-semibold'>
-                  Suggestions for "{highlightedText}"
+                  Suggestions for "{highlightedText?.slice(0, 50)}"
                 </span>
               </div>
               <Button
@@ -610,16 +617,36 @@ export function TextEditor({
                   <Button
                     key={item.tag}
                     variant='ghost'
-                    className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
+                    className='relative justify-start w-full h-auto p-3 py-2 text-left hover:bg-muted/50 group'
                     onClick={() => applyTag(item)}
                   >
                     <div className='space-y-1'>
-                      <div className='text-sm font-semibold text-foreground'>
+                      {/* <div className='text-sm font-semibold text-foreground'>
                         {item.reference}
-                      </div>
+                      </div> */}
                       <div className='font-mono text-xs text-muted-foreground'>
                         {item.tag}
                       </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger className='absolute z-50 invisible p-0 -translate-y-1/2 bg-white rounded-full size-6 hover:bg-muted right-2 group-hover:visible top-1/2'>
+                            <LucideInfo className='text-indigo-500' />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className='space-y-1'>
+                              <div className='text-sm font-semibold text-foreground'>
+                                {item.reference}
+                              </div>
+                              <div className='font-mono text-xs text-muted-foreground'>
+                                {item.tag}
+                              </div>
+                              <div className='text-xs text-muted-foreground'>
+                                {item.datatype}
+                              </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </Button>
                 ))}
