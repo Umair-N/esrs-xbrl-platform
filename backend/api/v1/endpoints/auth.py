@@ -13,6 +13,8 @@ from utils.validators import validate_user_input
 from datetime import datetime, timezone
 from schemas.user import UserUpdate
 import uuid
+from schemas.user import UserResponse
+
 
 
 router = APIRouter()
@@ -82,11 +84,29 @@ async def login(user_credentials: UserLogin, db=Depends(get_db)):
     response = JSONResponse(
         content={
             "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "full_name": user.full_name,
+                "is_active": user.is_active,
+                "is_verified": user.is_verified,
+                "role": user.role,
+                "created_at": user.created_at.isoformat() if isinstance(user.created_at, datetime) else user.created_at,
+                "company": user.company,
+                "designation": user.designation,
+                "last_accessed_at": user.last_accessed_at.isoformat() if isinstance(user.last_accessed_at, datetime) else user.last_accessed_at,
+                "last_login": user.last_login.isoformat() if isinstance(user.last_login, datetime) else user.last_login,
+                "platform_access": user.platform_access,
+                "status": user.status,
+                "updated_at": user.updated_at.isoformat() if isinstance(user.updated_at, datetime) else user.updated_at,
+            }
             # "access_token": access_token,
             # "token_type": "bearer",
-            # "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
+            # "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         }
     )
+
 
     response.set_cookie(
         key="refresh_token",
