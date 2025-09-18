@@ -557,6 +557,12 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
         // Use definition as the original label/definition. This ensures the
         // definition appears in the hover card.
         originalLabel: pendingConcept.definition,
+        // Propagate the feedback ID from the pending concept so it can be
+        // attached to the tag when created. If no feedback ID is present,
+        // this field will be undefined.
+        ...(pendingConcept.feedbackId !== undefined
+          ? { feedbackId: pendingConcept.feedbackId }
+          : {}),
       } as any);
       // Clear the pending concept so it is only applied once
       setPendingConcept(null);
@@ -635,7 +641,10 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
       ? convertContextOutToXbrlContext(contextToUse) // Convert ContextOut to XbrlContext
       : undefined;
 
-    // Creating the new tag object
+    // Creating the new tag object. If the selected concept originated from a
+    // recommendation, it may carry a feedbackId property that should be
+    // attached to the tag. We use a computed spread to include this
+    // property only when defined.
     const newTag: XbrlTag = {
       id: generateUniqueId(), // Generate a unique ID for the tag
       concept: {
@@ -647,13 +656,17 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
           (selectedConcept.periodType as 'instant' | 'duration') || 'duration', // Default to 'duration' if no periodType is specified
         dataType: selectedConcept.type || 'xbrli:stringItemType', // Default to 'xbrli:stringItemType'
         balance: undefined,
-        abstract: selectedConcept.abstract === 'true', // Ensure abstract is correctly handled
+        abstract: (selectedConcept as any).abstract === 'true', // Ensure abstract is correctly handled
         labels: selectedConcept.originalLabel
           ? [{ value: selectedConcept.originalLabel, role: 'label' }] // Assign the original label to the concept
           : undefined,
         references: undefined, // Handle references if needed
       },
       ...(convertedContext && { context: convertedContext }), // Attach converted context if it's available
+      // Include the feedback ID if the selected concept originated from a recommendation
+      ...((selectedConcept as any).feedbackId !== undefined
+        ? { feedbackId: (selectedConcept as any).feedbackId }
+        : {}),
       createdAt: new Date().toISOString(), // Record creation timestamp
       startIndex: highlightedText?.startIndex || 0, // Use the start index from the highlighted text
       endIndex: highlightedText?.endIndex || 0, // Use the end index from the highlighted text

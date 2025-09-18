@@ -20,6 +20,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { useRecommendations } from '@/features/recommender/api/get-recommendations';
+import { usePostFeedback } from '@/features/recommender/api/post-feedback';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { sampleContexts } from '@/lib/sample-data';
@@ -93,6 +94,9 @@ export function TextEditor({
   } | null>(null);
 
   const { mutate } = useRecommendations();
+  // Hook for submitting feedback to the AI recommender. When a user selects
+  // a suggestion, we will use this to notify the service about the choice.
+  const { mutate: sendFeedback } = usePostFeedback();
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
@@ -206,10 +210,17 @@ export function TextEditor({
     tag: string;
     reference: string;
     datatype: string;
+    rank?: number;
   }) => {
     // Guard against applying a tag when no text has been selected
     if (!highlightRange) return;
-    // Create a minimal concept object from the recommendation. Additional
+
+    // Capture the current highlight range and context ID. We'll need these
+    // values later when creating the tag in the onSuccess/onError callbacks.
+    const { blockId, startIndex, endIndex } = highlightRange;
+    const localContextId = selectedContextId;
+
+    // Construct a minimal concept object from the recommendation. Additional
     // metadata (e.g. definition, period type) may be resolved by the
     // taxonomy lookup within the tagging panel.
     const concept = {
@@ -219,40 +230,84 @@ export function TextEditor({
       type: item.datatype,
       periodType: '',
     };
-    // If a context has already been selected in the tagging tools, we can
-    // immediately create the tag with that context. Otherwise, we defer
-    // creation by storing a pending concept for the tagging panel.
-    if (selectedContextId) {
-      const { blockId, startIndex, endIndex } = highlightRange;
-      const context = sampleContexts.find((c) => c.id === selectedContextId);
-      const newTag = {
-        id: `${Date.now()}`,
-        concept,
-        startIndex,
-        endIndex,
-        ...(context ? { context } : {}),
-      };
-      const updatedReport: ReportDocument = {
-        ...report,
-        blocks: report.blocks.map((blk) =>
-          blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
-        ),
-        updatedAt: new Date().toISOString(),
-      };
-      onReportChange(updatedReport);
-    } else {
-      // Place the pending concept into the global tagging store. The tagging
-      // panel will detect this value and preselect it for context assignment.
-      setPendingConcept(concept);
-    }
-    // Hide the suggestion popover and clear the highlight range. Tag
-    // creation (if deferred) will happen within the tagging panel.
-    setShowPopover(false);
-    setHighlightRange(null);
-    if (popoverTriggerElement) {
-      document.body.removeChild(popoverTriggerElement);
-      setPopoverTriggerElement(null);
-    }
+
+    /**
+     * Helper to finalise tag creation or pending concept storage. This
+     * function is called after the feedback API responds. It receives
+     * an optional feedback ID and uses captured variables from the
+     * applyTag scope to update the report or pending concept. It also
+     * hides the suggestion popover and clears the highlight range.
+     */
+    const finalizeTag = (feedbackId?: number) => {
+      if (localContextId) {
+        // If a context has been selected, create and attach the tag
+        const context = sampleContexts.find((c) => c.id === localContextId);
+        const newTag = {
+          id: `${Date.now()}`,
+          concept,
+          startIndex,
+          endIndex,
+          ...(context ? { context } : {}),
+          ...(feedbackId !== undefined ? { feedbackId } : {}),
+        };
+        const updatedReport: ReportDocument = {
+          ...report,
+          blocks: report.blocks.map((blk) =>
+            blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        onReportChange(updatedReport);
+      } else {
+        // No context selected yet; defer creation by storing the concept
+        // along with its feedback ID (if any) in the global tagging store.
+        if (feedbackId !== undefined) {
+          setPendingConcept({ ...concept, feedbackId });
+        } else {
+          setPendingConcept(concept);
+        }
+      }
+
+      // Hide the suggestion popover and clear the highlight range.
+      setShowPopover(false);
+      setHighlightRange(null);
+      if (popoverTriggerElement) {
+        document.body.removeChild(popoverTriggerElement);
+        setPopoverTriggerElement(null);
+      }
+    };
+
+    // Prepare the feedback payload. The AI recommender expects these
+    // properties to record which suggestion was selected for the query. If
+    // the rank is missing, default to 0.
+    const feedbackPayload = {
+      taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+      query: highlightedText,
+      reference: item.reference,
+      tag: item.tag,
+      is_correct: true,
+      is_custom: false,
+      rank: item.rank ?? 0,
+    };
+
+    // Submit feedback and handle the response. We use the mutate function
+    // returned from usePostFeedback to perform the API call. On success
+    // we extract the returned ID and finalise tag creation. On error we
+    // finalise without a feedback ID.
+    sendFeedback(
+      { data: feedbackPayload },
+      {
+        onSuccess: (res: any) => {
+          // The feedback API returns an object containing an `id` field.
+          const fid: number | undefined =
+            res && typeof res.id === 'number' ? res.id : undefined;
+          finalizeTag(fid);
+        },
+        onError: () => {
+          finalizeTag(undefined);
+        },
+      }
+    );
   };
 
   const closePopover = () => {
@@ -298,7 +353,7 @@ export function TextEditor({
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
-          <HoverCardContent className='w-80'>
+          <HoverCardContent className='w-80  '>
             <div className='space-y-3'>
               <h4 className='text-base font-semibold break-words'>
                 {tag.concept.label}
@@ -505,30 +560,37 @@ export function TextEditor({
           <div style={{ display: 'none' }} />
         </PopoverTrigger>
         <PopoverContent
-          className='p-0 resize overflow-hidden min-w-96 min-h-72'
+          className='p-0 w-80'
           side='bottom'
           align='start'
           sideOffset={8}
+          /*
+           * Make the suggestion popover resizable by the user. We preserve
+           * positioning when anchored to the highlighted text but always
+           * include CSS resize and overflow properties so users can drag
+           * the corner to adjust width and height. Without specifying
+           * overflow: auto the resize handle would be hidden.
+           */
           style={
             popoverTriggerElement
               ? {
                   position: 'fixed',
                   top: popoverTriggerElement.offsetTop,
                   left: popoverTriggerElement.offsetLeft,
-                  width: '600px',
-                  height: '350px',
+                  resize: 'both',
+                  overflow: 'auto',
                 }
               : {
-                  width: '600px',
-                  height: '350px',
+                  resize: 'both',
+                  overflow: 'auto',
                 }
           }
         >
-          <div className='p-4 h-full flex flex-col overflow-hidden text-wrap whitespace-nowrap'>
-            <div className='flex items-center justify-between mb-3 flex-shrink-0'>
-              <div className='flex items-center gap-2 min-w-0'>
-                <Lightbulb className='w-4 h-4 text-primary flex-shrink-0' />
-                <span className='text-sm font-semibold truncate'>
+          <div className='p-4'>
+            <div className='flex items-center justify-between mb-3'>
+              <div className='flex items-center gap-2'>
+                <Lightbulb className='w-4 h-4 text-primary' />
+                <span className='text-sm font-semibold'>
                   Suggestions for "{highlightedText}"
                 </span>
               </div>
@@ -536,41 +598,37 @@ export function TextEditor({
                 variant='ghost'
                 size='sm'
                 onClick={closePopover}
-                className='w-6 h-6 p-0 hover:bg-muted flex-shrink-0'
+                className='w-6 h-6 p-0 hover:bg-muted'
               >
                 <X className='w-3 h-3' />
               </Button>
             </div>
 
             {recommendations.length > 0 ? (
-              <div className='flex-1 overflow-y-auto custom-scrollbar min-h-0'>
-                <div className='space-y-1'>
-                  {recommendations.map((item, index) => (
-                    <Button
-                      key={index}
-                      variant='ghost'
-                      className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
-                      onClick={() => applyTag(item)}
-                    >
-                      <div className='space-y-1 min-w-0 w-full'>
-                        <div className='text-sm font-semibold text-foreground break-words'>
-                          {item.reference}
-                        </div>
-                        <div className='font-mono text-xs text-muted-foreground break-all'>
-                          {item.tag}
-                        </div>
+              <div className='space-y-1 overflow-y-auto max-h-64 custom-scrollbar'>
+                {recommendations.map((item, index) => (
+                  <Button
+                    key={item.tag}
+                    variant='ghost'
+                    className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
+                    onClick={() => applyTag(item)}
+                  >
+                    <div className='space-y-1'>
+                      <div className='text-sm font-semibold text-foreground'>
+                        {item.reference}
                       </div>
-                    </Button>
-                  ))}
-                </div>
+                      <div className='font-mono text-xs text-muted-foreground'>
+                        {item.tag}
+                      </div>
+                    </div>
+                  </Button>
+                ))}
               </div>
             ) : (
-              <div className='flex-1 flex items-center justify-center text-center text-muted-foreground'>
-                <div>
-                  <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
-                  <p className='text-sm font-medium'>No suggestions found</p>
-                  <p className='text-xs'>Try selecting different text</p>
-                </div>
+              <div className='py-6 text-center text-muted-foreground'>
+                <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
+                <p className='text-sm font-medium'>No suggestions found</p>
+                <p className='text-xs'>Try selecting different text</p>
               </div>
             )}
           </div>

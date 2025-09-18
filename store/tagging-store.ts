@@ -36,6 +36,15 @@ type RecommendationConcept = {
      * resolved later by the taxonomy lookup.
      */
     periodType: string;
+
+    /**
+     * Optional feedback ID associated with the recommendation. This is
+     * returned from the AI recommender when feedback is posted for a
+     * selected suggestion. When present, it allows the tagging panel
+     * and other components to remove the corresponding feedback on
+     * deletion of a tag.
+     */
+    feedbackId?: number;
 };
 
 type TaggingStore = {
