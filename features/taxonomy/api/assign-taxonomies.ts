@@ -12,7 +12,7 @@ export const setActiveUserTaxonomy = ({
   userId: number;
   data: { taxonomy_ids: string[] };
 }) => {
-  return api.post(`/taxonomy/admin/users/${userId}/set-active`, data);
+  return api.patch(`/taxonomy/admin/users/${userId}/set-active`, data);
 };
 
 type UseSetActiveUserTaxonomyOptions = {

@@ -49,7 +49,7 @@ def disable_taxonomy(taxonomy_id: int, db: PGConnection = Depends(get_db), _: An
         raise HTTPException(404, detail="Taxonomy not found")
 
 
-@taxonomy_admin.post("/users/{user_id}/set-active")
+@taxonomy_admin.patch("/users/{user_id}/set-active")
 def set_user_taxonomy(
     user_id: int,
     body: TaxonomyRequestBody,  
@@ -64,7 +64,6 @@ def set_user_taxonomy(
         return {"message": f"Taxonomies {body.taxonomy_ids} are now active for user {user_id}"}
     except ValueError as e:
         raise HTTPException(404, detail=str(e))
-
 
 @taxonomy_admin.post("/users/{user_id}/disable")
 def disable_user_taxonomy(user_id: int, db: PGConnection = Depends(get_db), _: Any = Depends(require_admin)):

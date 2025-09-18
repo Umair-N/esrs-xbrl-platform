@@ -171,7 +171,7 @@ class TaxonomyCRUD:
             cur.close()
 
     def get_user_taxonomies(self, user_id: int, db) -> List[Dict[str, Any]]:
-        """Get all taxonomies assigned to a user (including active and inactive)."""
+        """Get all enabled taxonomies assigned to a user."""
         cur = db.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("""
@@ -179,6 +179,7 @@ class TaxonomyCRUD:
                 FROM user_taxonomies ut
                 JOIN taxonomies t ON t.id = ut.taxonomy_id
                 WHERE ut.user_id = %(uid)s
+                AND t.enabled = TRUE
                 ORDER BY t.created_at DESC;
             """, {"uid": user_id})
             rows = cur.fetchall()
