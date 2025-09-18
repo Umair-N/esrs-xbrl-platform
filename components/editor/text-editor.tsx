@@ -20,6 +20,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { useRecommendations } from '@/features/recommender/api/get-recommendations';
+import { usePostFeedback } from '@/features/recommender/api/post-feedback';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { sampleContexts } from '@/lib/sample-data';
@@ -93,6 +94,9 @@ export function TextEditor({
   } | null>(null);
 
   const { mutate } = useRecommendations();
+  // Hook for submitting feedback to the AI recommender. When a user selects
+  // a suggestion, we will use this to notify the service about the choice.
+  const { mutate: sendFeedback } = usePostFeedback();
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
@@ -206,9 +210,33 @@ export function TextEditor({
     tag: string;
     reference: string;
     datatype: string;
+    rank?: number;
   }) => {
     // Guard against applying a tag when no text has been selected
     if (!highlightRange) return;
+
+    // Send feedback to the AI recommender about the user's selection. The
+    // recommender service uses this information to improve future
+    // suggestions. We include taxonomy, the original query text, the
+    // selected concept's label (reference), its identifier (tag), and
+    // contextual flags indicating that this choice was correct and not
+    // custom. If rank is missing, default to 0.
+    try {
+      sendFeedback({
+        data: {
+          taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+          query: highlightedText,
+          reference: item.reference,
+          tag: item.tag,
+          is_correct: true,
+          is_custom: false,
+          rank: item.rank ?? 0,
+        },
+      });
+    } catch (err) {
+      // Errors are handled within usePostFeedback's onError; swallow here to avoid
+      // interrupting user flow.
+    }
     // Create a minimal concept object from the recommendation. Additional
     // metadata (e.g. definition, period type) may be resolved by the
     // taxonomy lookup within the tagging panel.
@@ -298,7 +326,7 @@ export function TextEditor({
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
-          <HoverCardContent className='w-80'>
+          <HoverCardContent className='w-80  '>
             <div className='space-y-3'>
               <h4 className='text-base font-semibold break-words'>
                 {tag.concept.label}
@@ -505,30 +533,37 @@ export function TextEditor({
           <div style={{ display: 'none' }} />
         </PopoverTrigger>
         <PopoverContent
-          className='p-0 resize overflow-hidden min-w-96 min-h-72'
+          className='p-0 w-80'
           side='bottom'
           align='start'
           sideOffset={8}
+          /*
+           * Make the suggestion popover resizable by the user. We preserve
+           * positioning when anchored to the highlighted text but always
+           * include CSS resize and overflow properties so users can drag
+           * the corner to adjust width and height. Without specifying
+           * overflow: auto the resize handle would be hidden.
+           */
           style={
             popoverTriggerElement
               ? {
                   position: 'fixed',
                   top: popoverTriggerElement.offsetTop,
                   left: popoverTriggerElement.offsetLeft,
-                  width: '600px',
-                  height: '350px',
+                  resize: 'both',
+                  overflow: 'auto',
                 }
               : {
-                  width: '600px',
-                  height: '350px',
+                  resize: 'both',
+                  overflow: 'auto',
                 }
           }
         >
-          <div className='p-4 h-full flex flex-col overflow-hidden text-wrap whitespace-nowrap'>
-            <div className='flex items-center justify-between mb-3 flex-shrink-0'>
-              <div className='flex items-center gap-2 min-w-0'>
-                <Lightbulb className='w-4 h-4 text-primary flex-shrink-0' />
-                <span className='text-sm font-semibold truncate'>
+          <div className='p-4'>
+            <div className='flex items-center justify-between mb-3'>
+              <div className='flex items-center gap-2'>
+                <Lightbulb className='w-4 h-4 text-primary' />
+                <span className='text-sm font-semibold'>
                   Suggestions for "{highlightedText}"
                 </span>
               </div>
@@ -536,41 +571,37 @@ export function TextEditor({
                 variant='ghost'
                 size='sm'
                 onClick={closePopover}
-                className='w-6 h-6 p-0 hover:bg-muted flex-shrink-0'
+                className='w-6 h-6 p-0 hover:bg-muted'
               >
                 <X className='w-3 h-3' />
               </Button>
             </div>
 
             {recommendations.length > 0 ? (
-              <div className='flex-1 overflow-y-auto custom-scrollbar min-h-0'>
-                <div className='space-y-1'>
-                  {recommendations.map((item, index) => (
-                    <Button
-                      key={index}
-                      variant='ghost'
-                      className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
-                      onClick={() => applyTag(item)}
-                    >
-                      <div className='space-y-1 min-w-0 w-full'>
-                        <div className='text-sm font-semibold text-foreground break-words'>
-                          {item.reference}
-                        </div>
-                        <div className='font-mono text-xs text-muted-foreground break-all'>
-                          {item.tag}
-                        </div>
+              <div className='space-y-1 overflow-y-auto max-h-64 custom-scrollbar'>
+                {recommendations.map((item, index) => (
+                  <Button
+                    key={item.tag}
+                    variant='ghost'
+                    className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
+                    onClick={() => applyTag(item)}
+                  >
+                    <div className='space-y-1'>
+                      <div className='text-sm font-semibold text-foreground'>
+                        {item.reference}
                       </div>
-                    </Button>
-                  ))}
-                </div>
+                      <div className='font-mono text-xs text-muted-foreground'>
+                        {item.tag}
+                      </div>
+                    </div>
+                  </Button>
+                ))}
               </div>
             ) : (
-              <div className='flex-1 flex items-center justify-center text-center text-muted-foreground'>
-                <div>
-                  <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
-                  <p className='text-sm font-medium'>No suggestions found</p>
-                  <p className='text-xs'>Try selecting different text</p>
-                </div>
+              <div className='py-6 text-center text-muted-foreground'>
+                <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
+                <p className='text-sm font-medium'>No suggestions found</p>
+                <p className='text-xs'>Try selecting different text</p>
               </div>
             )}
           </div>
