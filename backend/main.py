@@ -1,6 +1,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+import time
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -13,10 +14,10 @@ from api.v1.api import api_router
 from core.config import settings
 from database.connection import db_manager
 
-# Enable pretty tracebacks
+# Enable pretty tracebacks for easier debugging
 install(show_locals=True)
 
-# Ensure directories
+# Ensure necessary directories exist
 os.makedirs("logs", exist_ok=True)
 os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
 
@@ -37,20 +38,26 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
 # FastAPI lifespan event
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not db_manager.is_connection_alive():
-        logger.error("Database connection failed on startup")
-        raise Exception("Database connection failed")
-    logger.info("Database connection established")
+    retries = 3
+    for attempt in range(retries):
+        if db_manager.is_connection_alive():
+            logger.info("Database connection established")
+            break
+        else:
+            logger.error(f"Database connection failed on attempt {attempt + 1}")
+            if attempt < retries - 1:
+                time.sleep(5)  # Wait before retrying
+            else:
+                raise Exception("Database connection failed after retries")
 
     yield
 
+    # Cleanup connections at shutdown
     db_manager.close_all_connections()
     logger.info("Database connections closed")
-
 
 # App instance
 app = FastAPI(
@@ -61,7 +68,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -69,6 +76,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.middleware("http")
 async def auto_refresh_tokens(request: Request, call_next):
     response = await call_next(request)
@@ -82,28 +90,31 @@ async def auto_refresh_tokens(request: Request, call_next):
         else:
             same_site, secure_flag = "lax", False   # localhost HTTP (same-origin via proxy)
 
-        response.set_cookie(
-            key="access_token",
-            value=tokens["access_token"],
-            httponly=True,
-            samesite=same_site,
-            secure=secure_flag,
-            max_age=int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
-            path="/",
-        )
-        response.set_cookie(
-            key="refresh_token",
-            value=tokens["refresh_token"],
-            httponly=True,
-            samesite=same_site,
-            secure=secure_flag,
-            max_age=int(settings.REFRESH_TOKEN_EXPIRE_DAYS) * 24 * 60 * 60,
-            path="/",
-        )
+        try:
+            response.set_cookie(
+                key="access_token",
+                value=tokens["access_token"],
+                httponly=True,
+                samesite=same_site,
+                secure=secure_flag,
+                max_age=int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
+                path="/",
+            )
+            response.set_cookie(
+                key="refresh_token",
+                value=tokens["refresh_token"],
+                httponly=True,
+                samesite=same_site,
+                secure=secure_flag,
+                max_age=int(settings.REFRESH_TOKEN_EXPIRE_DAYS) * 24 * 60 * 60,
+                path="/",
+            )
+        except KeyError:
+            logger.warning("Tokens are incomplete or malformed in request.")
 
     return response
 
-# Mount static uploads
+# Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIRECTORY), name="uploads")
 
 # API routes
@@ -114,13 +125,15 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def root():
     return {"message": "FastAPI Backend is running", "version": "1.0.0"}
 
-# Health check
+# Health check endpoint
 @app.get("/health")
 async def health_check():
     db_healthy = db_manager.is_connection_alive()
     return {
         "status": "healthy" if db_healthy else "unhealthy",
         "database": "connected" if db_healthy else "disconnected",
+        "timestamp": time.time(),  # Optional, provides last check time
+        "version": settings.VERSION,
     }
 
 # Global HTTPException handler
@@ -135,7 +148,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Global unhandled exception handler
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception", exc_info=exc)
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}", exc_info=exc)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error", "error": str(exc)},
