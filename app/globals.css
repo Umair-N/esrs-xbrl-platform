@@ -92,3 +92,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+::selection {
+  background-color: rgb(14, 206, 59); /* Highlight color */
+  color: black; /* Text color */
+}

@@ -89,7 +89,7 @@ export function TaggedFactsList({
 
       toast.success('Tag deleted', {
         description: `Removed "${tag.concept.label}"`,
-        icon: <CheckCircle className='h-4 w-4' />,
+        icon: <CheckCircle className='w-4 h-4' />,
         duration: 2000,
       });
     } catch (error) {
@@ -122,12 +122,12 @@ export function TaggedFactsList({
   // Empty state
   if (allTags.length === 0) {
     return (
-      <div className='flex flex-col items-center justify-center text-center py-8 h-full'>
-        <div className='w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center mb-4'>
-          <Tag className='h-6 w-6 text-purple-600' />
+      <div className='flex flex-col items-center justify-center h-full py-8 text-center'>
+        <div className='flex items-center justify-center w-12 h-12 mb-4 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20'>
+          <Tag className='w-6 h-6 text-purple-600' />
         </div>
-        <h3 className='text-base font-semibold mb-2'>No Tagged Facts Yet</h3>
-        <p className='text-sm text-muted-foreground max-w-sm leading-relaxed'>
+        <h3 className='mb-2 text-base font-semibold'>No Tagged Facts Yet</h3>
+        <p className='max-w-sm text-sm leading-relaxed text-muted-foreground'>
           Start by selecting text in the document and adding tags.
         </p>
       </div>
@@ -137,12 +137,12 @@ export function TaggedFactsList({
   return (
     <div className='flex flex-col h-full min-h-0'>
       {/* Header */}
-      <div className='text-sm text-muted-foreground mb-3 flex-shrink-0'>
+      <div className='flex-shrink-0 mb-3 text-sm text-muted-foreground'>
         {allTags.length} tagged fact{allTags.length !== 1 ? 's' : ''}
       </div>
 
       {/* Scrollable List */}
-      <div className='flex-1 overflow-y-auto space-y-3 pr-1'>
+      <div className='flex-1 pr-1 space-y-3 overflow-y-auto'>
         {allTags.map((tag) => {
           const isDeleting = deletingTags.has(tag.id);
           const isESRS = tag.concept.id.toLowerCase().includes('esrs');
@@ -159,7 +159,7 @@ export function TaggedFactsList({
               <CardHeader className='pb-2'>
                 <div className='flex items-start justify-between gap-2'>
                   <div className='flex-1 min-w-0'>
-                    <CardTitle className='text-sm font-semibold break-words leading-tight'>
+                    <CardTitle className='text-sm font-semibold leading-tight break-words'>
                       {tag.concept.label}
                     </CardTitle>
                     <div className='flex items-center gap-1 mt-1'>
@@ -171,43 +171,39 @@ export function TaggedFactsList({
                             : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300'
                         }`}
                       >
-                        {isESRS ? 'ESRS' : 'XBRL'}
+                        {tag?.concept?.id}
                       </Badge>
                     </div>
                   </div>
                   <Button
                     size='icon'
                     variant='ghost'
-                    className='h-6 w-6 flex-shrink-0 hover:bg-destructive hover:text-destructive-foreground'
+                    className='flex-shrink-0 w-6 h-6 hover:bg-destructive hover:text-destructive-foreground'
                     onClick={() => handleDeleteTag(tag.blockId, tag.id)}
                     disabled={isDeleting}
                   >
-                    <Trash2 className='h-3 w-3' />
+                    <Trash2 className='w-3 h-3' />
                   </Button>
                 </div>
               </CardHeader>
 
-              <CardContent className='space-y-3 pt-0 pb-3'>
+              <CardContent className='pt-0'>
                 {/* Tagged Text */}
+                <span className='text-xs'>Tagged text:</span>
                 <div
-                  className={`p-2 rounded border text-xs break-words leading-relaxed max-h-24 overflow-hidden text-ellipsis ${
-                    isESRS
-                      ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
-                      : 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800'
-                  }`}
+                  className={`p-2 rounded border text-xs break-words leading-relaxed max-h-24 overflow-hidden text-ellipsis bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'`}
                 >
                   {tag.taggedText}
                 </div>
-
                 {/* Actions */}
-                <div className='flex gap-2'>
+                {/* <div className='flex gap-2'>
                   <Button
                     variant='outline'
                     size='sm'
                     className='flex-1 text-xs h-7 hover:bg-primary hover:text-primary-foreground'
                     onClick={() => handleViewInDocument(tag.blockId)}
                   >
-                    <Eye className='h-3 w-3 mr-1' />
+                    <Eye className='w-3 h-3 mr-1' />
                     View
                   </Button>
                   <Button
@@ -216,10 +212,10 @@ export function TaggedFactsList({
                     className='flex-1 text-xs h-7 hover:bg-secondary hover:text-secondary-foreground'
                     onClick={() => handleViewInTaxonomy(tag)}
                   >
-                    <ExternalLink className='h-3 w-3 mr-1' />
+                    <ExternalLink className='w-3 h-3 mr-1' />
                     Taxonomy
                   </Button>
-                </div>
+                </div> */}
               </CardContent>
             </Card>
           );

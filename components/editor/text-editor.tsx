@@ -128,7 +128,6 @@ export function TextEditor({
       updatedAt: new Date().toISOString(),
     };
 
-    console.log('Saving edited block:', updatedReport);
     onReportChange(updatedReport);
     setEditingBlockId(null);
 
@@ -269,8 +268,11 @@ export function TextEditor({
         };
         const updatedReport: ReportDocument = {
           ...report,
-          blocks: report.blocks.map((blk) =>
-            blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+          blocks: report.blocks.map(
+            (
+              blk //@ts-ignore
+            ) =>
+              blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
           ),
           updatedAt: new Date().toISOString(),
         };
