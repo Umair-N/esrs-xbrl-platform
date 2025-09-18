@@ -23,6 +23,15 @@ export interface XbrlTag {
   // Optional: indices of the highlighted text in the content
   startIndex?: number; // Start index of the highlighted text
   endIndex?: number; // End index of the highlighted text
+
+  /**
+   * Optional feedback ID returned from the AI recommender when a user
+   * selects a recommended tag. Storing this ID allows the application
+   * to delete the associated feedback when the tag is removed. Tags
+   * created manually without using the recommendation service will have
+   * this property undefined.
+   */
+  feedbackId?: number;
 }
 
 export interface TaxonomyConcept {

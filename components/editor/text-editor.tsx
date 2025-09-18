@@ -215,29 +215,12 @@ export function TextEditor({
     // Guard against applying a tag when no text has been selected
     if (!highlightRange) return;
 
-    // Send feedback to the AI recommender about the user's selection. The
-    // recommender service uses this information to improve future
-    // suggestions. We include taxonomy, the original query text, the
-    // selected concept's label (reference), its identifier (tag), and
-    // contextual flags indicating that this choice was correct and not
-    // custom. If rank is missing, default to 0.
-    try {
-      sendFeedback({
-        data: {
-          taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
-          query: highlightedText,
-          reference: item.reference,
-          tag: item.tag,
-          is_correct: true,
-          is_custom: false,
-          rank: item.rank ?? 0,
-        },
-      });
-    } catch (err) {
-      // Errors are handled within usePostFeedback's onError; swallow here to avoid
-      // interrupting user flow.
-    }
-    // Create a minimal concept object from the recommendation. Additional
+    // Capture the current highlight range and context ID. We'll need these
+    // values later when creating the tag in the onSuccess/onError callbacks.
+    const { blockId, startIndex, endIndex } = highlightRange;
+    const localContextId = selectedContextId;
+
+    // Construct a minimal concept object from the recommendation. Additional
     // metadata (e.g. definition, period type) may be resolved by the
     // taxonomy lookup within the tagging panel.
     const concept = {
@@ -247,40 +230,84 @@ export function TextEditor({
       type: item.datatype,
       periodType: '',
     };
-    // If a context has already been selected in the tagging tools, we can
-    // immediately create the tag with that context. Otherwise, we defer
-    // creation by storing a pending concept for the tagging panel.
-    if (selectedContextId) {
-      const { blockId, startIndex, endIndex } = highlightRange;
-      const context = sampleContexts.find((c) => c.id === selectedContextId);
-      const newTag = {
-        id: `${Date.now()}`,
-        concept,
-        startIndex,
-        endIndex,
-        ...(context ? { context } : {}),
-      };
-      const updatedReport: ReportDocument = {
-        ...report,
-        blocks: report.blocks.map((blk) =>
-          blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
-        ),
-        updatedAt: new Date().toISOString(),
-      };
-      onReportChange(updatedReport);
-    } else {
-      // Place the pending concept into the global tagging store. The tagging
-      // panel will detect this value and preselect it for context assignment.
-      setPendingConcept(concept);
-    }
-    // Hide the suggestion popover and clear the highlight range. Tag
-    // creation (if deferred) will happen within the tagging panel.
-    setShowPopover(false);
-    setHighlightRange(null);
-    if (popoverTriggerElement) {
-      document.body.removeChild(popoverTriggerElement);
-      setPopoverTriggerElement(null);
-    }
+
+    /**
+     * Helper to finalise tag creation or pending concept storage. This
+     * function is called after the feedback API responds. It receives
+     * an optional feedback ID and uses captured variables from the
+     * applyTag scope to update the report or pending concept. It also
+     * hides the suggestion popover and clears the highlight range.
+     */
+    const finalizeTag = (feedbackId?: number) => {
+      if (localContextId) {
+        // If a context has been selected, create and attach the tag
+        const context = sampleContexts.find((c) => c.id === localContextId);
+        const newTag = {
+          id: `${Date.now()}`,
+          concept,
+          startIndex,
+          endIndex,
+          ...(context ? { context } : {}),
+          ...(feedbackId !== undefined ? { feedbackId } : {}),
+        };
+        const updatedReport: ReportDocument = {
+          ...report,
+          blocks: report.blocks.map((blk) =>
+            blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        onReportChange(updatedReport);
+      } else {
+        // No context selected yet; defer creation by storing the concept
+        // along with its feedback ID (if any) in the global tagging store.
+        if (feedbackId !== undefined) {
+          setPendingConcept({ ...concept, feedbackId });
+        } else {
+          setPendingConcept(concept);
+        }
+      }
+
+      // Hide the suggestion popover and clear the highlight range.
+      setShowPopover(false);
+      setHighlightRange(null);
+      if (popoverTriggerElement) {
+        document.body.removeChild(popoverTriggerElement);
+        setPopoverTriggerElement(null);
+      }
+    };
+
+    // Prepare the feedback payload. The AI recommender expects these
+    // properties to record which suggestion was selected for the query. If
+    // the rank is missing, default to 0.
+    const feedbackPayload = {
+      taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+      query: highlightedText,
+      reference: item.reference,
+      tag: item.tag,
+      is_correct: true,
+      is_custom: false,
+      rank: item.rank ?? 0,
+    };
+
+    // Submit feedback and handle the response. We use the mutate function
+    // returned from usePostFeedback to perform the API call. On success
+    // we extract the returned ID and finalise tag creation. On error we
+    // finalise without a feedback ID.
+    sendFeedback(
+      { data: feedbackPayload },
+      {
+        onSuccess: (res: any) => {
+          // The feedback API returns an object containing an `id` field.
+          const fid: number | undefined =
+            res && typeof res.id === 'number' ? res.id : undefined;
+          finalizeTag(fid);
+        },
+        onError: () => {
+          finalizeTag(undefined);
+        },
+      }
+    );
   };
 
   const closePopover = () => {

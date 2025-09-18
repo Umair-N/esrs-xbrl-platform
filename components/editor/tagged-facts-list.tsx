@@ -1,19 +1,14 @@
-"use client";
+'use client';
 
-import type { ReportDocument } from "@/types/report";
-import { Button } from "@/components/ui/button";
-import {
-  Trash2,
-  Eye,
-  ExternalLink,
-  CheckCircle,
-  Tag,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import type { ReportDocument } from '@/types/report';
+import { Button } from '@/components/ui/button';
+import { Trash2, Eye, ExternalLink, CheckCircle, Tag } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useDeleteFeedback } from '@/features/recommender/api/delete-feedback';
 
 interface TaggedFactsListProps {
   report: ReportDocument;
@@ -28,6 +23,12 @@ export function TaggedFactsList({
 }: TaggedFactsListProps) {
   const [deletingTags, setDeletingTags] = useState<Set<string>>(new Set());
   const router = useRouter();
+
+  // Hook for deleting feedback associated with a tag. When a tag that
+  // originated from a recommendation is removed, this will remove the
+  // corresponding feedback entry in the AI recommender. Use the mutate
+  // function to trigger the API call.
+  const { mutate: deleteFeedback } = useDeleteFeedback();
 
   // Collect all tags
   const allTags = report.blocks.flatMap((block) =>
@@ -44,8 +45,8 @@ export function TaggedFactsList({
 
   const handleDeleteTag = async (blockId: string, tagId: string) => {
     if (!onReportChange) {
-      toast.error("Cannot delete tag", {
-        description: "Missing update handler",
+      toast.error('Cannot delete tag', {
+        description: 'Missing update handler',
       });
       return;
     }
@@ -57,7 +58,7 @@ export function TaggedFactsList({
       const tag = block?.tags.find((t) => t.id === tagId);
 
       if (!block || !tag) {
-        toast.error("Cannot delete tag", { description: "Tag not found" });
+        toast.error('Cannot delete tag', { description: 'Tag not found' });
         return;
       }
 
@@ -78,14 +79,22 @@ export function TaggedFactsList({
 
       onReportChange(updatedReport);
 
-      toast.success("Tag deleted", {
+      // If the tag has an associated feedback ID, delete the feedback
+      // entry from the AI recommender. We call the mutation without
+      // blocking the UI; the deletion happens in the background. Any
+      // errors will be handled internally by the hook.
+      if ((tag as any)?.feedbackId !== undefined) {
+        deleteFeedback({ id: (tag as any).feedbackId });
+      }
+
+      toast.success('Tag deleted', {
         description: `Removed "${tag.concept.label}"`,
-        icon: <CheckCircle className="h-4 w-4" />,
+        icon: <CheckCircle className='h-4 w-4' />,
         duration: 2000,
       });
     } catch (error) {
-      console.error("Error deleting tag:", error);
-      toast.error("Failed to delete tag");
+      console.error('Error deleting tag:', error);
+      toast.error('Failed to delete tag');
     } finally {
       setDeletingTags((prev) => {
         const newSet = new Set(prev);
@@ -98,27 +107,27 @@ export function TaggedFactsList({
   const handleViewInTaxonomy = (tag: any) => {
     const queryParams = new URLSearchParams({
       conceptId: tag.concept.id,
-      conceptLabel: tag.concept.label || "",
-      conceptType: tag.concept.type || "",
-      periodType: tag.concept.periodType || "",
+      conceptLabel: tag.concept.label || '',
+      conceptType: tag.concept.type || '',
+      periodType: tag.concept.periodType || '',
     });
     router.push(`/taxonomy?${queryParams.toString()}`);
   };
 
   const handleViewInDocument = (blockId: string) => {
     onBlockSelect(blockId);
-    toast.success("Navigated to document", { duration: 1500 });
+    toast.success('Navigated to document', { duration: 1500 });
   };
 
   // Empty state
   if (allTags.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-center py-8 h-full">
-        <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center mb-4">
-          <Tag className="h-6 w-6 text-purple-600" />
+      <div className='flex flex-col items-center justify-center text-center py-8 h-full'>
+        <div className='w-12 h-12 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center mb-4'>
+          <Tag className='h-6 w-6 text-purple-600' />
         </div>
-        <h3 className="text-base font-semibold mb-2">No Tagged Facts Yet</h3>
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+        <h3 className='text-base font-semibold mb-2'>No Tagged Facts Yet</h3>
+        <p className='text-sm text-muted-foreground max-w-sm leading-relaxed'>
           Start by selecting text in the document and adding tags.
         </p>
       </div>
@@ -126,88 +135,88 @@ export function TaggedFactsList({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className='flex flex-col h-full min-h-0'>
       {/* Header */}
-      <div className="text-sm text-muted-foreground mb-3 flex-shrink-0">
-        {allTags.length} tagged fact{allTags.length !== 1 ? "s" : ""}
+      <div className='text-sm text-muted-foreground mb-3 flex-shrink-0'>
+        {allTags.length} tagged fact{allTags.length !== 1 ? 's' : ''}
       </div>
 
       {/* Scrollable List */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+      <div className='flex-1 overflow-y-auto space-y-3 pr-1'>
         {allTags.map((tag) => {
           const isDeleting = deletingTags.has(tag.id);
-          const isESRS = tag.concept.id.toLowerCase().includes("esrs");
+          const isESRS = tag.concept.id.toLowerCase().includes('esrs');
 
           return (
             <Card
               key={tag.id}
               className={`transition-all duration-200 border-l-4 ${
                 isESRS
-                  ? "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/10"
-                  : "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/10"
-              } ${isDeleting ? "opacity-50 scale-95" : "hover:shadow-md"}`}
+                  ? 'border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/10'
+                  : 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/10'
+              } ${isDeleting ? 'opacity-50 scale-95' : 'hover:shadow-md'}`}
             >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm font-semibold break-words leading-tight">
+              <CardHeader className='pb-2'>
+                <div className='flex items-start justify-between gap-2'>
+                  <div className='flex-1 min-w-0'>
+                    <CardTitle className='text-sm font-semibold break-words leading-tight'>
                       {tag.concept.label}
                     </CardTitle>
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className='flex items-center gap-1 mt-1'>
                       <Badge
-                        variant="outline"
+                        variant='outline'
                         className={`text-xs ${
                           isESRS
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-300"
-                            : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300"
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-300'
+                            : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300'
                         }`}
                       >
-                        {isESRS ? "ESRS" : "XBRL"}
+                        {isESRS ? 'ESRS' : 'XBRL'}
                       </Badge>
                     </div>
                   </div>
                   <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 flex-shrink-0 hover:bg-destructive hover:text-destructive-foreground"
+                    size='icon'
+                    variant='ghost'
+                    className='h-6 w-6 flex-shrink-0 hover:bg-destructive hover:text-destructive-foreground'
                     onClick={() => handleDeleteTag(tag.blockId, tag.id)}
                     disabled={isDeleting}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className='h-3 w-3' />
                   </Button>
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-3 pt-0 pb-3">
+              <CardContent className='space-y-3 pt-0 pb-3'>
                 {/* Tagged Text */}
                 <div
                   className={`p-2 rounded border text-xs break-words leading-relaxed max-h-24 overflow-hidden text-ellipsis ${
                     isESRS
-                      ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800"
-                      : "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
+                      ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                      : 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800'
                   }`}
                 >
                   {tag.taggedText}
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className='flex gap-2'>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-7 hover:bg-primary hover:text-primary-foreground"
+                    variant='outline'
+                    size='sm'
+                    className='flex-1 text-xs h-7 hover:bg-primary hover:text-primary-foreground'
                     onClick={() => handleViewInDocument(tag.blockId)}
                   >
-                    <Eye className="h-3 w-3 mr-1" />
+                    <Eye className='h-3 w-3 mr-1' />
                     View
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-7 hover:bg-secondary hover:text-secondary-foreground"
+                    variant='outline'
+                    size='sm'
+                    className='flex-1 text-xs h-7 hover:bg-secondary hover:text-secondary-foreground'
                     onClick={() => handleViewInTaxonomy(tag)}
                   >
-                    <ExternalLink className="h-3 w-3 mr-1" />
+                    <ExternalLink className='h-3 w-3 mr-1' />
                     Taxonomy
                   </Button>
                 </div>
