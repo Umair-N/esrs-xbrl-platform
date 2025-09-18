@@ -77,13 +77,38 @@ export default function UploadPage() {
   );
 
   return (
-    <div className='flex items-center justify-center py-8'>
+    <div className='flex items-center justify-center py-8 '>
       <div className='w-full max-w-3xl'>
-        <div className='flex justify-center items-center gap-5'>
-          <Link className={buttonVariants()} href='/sessions'>
-            View my files
+        <div className='flex justify-center items-center gap-6'>
+          {/* Button for viewing files */}
+          <Link
+            className={`${buttonVariants()} bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 py-2 px-6 rounded-lg shadow-xl font-bold text-white border-0 transition duration-300 ease-in-out transform hover:scale-105`}
+            href='/sessions'
+          >
+            View My Files
           </Link>
-          <Link href='/editor'>Continue previous session</Link>
+
+          {/* Link for continuing previous session */}
+          <Link
+            href='/editor'
+            className='flex items-center text-violet-600 hover:bg-violet-100 hover:text-violet-800 px-4 py-2 rounded-lg text-lg font-semibold transition duration-300 ease-in-out hover:shadow-md'
+          >
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              className='h-5 w-5 mr-2'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+              strokeWidth='2'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M9 5l7 7-7 7'
+              ></path>
+            </svg>
+            Continue Previous Session
+          </Link>
         </div>
 
         <FileUploader onReportLoaded={handleReportLoaded} />

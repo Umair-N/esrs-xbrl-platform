@@ -20,6 +20,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
@@ -38,6 +43,8 @@ import {
   BookOpen,
   Sparkles,
   GripVertical,
+  MoreHorizontal,
+  Loader2,
 } from 'lucide-react';
 import { axiosInstance } from '@/lib/axios';
 import { toast } from 'sonner';
@@ -93,6 +100,8 @@ export default function EditorPage() {
     endIndex: number;
   } | null>(null);
   const [isTaggedFactsOpen, setIsTaggedFactsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Load the report from localStorage on mount. If none exists, redirect.
   useEffect(() => {
@@ -179,8 +188,49 @@ export default function EditorPage() {
     }
   };
 
+  const handleSaveSession = async () => {
+    if (!report) return;
+
+    setIsSaving(true);
+    try {
+      const updatedReport = {
+        ...report,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to localStorage with report ID
+      localStorage.setItem(
+        `report_${report.id}`,
+        JSON.stringify(updatedReport)
+      );
+
+      // Update the current session
+      setReport(updatedReport);
+
+      // Also call the existing handleSave function for API persistence
+      await handleSave(updatedReport);
+
+      console.log('ESRS Report saved successfully');
+    } catch (error) {
+      console.error('Error saving report:', error);
+      toast.error('Failed to save session');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleReportChange = (updatedReport: ReportDocument) => {
     setReport(updatedReport);
+  };
+
+  const handleNewDocument = () => {
+    router.push('/upload');
+    setIsMenuOpen(false);
+  };
+
+  const handleViewSessions = () => {
+    router.push('/sessions');
+    setIsMenuOpen(false);
   };
 
   if (!report) {
@@ -203,8 +253,8 @@ export default function EditorPage() {
         className='flex-1 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm'
       >
         <ResizablePanel defaultSize={50} minSize={40}>
-          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
-            <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-1 pt-1 pl-3'>
+          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none overflow-hidden'>
+            <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-2 pt-2 pl-3'>
               <CardTitle className='flex items-center gap-3 text-lg'>
                 <div className='p-2 bg-blue-500 rounded-lg'>
                   <BookOpen className='h-5 w-5 text-white' />
@@ -219,7 +269,7 @@ export default function EditorPage() {
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className='flex-1 p-0 mt-2 h-screen'>
+            <CardContent className='flex-1 p-0 mt-2 overflow-hidden'>
               <TextEditor
                 report={report}
                 selectedBlockId={selectedBlockId}
@@ -241,7 +291,7 @@ export default function EditorPage() {
         </ResizableHandle>
 
         <ResizablePanel defaultSize={50} minSize={30}>
-          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
+          <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none overflow-hidden'>
             <CardHeader className='flex-shrink-0 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 pb-1 pt-1 pl-3'>
               <CardTitle className='flex items-center justify-between gap-3 text-lg'>
                 <div className='flex items-center gap-3'>
@@ -258,16 +308,23 @@ export default function EditorPage() {
                   </div>
                 </div>
                 <div className='flex items-center gap-2'>
-                  {/* Navigate to sessions page */}
+                  {/* Save Session Button */}
                   <Button
                     variant='outline'
                     size='sm'
-                    onClick={() => router.push('/sessions')}
-                    className='gap-2 h-9 px-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0'
+                    onClick={handleSaveSession}
+                    disabled={isSaving}
+                    className='gap-2 h-9 px-3 hover:bg-green-50 hover:border-green-300 dark:hover:bg-green-900/20 transition-colors flex-shrink-0'
                   >
-                    <BookOpen className='h-4 w-4' />
-                    Sessions
+                    {isSaving ? (
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                    ) : (
+                      <Save className='h-4 w-4' />
+                    )}
+                    {isSaving ? 'Saving...' : 'Save Session'}
                   </Button>
+
+                  {/* View Tagged Facts Dialog */}
                   <Dialog
                     open={isTaggedFactsOpen}
                     onOpenChange={setIsTaggedFactsOpen}
@@ -324,22 +381,41 @@ export default function EditorPage() {
                       </div>
                     </DialogContent>
                   </Dialog>
-                  {/* Navigate to upload page for a new document */}
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        // localStorage.removeItem('xbrl-editor-session');
-                        // localStorage.removeItem('xbrl-session-id');
-                      }
-                      router.push('/upload');
-                    }}
-                    className='gap-2 h-9 px-4 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0'
-                  >
-                    <Upload className='h-4 w-4' />
-                    New Document
-                  </Button>
+
+                  {/* Menu Popover */}
+                  <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='gap-2 h-9 px-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0'
+                      >
+                        <MoreHorizontal className='h-4 w-4' />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-56 p-0' align='end'>
+                      <div className='p-1'>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          onClick={handleViewSessions}
+                          className='w-full justify-start gap-2 h-9'
+                        >
+                          <BookOpen className='h-4 w-4' />
+                          Sessions
+                        </Button>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          onClick={handleNewDocument}
+                          className='w-full justify-start gap-2 h-9'
+                        >
+                          <Upload className='h-4 w-4' />
+                          New Document
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </CardTitle>
             </CardHeader>

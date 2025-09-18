@@ -4,6 +4,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { useUser } from '@/lib/auth';
 import Navigate from '@/components/navigate';
 import PageSwitcherLoader from '@/components/page-switcher-loader';
+import { BriskyAIBot } from '@/components/briskyai-bot';
 
 export default function MainLayout({
   children,
@@ -43,6 +44,7 @@ export default function MainLayout({
     <div className='flex flex-col min-h-screen'>
       <SiteHeader />
       <main className='flex-1'>{children}</main>
+      <BriskyAIBot />
       {/* <SiteFooter /> */}
     </div>
   ) : (

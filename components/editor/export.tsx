@@ -68,27 +68,27 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
     (taggedBlocks / report.blocks.length) * 100
   );
 
-  const handleSaveProject = async () => {
-    setIsSaving(true);
-    try {
-      const updatedReport = {
-        ...report,
-        updatedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(
-        `report_${report.id}`,
-        JSON.stringify(updatedReport)
-      );
-      if (onSave) {
-        onSave(updatedReport);
-      }
-      console.log('ESRS Report saved successfully');
-    } catch (error) {
-      console.error('Error saving report:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // const handleSaveProject = async () => {
+  //   setIsSaving(true);
+  //   try {
+  //     const updatedReport = {
+  //       ...report,
+  //       updatedAt: new Date().toISOString(),
+  //     };
+  //     localStorage.setItem(
+  //       `report_${report.id}`,
+  //       JSON.stringify(updatedReport)
+  //     );
+  //     if (onSave) {
+  //       onSave(updatedReport);
+  //     }
+  //     console.log('ESRS Report saved successfully');
+  //   } catch (error) {
+  //     console.error('Error saving report:', error);
+  //   } finally {
+  //     setIsSaving(false);
+  //   }
+  // };
 
   const handleExportXBRL = async () => {
     setIsExporting(true);
@@ -238,26 +238,6 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
 
       {/* Export & Session Controls */}
       <div className='space-y-2'>
-        {/* Save Session Button */}
-        <Button
-          onClick={handleSaveProject}
-          disabled={isSaving}
-          className='w-full text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800'
-          size='sm'
-        >
-          {isSaving ? (
-            <>
-              <div className='w-3 h-3 mr-2 border-2 border-white rounded-full animate-spin border-t-transparent' />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className='w-3 h-3 mr-2' />
-              Save Session
-            </>
-          )}
-        </Button>
-
         {/* Export XBRL Button */}
         <Button
           onClick={handleExportXBRL}
@@ -278,7 +258,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
           )}
         </Button>
 
-        <div className='grid grid-cols-2 gap-2'>
+        <div className='grid grid-cols-1'>
           {/* Preview Button */}
           <Dialog open={showPreview} onOpenChange={setShowPreview}>
             <DialogTrigger asChild>
@@ -311,7 +291,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
             </DialogContent>
           </Dialog>
 
-          {/* Validate Button */}
+          {/* Validate Button
           <Button
             variant='outline'
             size='sm'
@@ -340,7 +320,7 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
                 Validate
               </>
             )}
-          </Button>
+          </Button> */}
         </div>
       </div>
 
