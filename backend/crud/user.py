@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict
 
 from core.security import get_password_hash
-from models.user import User
+from models.user import User, UserStatus
 from psycopg2.extras import RealDictCursor
 from schemas.user import UserCreate, UserUpdate
 from datetime import datetime, timezone
@@ -280,32 +280,86 @@ class UserCRUD:
             raise error
         finally:
             cursor.close()
+
+
     def enable(self, user_id: int, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
-            query = "UPDATE users SET is_active = true WHERE id = %(id)s RETURNING *"
+            # Query to get the user by user_id
+            query = """
+                SELECT * FROM users WHERE id = %(id)s;
+            """
             cursor.execute(query, {"id": user_id})
-            result = cursor.fetchone()
-            db.commit()
-            return User(**result) if result else None
+            user = cursor.fetchone()
+
+            if user:
+                # Update user status, is_active, and platform_access
+                update_query = """
+                    UPDATE users
+                    SET status = %(status)s, is_active = %(is_active)s, platform_access = %(platform_access)s
+                    WHERE id = %(id)s
+                    RETURNING *;
+                """
+                cursor.execute(update_query, {
+                    "status": UserStatus.active.value,  # Using Enum's value as a string
+                    "is_active": True,
+                    "platform_access": True,  # Enable platform access
+                    "id": user_id
+                })
+                db.commit()  # Commit the transaction
+
+                updated_user = cursor.fetchone()  # Get the updated user
+                return User(**updated_user) if updated_user else None
+            
+            return None  # Return None if the user wasn't found
+
         except Exception as error:
-            db.rollback()
+            db.rollback()  # Rollback in case of an error
             raise error
+
         finally:
             cursor.close()
+
+
+
     def disable(self, user_id: int, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
-            query = "UPDATE users SET is_active = false WHERE id = %(id)s RETURNING *"
+            # Query to get the user by user_id
+            query = """
+                SELECT * FROM users WHERE id = %(id)s;
+            """
             cursor.execute(query, {"id": user_id})
-            result = cursor.fetchone()
-            db.commit()
-            return User(**result) if result else None
+            user = cursor.fetchone()
+
+            if user:
+                # Update user status, is_active, and platform_access
+                update_query = """
+                    UPDATE users
+                    SET status = %(status)s, is_active = %(is_active)s, platform_access = %(platform_access)s
+                    WHERE id = %(id)s
+                    RETURNING *;
+                """
+                cursor.execute(update_query, {
+                    "status": UserStatus.disabled.value,  # Using Enum's value as a string
+                    "is_active": False,
+                    "platform_access": False,  # Disable platform access
+                    "id": user_id
+                })
+                db.commit()  # Commit the transaction
+
+                updated_user = cursor.fetchone()  # Get the updated user
+                return User(**updated_user) if updated_user else None
+            
+            return None  # Return None if the user wasn't found
+
         except Exception as error:
-            db.rollback()
+            db.rollback()  # Rollback in case of an error
             raise error
+
         finally:
             cursor.close()
+
 
 
 user_crud = UserCRUD()
