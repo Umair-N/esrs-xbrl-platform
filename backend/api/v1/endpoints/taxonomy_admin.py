@@ -69,3 +69,4 @@ def set_user_taxonomy(
 def disable_user_taxonomy(user_id: int, db: PGConnection = Depends(get_db), _: Any = Depends(require_admin)):
     count = taxonomy_service.disable_user_taxonomy(user_id=user_id, db=db)
     return {"message": f"Disabled {count} active mapping(s) for user {user_id}"}
+
