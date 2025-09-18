@@ -283,7 +283,7 @@ class UserCRUD:
     def enable(self, user_id: int, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
-            query = "UPDATE users SET is_active = true WHERE id = %(id)s RETURNING *"
+            query = "UPDATE users SET is_active = true, status = 'active' WHERE id = %(id)s RETURNING *"
             cursor.execute(query, {"id": user_id})
             result = cursor.fetchone()
             db.commit()
@@ -296,7 +296,12 @@ class UserCRUD:
     def disable(self, user_id: int, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
-            query = "UPDATE users SET is_active = false WHERE id = %(id)s RETURNING *"
+            query = """
+                UPDATE users 
+                SET is_active = false, status = 'disabled' 
+                WHERE id = %(id)s 
+                RETURNING *;
+            """
             cursor.execute(query, {"id": user_id})
             result = cursor.fetchone()
             db.commit()
