@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { AuthResponse, User } from '@/types/api';
 
 import { api } from './api-client';
+import { showSuccess } from '@/components/heads-up';
 
 export const getUser = async (): Promise<User> => {
   const response = (await api.get('/users/me')) as User;
@@ -62,6 +63,7 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   return useMutation({
     mutationFn: logout,
     onSuccess: () => {
+      showSuccess({ title: 'Logout successful' })
       queryClient.removeQueries({ queryKey: userQueryKey });
       localStorage.removeItem('xbrl-editor-session')
       localStorage.removeItem('xbrl-session-id')
