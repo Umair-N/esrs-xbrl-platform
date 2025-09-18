@@ -1,5 +1,5 @@
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
-import { DashboardHeader } from '@/components/admin/dashboard-header';
+// import { DashboardHeader } from '@/components/admin/dashboard-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AdminAccess } from '@/utils/admin-access';
 
@@ -13,7 +13,7 @@ export default function EditorLayout({
       <SidebarProvider className='z-[99999]'>
         <AdminSidebar />
         <SidebarInset>
-          <DashboardHeader />
+          {/* <DashboardHeader /> */}
 
           {children}
         </SidebarInset>

@@ -298,7 +298,7 @@ export function TextEditor({
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
-          <HoverCardContent className='w-80  '>
+          <HoverCardContent className='w-80'>
             <div className='space-y-3'>
               <h4 className='text-base font-semibold break-words'>
                 {tag.concept.label}
@@ -505,7 +505,7 @@ export function TextEditor({
           <div style={{ display: 'none' }} />
         </PopoverTrigger>
         <PopoverContent
-          className='p-0 w-80'
+          className='p-0 resize overflow-hidden min-w-96 min-h-72'
           side='bottom'
           align='start'
           sideOffset={8}
@@ -515,15 +515,20 @@ export function TextEditor({
                   position: 'fixed',
                   top: popoverTriggerElement.offsetTop,
                   left: popoverTriggerElement.offsetLeft,
+                  width: '600px',
+                  height: '350px',
                 }
-              : undefined
+              : {
+                  width: '600px',
+                  height: '350px',
+                }
           }
         >
-          <div className='p-4'>
-            <div className='flex items-center justify-between mb-3'>
-              <div className='flex items-center gap-2'>
-                <Lightbulb className='w-4 h-4 text-primary' />
-                <span className='text-sm font-semibold'>
+          <div className='p-4 h-full flex flex-col overflow-hidden text-wrap whitespace-nowrap'>
+            <div className='flex items-center justify-between mb-3 flex-shrink-0'>
+              <div className='flex items-center gap-2 min-w-0'>
+                <Lightbulb className='w-4 h-4 text-primary flex-shrink-0' />
+                <span className='text-sm font-semibold truncate'>
                   Suggestions for "{highlightedText}"
                 </span>
               </div>
@@ -531,37 +536,41 @@ export function TextEditor({
                 variant='ghost'
                 size='sm'
                 onClick={closePopover}
-                className='w-6 h-6 p-0 hover:bg-muted'
+                className='w-6 h-6 p-0 hover:bg-muted flex-shrink-0'
               >
                 <X className='w-3 h-3' />
               </Button>
             </div>
 
             {recommendations.length > 0 ? (
-              <div className='space-y-1 overflow-y-auto max-h-64 custom-scrollbar'>
-                {recommendations.map((item, index) => (
-                  <Button
-                    key={item.tag}
-                    variant='ghost'
-                    className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
-                    onClick={() => applyTag(item)}
-                  >
-                    <div className='space-y-1'>
-                      <div className='text-sm font-semibold text-foreground'>
-                        {item.reference}
+              <div className='flex-1 overflow-y-auto custom-scrollbar min-h-0'>
+                <div className='space-y-1'>
+                  {recommendations.map((item, index) => (
+                    <Button
+                      key={index}
+                      variant='ghost'
+                      className='justify-start w-full h-auto p-3 text-left hover:bg-muted/50'
+                      onClick={() => applyTag(item)}
+                    >
+                      <div className='space-y-1 min-w-0 w-full'>
+                        <div className='text-sm font-semibold text-foreground break-words'>
+                          {item.reference}
+                        </div>
+                        <div className='font-mono text-xs text-muted-foreground break-all'>
+                          {item.tag}
+                        </div>
                       </div>
-                      <div className='font-mono text-xs text-muted-foreground'>
-                        {item.tag}
-                      </div>
-                    </div>
-                  </Button>
-                ))}
+                    </Button>
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className='py-6 text-center text-muted-foreground'>
-                <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
-                <p className='text-sm font-medium'>No suggestions found</p>
-                <p className='text-xs'>Try selecting different text</p>
+              <div className='flex-1 flex items-center justify-center text-center text-muted-foreground'>
+                <div>
+                  <Lightbulb className='w-8 h-8 mx-auto mb-2 opacity-50' />
+                  <p className='text-sm font-medium'>No suggestions found</p>
+                  <p className='text-xs'>Try selecting different text</p>
+                </div>
               </div>
             )}
           </div>
