@@ -9,6 +9,7 @@ from schemas.user import UserResponse, UserUpdate
 from services.user_service import user_service
 from datetime import datetime, timezone
 from math import ceil
+from fastapi.responses import JSONResponse
 router = APIRouter()
 
 
@@ -146,19 +147,43 @@ async def update_user(
         created_at=updated_user.created_at,
     )
 
-@router.put("/{user_id}/grant-access", response_model=UserResponse)
+@router.put("/{user_id}/grant-access")
 async def grant_platform_access(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
-    return user_service.grant_access(user_id, db)
+    user_service.grant_access(user_id, db)
+    response = JSONResponse(
+        content={
+            "message": "Platform access granted successfully",
+        }
+    )
+    return response
 
-@router.put("/{user_id}/revoke-access", response_model=UserResponse)
+@router.put("/{user_id}/revoke-access")
 async def revoke_platform_access(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
-    return user_service.revoke_access(user_id, db)
+    user_service.revoke_access(user_id, db)
+    response = JSONResponse(
+        content={
+            "message": "Platform access revoked successfully",
+        }
+    )
+    return response
 
-@router.put("/{user_id}/enable", response_model=UserResponse)
+@router.put("/{user_id}/enable")
 async def enable_user(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
-    return user_service.revoke_access(user_id, db)
+    user_service.enable(user_id, db)
+    response = JSONResponse(
+        content={
+            "message": "User enabled successfully",
+        }
+    )
+    return response
 
-@router.put("/{user_id}/disable", response_model=UserResponse)
+@router.put("/{user_id}/disable")
 async def disable_user(user_id: int, admin_user: User = Depends(require_admin), db=Depends(get_db)):
-    return user_service.disable(user_id, db)
+    user_service.disable(user_id, db)
+    response = JSONResponse(
+        content={
+            "message": "User disabled successfully",
+        }
+    )
+    return response
 
