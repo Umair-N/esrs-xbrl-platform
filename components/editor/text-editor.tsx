@@ -388,22 +388,28 @@ export function TextEditor({
                   {tag.concept.periodType}
                 </Badge>
               </div>
-              <Separator />
-              <div className='space-y-1 text-xs'>
-                <p className='font-semibold'>Context: {tag?.context?.label}</p>
-                <p className='text-muted-foreground'>
-                  Entity: {tag?.context?.entityName} (
-                  {tag?.context?.entityIdentifier})
-                </p>
-                <p className='text-muted-foreground'>
-                  Period:{' '}
-                  {tag?.context?.periodType === 'instant'
-                    ? `As of ${new Date(tag.context.instantDate || '').toLocaleDateString()}`
-                    : `${new Date(tag?.context?.startDate || '').toLocaleDateString()} to ${new Date(
-                        tag?.context?.endDate || ''
-                      ).toLocaleDateString()}`}
-                </p>
-              </div>
+              {tag?.context && (
+                <>
+                  <Separator />
+                  <div className='space-y-1 text-xs'>
+                    <p className='font-semibold'>
+                      Context: {tag?.context?.label}
+                    </p>
+                    <p className='text-muted-foreground'>
+                      Entity: {tag?.context?.entityName} (
+                      {tag?.context?.entityIdentifier})
+                    </p>
+                    <p className='text-muted-foreground'>
+                      Period:{' '}
+                      {tag?.context?.periodType === 'instant'
+                        ? `As of ${new Date(tag.context.instantDate || '').toLocaleDateString()}`
+                        : `${new Date(tag?.context?.startDate || '').toLocaleDateString()} to ${new Date(
+                            tag?.context?.endDate || ''
+                          ).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </HoverCardContent>
         </HoverCard>
