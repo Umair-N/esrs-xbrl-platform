@@ -71,11 +71,12 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,  # Use the explicit list of allowed origins
+    allow_credentials=True,  # Allow sending credentials (cookies, etc.)
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit allowed methods
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],  # Explicit allowed headers
 )
+
 
 @app.middleware("http")
 async def auto_refresh_tokens(request: Request, call_next):
