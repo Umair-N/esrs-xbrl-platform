@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/resizable';
 import { FileUploader } from '@/components/editor/file-uploader';
 import { TextEditor } from '@/components/editor/text-editor';
+import { PdfEditor } from '@/components/editor/pdf-editor';
 import { TaggingPanel } from '@/components/editor/tagging-panel';
 import { TaggedFactsList } from '@/components/editor/tagged-facts-list';
 import { SaveExportPanel } from '@/components/editor/export';
@@ -121,14 +122,18 @@ export default function EditorPage() {
       const saved = localStorage.getItem('xbrl-editor-session');
       if (saved) {
         const parsed: ReportDocument = JSON.parse(saved);
-        // Always merge the report blocks on load so the editor
-        // consistently displays a single combined block. This also
-        // updates tag indices when the original report contained
-        // multiple blocks.
-        const merged = mergeReportBlocks(parsed);
-        setReport(merged);
-        if (merged.blocks && merged.blocks.length > 0) {
-          setSelectedBlockId(merged.blocks[0].id);
+        // Determine if the report originated from a PDF. If so,
+        // avoid merging blocks when restoring from localStorage.
+        // Merging would shift character indices and break the
+        // alignment of tags in the PDF viewer. For all other
+        // file types or pasted text, combine blocks to simplify
+        // editing. The file_type property is included in the
+        // stored report when it was created from an uploaded file.
+        const isPdf = parsed.file_type?.toLowerCase().includes('pdf');
+        const restored = isPdf ? parsed : mergeReportBlocks(parsed);
+        setReport(restored);
+        if (restored.blocks && restored.blocks.length > 0) {
+          setSelectedBlockId(restored.blocks[0].id);
         }
       }
     } catch (err) {
@@ -180,12 +185,13 @@ export default function EditorPage() {
   }, [report]);
 
   const handleReportLoaded = (newReport: ReportDocument) => {
-    // Merge multiple blocks into a single block to avoid rendering
-    // separate scrollable sections for each block. This preserves the
-    // original tag positions by adjusting their indices and combines
-    // content with double newlines. If the report already has a
-    // single block, mergeReportBlocks returns it unchanged.
-    const mergedReport = mergeReportBlocks(newReport);
+    // When loading a report that originates from a PDF, do not merge
+    // its blocks. Each page is represented as a separate block and
+    // merging them would shift character indices and break tag
+    // alignment with the PDF viewer. For all other file types,
+    // combine blocks with double newlines to simplify the editor.
+    const isPdf = newReport.file_type?.toLowerCase().includes('pdf');
+    const mergedReport = isPdf ? newReport : mergeReportBlocks(newReport);
     setReport(mergedReport);
     if (mergedReport.blocks.length > 0) {
       setSelectedBlockId(mergedReport.blocks[0].id);
@@ -255,14 +261,19 @@ export default function EditorPage() {
       const reportData = session?.data as ReportDocument;
       // Persist sessionId so future saves update instead of creating new
       localStorage.setItem('xbrl-session-id', sessionId);
-      // Merge blocks to maintain consistency
-      const merged = mergeReportBlocks(reportData);
-      setReport(merged);
-      if (merged.blocks && merged.blocks.length > 0) {
-        setSelectedBlockId(merged.blocks[0].id);
+      // Determine if the loaded session report originated from a PDF.
+      // Avoid merging blocks for PDFs to preserve page-level character
+      // indices. For other file types, merge blocks to simplify the
+      // editor view. Some older sessions may not include file_type,
+      // in which case fall back to merging by default.
+      const isPdf = reportData.file_type?.toLowerCase().includes('pdf');
+      const restored = isPdf ? reportData : mergeReportBlocks(reportData);
+      setReport(restored);
+      if (restored.blocks && restored.blocks.length > 0) {
+        setSelectedBlockId(restored.blocks[0].id);
       }
       // Persist to local storage as well
-      localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
+      localStorage.setItem('xbrl-editor-session', JSON.stringify(restored));
     } catch (err) {
       console.error('Failed to load session', err);
       toast.error('Failed to load session');
@@ -406,13 +417,38 @@ export default function EditorPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className='flex-1 p-0 mt-2 h-screen'>
-              <TextEditor
-                report={report}
-                selectedBlockId={selectedBlockId}
-                onBlockSelect={handleBlockSelect}
-                onReportChange={setReport}
-                onTextHighlight={handleTextHighlight}
-              />
+              {/*
+               * Conditionally render the PDF editor when the uploaded report
+               * originates from a PDF file. Otherwise fall back to the
+               * existing text editor. The file_type property is populated
+               * by the backend when the report is created from an uploaded
+               * file; reports created via pasted text have no file_type.
+               */}
+              {report.file_type?.toLowerCase().includes('pdf') ? (
+                <PdfEditor
+                  report={report}
+                  onReportChange={setReport}
+                  // When the user selects a word in the PDF, update
+                  // both the highlighted text and the selected block
+                  // so that tags are applied to the correct page.
+                  onTextHighlight={(blockId, text, start, end) => {
+                    setSelectedBlockId(blockId);
+                    setHighlightedText({
+                      text,
+                      startIndex: start,
+                      endIndex: end,
+                    });
+                  }}
+                />
+              ) : (
+                <TextEditor
+                  report={report}
+                  selectedBlockId={selectedBlockId}
+                  onBlockSelect={handleBlockSelect}
+                  onReportChange={setReport}
+                  onTextHighlight={handleTextHighlight}
+                />
+              )}
             </CardContent>
           </Card>
         </ResizablePanel>

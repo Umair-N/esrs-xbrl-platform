@@ -30,6 +30,7 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable';
 import { TextEditor } from '@/components/editor/text-editor';
+import { PdfEditor } from '@/components/editor/pdf-editor';
 import { TaggingPanel } from '@/components/editor/tagging-panel';
 import { TaggedFactsList } from '@/components/editor/tagged-facts-list';
 import { SaveExportPanel } from '@/components/editor/export';
@@ -110,10 +111,15 @@ export default function EditorPage() {
     if (saved) {
       try {
         const parsed: ReportDocument = JSON.parse(saved);
-        const merged = mergeReportBlocks(parsed);
-        setReport(merged);
-        if (merged.blocks && merged.blocks.length > 0) {
-          setSelectedBlockId(merged.blocks[0].id);
+        // Determine if the report was created from a PDF. If so,
+        // avoid merging blocks so that each page remains a separate
+        // block and character indices stay aligned. Otherwise merge
+        // blocks by default.
+        const isPdf = parsed.file_type?.toLowerCase().includes('pdf');
+        const restored = isPdf ? parsed : mergeReportBlocks(parsed);
+        setReport(restored);
+        if (restored.blocks && restored.blocks.length > 0) {
+          setSelectedBlockId(restored.blocks[0].id);
         }
       } catch (err) {
         console.error('Failed to parse saved report', err);
@@ -270,13 +276,31 @@ export default function EditorPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className='flex-1 p-0 mt-2 overflow-hidden'>
-              <TextEditor
-                report={report}
-                selectedBlockId={selectedBlockId}
-                onBlockSelect={handleBlockSelect}
-                onReportChange={setReport}
-                onTextHighlight={handleTextHighlight}
-              />
+              {report.file_type?.toLowerCase().includes('pdf') ? (
+                <PdfEditor
+                  report={report}
+                  onReportChange={setReport}
+                  // When selecting a word in a PDF, update the selected block
+                  // and the highlighted text. The block ID corresponds to the
+                  // page index, preserving correct tag alignment.
+                  onTextHighlight={(blockId, text, start, end) => {
+                    setSelectedBlockId(blockId);
+                    setHighlightedText({
+                      text,
+                      startIndex: start,
+                      endIndex: end,
+                    });
+                  }}
+                />
+              ) : (
+                <TextEditor
+                  report={report}
+                  selectedBlockId={selectedBlockId}
+                  onBlockSelect={handleBlockSelect}
+                  onReportChange={setReport}
+                  onTextHighlight={handleTextHighlight}
+                />
+              )}
             </CardContent>
           </Card>
         </ResizablePanel>

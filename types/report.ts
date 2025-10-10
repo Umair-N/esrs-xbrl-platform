@@ -4,6 +4,15 @@ export interface ReportDocument {
   title: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Optional file metadata. When a report is uploaded from a PDF or DOCX
+   * file, the backend includes these fields so the frontend can
+   * determine the file type and fetch page-level data. These are
+   * undefined when a report is created from pasted text.
+   */
+  file_path?: string;
+  file_size?: number;
+  file_type?: string;
   blocks: ReportBlock[];
 }
 

@@ -95,9 +95,14 @@ export default function SessionsPage() {
       const res = await axiosInstance.get(`/sessions/${sessionId}`);
       const session = res.data;
       const reportData = session?.data as ReportDocument;
-      const merged = mergeReportBlocks(reportData);
+      // If the session originates from a PDF report, preserve the
+      // page‑level blocks. Otherwise, merge all blocks into one to
+      // simplify editing and maintain tag indices.
+      const isPdf = reportData?.file_type?.toLowerCase().includes('pdf');
+      const merged = isPdf ? reportData : mergeReportBlocks(reportData);
       if (typeof window !== 'undefined') {
         localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
+        // Persist session ID so subsequent saves update the same record
         localStorage.setItem('xbrl-session-id', sessionId);
       }
       router.push('/editor');

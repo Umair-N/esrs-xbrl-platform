@@ -8,6 +8,7 @@ from crud.report import report_crud
 from models.report import Report, ReportBlock
 from schemas.report import ReportCreate, TextUpload
 from utils.file_utils import extract_text_from_file
+from io import BytesIO
 
 
 class ReportService:
@@ -20,37 +21,58 @@ class ReportService:
         db
     ) -> Report:
         """Create report from uploaded file"""
-        # Extract text from file
-        try:
-            extracted_text = extract_text_from_file(file_content, filename)
-        except Exception as e:
-            raise ValueError(f"Could not extract text from file: {str(e)}")
-            
-        if not extracted_text.strip():
-            raise ValueError("No text could be extracted from the file")
-        
-        # Split into paragraphs
-        paragraphs = [p.strip() for p in extracted_text.split("\n\n") if p.strip()]
-        
+        # Determine file extension
+        ext = os.path.splitext(filename)[1].lower()
+        # Extract text differently based on file type. For PDF files
+        # we want to keep each page as a separate block so that the
+        # character indices returned by the PDF extraction endpoints
+        # align with block-level indices.  For other files, the existing
+        # behaviour (paragraph split on double newlines) is preserved.
+        if ext == ".pdf":
+            # Use PyPDF2 directly to extract page-level text.  We avoid
+            # utils.extract_text_from_file here because it concatenates
+            # pages, which would break index alignment.  We extract text
+            # page by page, stripping leading/trailing whitespace.  Empty
+            # pages are represented as an empty string.
+            try:
+                from PyPDF2 import PdfReader  # imported here to avoid circular import
+                reader = PdfReader(BytesIO(file_content))
+                paragraphs = []
+                for page in reader.pages:
+                    try:
+                        page_text = page.extract_text() or ""
+                    except Exception:
+                        page_text = ""
+                    paragraphs.append(page_text.strip())
+            except Exception as e:
+                raise ValueError(f"Could not extract text from PDF: {str(e)}")
+        else:
+            # Use the generic extractor and split on double newlines
+            try:
+                extracted_text = extract_text_from_file(file_content, filename)
+            except Exception as e:
+                raise ValueError(f"Could not extract text from file: {str(e)}")
+            if not extracted_text.strip():
+                raise ValueError("No text could be extracted from the file")
+            paragraphs = [p.strip() for p in extracted_text.split("\n\n") if p.strip()]
+        # Ensure we have at least one block
         if not paragraphs:
             raise ValueError("No content found in file")
 
         # Save file to disk
         file_id = str(uuid.uuid4())
         report_id = str(uuid.uuid4())
-        ext = os.path.splitext(filename)[1].lower()
         safe_filename = f"{file_id}{ext}"
         file_path = os.path.join(settings.UPLOAD_DIRECTORY, safe_filename)
-        
-        # Ensure directory exists
         os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
-        
         try:
             with open(file_path, "wb") as f:
                 f.write(file_content)
         except Exception as e:
             raise ValueError(f"Could not save file: {str(e)}")
-        # Create report with blocks
+        # Create report with blocks. For PDF files, each page becomes a block;
+        # for other files the paragraphs are used.  The report_crud layer
+        # handles block order and tag persistence.
         return report_crud.create_report_with_blocks(
             title=os.path.splitext(filename)[0] or "Uploaded Report",
             user_id=user_id,

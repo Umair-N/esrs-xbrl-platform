@@ -3,12 +3,29 @@ from typing import List
 from api.dep import get_current_user
 from database.session import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse, JSONResponse
 from schemas.report import ReportBlockResponse, ReportCreate, ReportResponse, TextUpload
 from services.report_service import report_service
 from utils.file_utils import validate_file_size, validate_file_type
 from datetime import datetime
 import json
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Additional imports for PDF page extraction
+#
+# We use the PyMuPDF library (imported as `fitz`) to generate page images
+# and extract word-level bounding boxes. These endpoints allow the frontend
+# to render the original PDF pages with precise text selection.  The
+# `fitz` module is available in this environment; if deploying elsewhere
+# ensure that the `PyMuPDF` package is installed.  See requirements.txt.
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None  # Will raise at runtime if endpoints are hit without PyMuPDF
+
+from pathlib import Path
+from io import BytesIO
 
 def parse_tags(value):
     if isinstance(value, list):
@@ -166,3 +183,192 @@ async def delete_report(
 
     cleanup_file(file_path)
     return {"message": "Report deleted successfully"}
+
+
+# ---------------------------------------------------------------------------
+# PDF page endpoints
+#
+# These endpoints enable the frontend to display uploaded PDF reports
+# with their original layout. They expose page dimensions, rendered
+# page images and word-level bounding boxes with global character offsets.
+
+def _ensure_pdf_lib():
+    """Internal helper to verify PyMuPDF availability."""
+    if fitz is None:
+        raise HTTPException(status_code=500, detail="PyMuPDF (fitz) library is required but not installed")
+
+
+def _get_report_and_file(report_id: str, user_id: int, db):
+    """Fetch a report by ID and return its file path and SQLAlchemy model.
+
+    Raises a 404 error if the report does not exist or if it is
+    missing a file_path (i.e., was created from pasted text).
+    """
+    report = report_service.get_report_by_id(report_id, user_id, db)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not report.file_path:
+        raise HTTPException(status_code=400, detail="Report has no associated file")
+    file_path = report.file_path
+    if not Path(file_path).exists():
+        raise HTTPException(status_code=404, detail="Report file not found on server")
+    return report, file_path
+
+
+@router.get("/{report_id}/pages_info")
+async def get_pages_info(
+    report_id: str,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Return basic information about each page of a PDF report.
+
+    The response includes the total number of pages and, for each page,
+    its width and height (in pixels) along with the character offset
+    relative to the beginning of the full extracted text. The character
+    offsets allow the frontend to map word selections back into the
+    global report text.
+
+    This endpoint is only applicable to PDF-based reports. A 400 error
+    is returned if the report does not have an attached file.
+    """
+    _ensure_pdf_lib()
+    report, file_path = _get_report_and_file(report_id, current_user.id, db)
+    # Open the PDF and accumulate per-page info
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open PDF: {e}")
+    pages_info = []
+    char_offset = 0
+    for page_number in range(len(doc)):
+        page = doc[page_number]
+        # Use `text` extractor to get plain text for page; fallback to empty string
+        try:
+            page_text = page.get_text("text") or ""
+        except Exception:
+            page_text = ""
+        # Record page dimensions and current global char offset
+        pages_info.append(
+            {
+                "page_number": page_number,
+                "width": int(page.rect.width),
+                "height": int(page.rect.height),
+                "char_start": char_offset,
+                "char_end": char_offset + len(page_text),
+            }
+        )
+        char_offset += len(page_text)
+    return {"num_pages": len(doc), "pages": pages_info}
+
+
+@router.get("/{report_id}/pages/{page_number}/image")
+async def get_page_image(
+    report_id: str,
+    page_number: int,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Return a PNG image of the specified page in the PDF report.
+
+    The image is rendered at a scale of 1:1 (72 DPI), so the dimensions
+    in pixels match those reported by ``/pages_info``. If the page index
+    is out of range, a 404 error is returned.
+    """
+    _ensure_pdf_lib()
+    _, file_path = _get_report_and_file(report_id, current_user.id, db)
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open PDF: {e}")
+    if page_number < 0 or page_number >= len(doc):
+        raise HTTPException(status_code=404, detail="Page number out of range")
+    page = doc[page_number]
+    # Render page at 72 DPI (scale=1) for pixel-perfect alignment with bounding boxes
+    try:
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to render page image: {e}")
+    image_bytes = pix.tobytes("png")
+    return StreamingResponse(BytesIO(image_bytes), media_type="image/png")
+
+
+@router.get("/{report_id}/pages/{page_number}/words")
+async def get_page_words(
+    report_id: str,
+    page_number: int,
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Return word-level bounding boxes for a given PDF page.
+
+    Each item in the returned list contains the bounding box coordinates
+    (``x0``, ``y0``, ``x1``, ``y1``), the word text and its global
+    character start/end indices relative to the full extracted text of
+    the PDF. These indices can be used to create tags associated
+    with the report blocks.
+    """
+    _ensure_pdf_lib()
+    _, file_path = _get_report_and_file(report_id, current_user.id, db)
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open PDF: {e}")
+    if page_number < 0 or page_number >= len(doc):
+        raise HTTPException(status_code=404, detail="Page number out of range")
+    # Compute char offsets up to this page
+    char_offset = 0
+    for i in range(page_number):
+        try:
+            txt = doc[i].get_text("text") or ""
+        except Exception:
+            txt = ""
+        char_offset += len(txt)
+    page = doc[page_number]
+    # Get plain text for this page
+    try:
+        page_text = page.get_text("text") or ""
+    except Exception:
+        page_text = ""
+    words_output = []
+    # Use page.get_text("words") to get word-level bounding boxes. Format:
+    # (x0, y0, x1, y1, word, block_no, line_no, word_no)
+    try:
+        words = page.get_text("words")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to extract words: {e}")
+    # Iterate through words, tracking current index into page_text to
+    # compute start/end positions. We advance the search window after
+    # matching each word to avoid matching earlier occurrences.
+    search_pos = 0
+    for entry in words:
+        x0, y0, x1, y1, word_text, *_ = entry
+        # Find the word in page_text starting from current search position
+        idx = page_text.find(word_text, search_pos)
+        if idx < 0:
+            # If word not found (unlikely), fallback: use current search_pos
+            start = search_pos
+            end = start + len(word_text)
+        else:
+            start = idx
+            end = start + len(word_text)
+            search_pos = end
+        # Use character positions relative to this page's text (block).
+        # The frontend associates PDF pages with individual report blocks
+        # rather than merging them. Therefore start/end indices should
+        # correspond to positions within the page text, not the global
+        # extracted text. If you need global positions for other
+        # purposes, compute them by adding `char_offset` to these values.
+        words_output.append(
+            {
+                "bbox": [x0, y0, x1, y1],
+                "text": word_text,
+                "start_index": start,
+                "end_index": end,
+            }
+        )
+    return {
+        "page_width": int(page.rect.width),
+        "page_height": int(page.rect.height),
+        "words": words_output,
+    }

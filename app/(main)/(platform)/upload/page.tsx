@@ -65,10 +65,14 @@ export default function UploadPage() {
   // and navigate to the editor page.
   const handleReportLoaded = useCallback(
     (report: ReportDocument) => {
-      const merged = mergeReportBlocks(report);
+      // When uploading a PDF, keep its pages as separate blocks to
+      // preserve character indices. For other formats or pasted text,
+      // merge all blocks into one combined block for ease of editing.
+      const isPdf = report.file_type?.toLowerCase().includes('pdf');
+      const merged = isPdf ? report : mergeReportBlocks(report);
       if (typeof window !== 'undefined') {
         localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
-        // also clear any session id since this is a brand‑new upload
+        // clear any existing session ID since this is a brand new upload
         localStorage.removeItem('xbrl-session-id');
       }
       router.push('/editor');
