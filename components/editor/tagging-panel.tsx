@@ -49,6 +49,17 @@ import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { ContextOut, useContexts } from '@/features/contexts/api/list-contexts';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '../ui/dialog';
+import { AlertDialogHeader } from '../ui/alert-dialog';
+import CreateContexts from '@/features/contexts/components/create-contexts';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -736,6 +747,16 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   const ActiveIcon = TAB_META[activeTab].icon;
   const { data: myTaxonomies, isSuccess } = useMyTaxonomies();
   const { mutate: switchTaxonomy } = useSwitchTaxonomy({});
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Get the current taxonomy from search params
+  const currentTaxonomy = searchParams.get('taxonomy');
+
+  // Set initial value from search params or default to first taxonomy
+  const currentValue =
+    currentTaxonomy || (myTaxonomies?.[0]?.id.toString() ?? '');
 
   const handleSwitchTaxonomy = () => {
     if (!value) return;
@@ -766,6 +787,11 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
       switchTaxonomy({ taxonomyId: selected.id });
       setSelectedTaxonomy(selected);
     }
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('taxonomy', newValue);
+
+    // Update URL with new search params
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const { setSelectedTaxonomy } = useTaxonomyStore();
@@ -775,7 +801,13 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     if (isSuccess) {
       setValue(myTaxonomies[0]?.id.toString());
       console.log(isSuccess, 'success');
-      setSelectedTaxonomy(myTaxonomies[0]);
+      const taxo = currentTaxonomy
+        ? myTaxonomies.find((item) => item.id.toString() === currentTaxonomy)
+        : myTaxonomies[0];
+      setSelectedTaxonomy({
+        id: taxo?.id ?? 0,
+        name: taxo?.name ?? '',
+      });
     }
   }, [isSuccess]);
 
@@ -850,7 +882,7 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                 )}
               </div>
               {myTaxonomies && myTaxonomies.length > 0 && (
-                <Select value={value} onValueChange={handleValueChange}>
+                <Select value={currentValue} onValueChange={handleValueChange}>
                   <SelectTrigger className='w-[180px]'>
                     <SelectValue placeholder='Taxonomy' />
                   </SelectTrigger>
@@ -915,10 +947,32 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
           <Card className='p-0 mt-0 border-t shadow-sm'>
             <CardHeader>
               <CardTitle className='flex items-center gap-2 text-base'>
-                Context Selection{' '}
+                Context Selection
                 <Badge variant='secondary' className='text-xs'>
                   Optional
                 </Badge>
+                {/* Create Context Modal */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='h-7 gap-1 text-xs ml-auto'
+                    >
+                      <Plus className='h-3 w-3' />
+                      Create New
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+                    <AlertDialogHeader>
+                      <DialogTitle>Create New Context</DialogTitle>
+                      <DialogDescription>
+                        Define a new XBRL context to use for tagging.
+                      </DialogDescription>
+                    </AlertDialogHeader>
+                    <CreateContexts />
+                  </DialogContent>
+                </Dialog>
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-3'>
