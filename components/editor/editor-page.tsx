@@ -432,12 +432,41 @@ export default function EditorPage() {
                   // both the highlighted text and the selected block
                   // so that tags are applied to the correct page.
                   onTextHighlight={(blockId, text, start, end) => {
+                    // Update the selected block and highlighted text.  For PDF pages,
+                    // blockId may correspond to a page index rather than an existing
+                    // report block.  To ensure the tagging panel can display the
+                    // selection and allow tagging, create a placeholder block if
+                    // necessary.  Without this, the tagging panel would think
+                    // no block is selected and prompt "Select Text to Tag".
                     setSelectedBlockId(blockId);
                     setHighlightedText({
                       text,
                       startIndex: start,
                       endIndex: end,
                     });
+                    // If the block is missing in the current report, append a new
+                    // block with the given ID.  Use an empty content string and
+                    // default type of 'paragraph'.  Tags will be added later.
+                    if (!report.blocks.some((b) => b.id === blockId)) {
+                      setReport((prev) => {
+                        // Avoid duplicating a block if another highlight created
+                        // it in the meantime
+                        if (prev.blocks.some((b) => b.id === blockId))
+                          return prev;
+                        return {
+                          ...prev,
+                          blocks: [
+                            ...prev.blocks,
+                            {
+                              id: blockId,
+                              content: '',
+                              type: 'paragraph',
+                              tags: [],
+                            },
+                          ],
+                        };
+                      });
+                    }
                   }}
                 />
               ) : (

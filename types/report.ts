@@ -14,6 +14,34 @@ export interface ReportDocument {
   file_size?: number;
   file_type?: string;
   blocks: ReportBlock[];
+
+  /**
+   * Optional cache of rasterised PDF pages used by the `PdfEditor`. When a
+   * report originates from a PDF, each page is rendered into a canvas and
+   * converted to a data URL.  Storing these images and their word
+   * information allows previously viewed pages to be restored instantly on
+   * subsequent loads without re‑fetching from the server.  The object
+   * keys correspond to the zero‑based page index and the value stores
+   * dimensions, data URL and word boxes for that page.
+   */
+  pageCache?: {
+    [pageIndex: number]: {
+      pageNumber: number;
+      width: number;
+      height: number;
+      imageUrl: string;
+      words: any[];
+    };
+  };
+
+  /**
+   * Optional cache of page metadata (width and height) for PDF reports.  This
+   * mirrors the response from the `/pages_info` endpoint and is saved
+   * alongside a session so that the editor can avoid re‑fetching this
+   * lightweight information on reload.  It contains an array of objects
+   * with the same shape as returned by the backend service.
+   */
+  pageInfoCache?: any[];
 }
 
 export interface ReportBlock {

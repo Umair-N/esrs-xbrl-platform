@@ -30,17 +30,26 @@ export function TaggedFactsList({
   // function to trigger the API call.
   const { mutate: deleteFeedback } = useDeleteFeedback();
 
-  // Collect all tags
+  // Collect all tags.  For tags originating from PDF pages, the report
+  // block may not contain any text (content is empty).  In those cases,
+  // the tag will carry a `selectedText` property (set when the tag
+  // was created) containing the selected text.  Use this property
+  // whenever available; otherwise, fall back to computing the substring
+  // from the block's content using start and end indices.
   const allTags = report.blocks.flatMap((block) =>
-    block.tags.map((tag) => ({
-      ...tag,
-      blockId: block.id,
-      blockContent: block.content,
-      taggedText:
-        tag.startIndex !== undefined && tag.endIndex !== undefined
+    block.tags.map((tag) => {
+      const taggedText = (tag as any)?.selectedText
+        ? (tag as any).selectedText
+        : tag.startIndex !== undefined && tag.endIndex !== undefined
           ? block.content.substring(tag.startIndex, tag.endIndex)
-          : block.content,
-    }))
+          : block.content;
+      return {
+        ...tag,
+        blockId: block.id,
+        blockContent: block.content,
+        taggedText,
+      };
+    })
   );
 
   const handleDeleteTag = async (blockId: string, tagId: string) => {

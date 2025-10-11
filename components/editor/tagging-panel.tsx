@@ -602,17 +602,35 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     }
   }, [globalContextId]);
 
-  const selectedBlock = useMemo(
-    () =>
-      selectedBlockId
-        ? (report.blocks.find((b) => b.id === selectedBlockId) ?? null)
-        : {
-            id: 'default ',
-            text: 'default',
-            content: 'default',
-          },
-    [report.blocks, selectedBlockId]
-  );
+  const selectedBlock = useMemo(() => {
+    // When no block is selected, return a placeholder object.  The original
+    // implementation returned a dummy object only when selectedBlockId was
+    // falsy, and returned null if a block ID was provided but not found in
+    // report.blocks.  However, for PDF pages the block ID may correspond to
+    // a page index rather than an existing block, so returning null causes
+    // the tagging panel to show "Select Text to Tag" even though the user has
+    // highlighted text.  To fix this, if a block ID is provided but no
+    // matching block exists, return a dummy block object so the panel
+    // recognises a selection.
+    if (!selectedBlockId) {
+      return {
+        id: 'default',
+        text: 'default',
+        content: 'default',
+      } as any;
+    }
+    const found = report.blocks.find((b) => b.id === selectedBlockId);
+    if (found) return found;
+    // Fallback: treat the page ID as a block and provide an empty content.  The
+    // tags array will be initialised when a tag is added.  We include a
+    // minimal structure compatible with ReportBlock.
+    return {
+      id: selectedBlockId,
+      content: '',
+      type: 'paragraph',
+      tags: [],
+    } as any;
+  }, [report.blocks, selectedBlockId]);
 
   const isInitialLoading = isLoading || (!data && isFetching);
   const isUpdating = !!data && isFetching;
@@ -660,7 +678,12 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     // recommendation, it may carry a feedbackId property that should be
     // attached to the tag. We use a computed spread to include this
     // property only when defined.
-    const newTag: XbrlTag = {
+    // Create a tag object.  This is typed as `any` to allow the
+    // addition of a non-standard `selectedText` property used to
+    // persist the highlighted text for PDF pages.  Without
+    // `selectedText`, the tagged text will be empty because the
+    // corresponding report block may not contain any content.
+    const newTag: any = {
       id: generateUniqueId(), // Generate a unique ID for the tag
       concept: {
         id: selectedConcept.id,
@@ -685,17 +708,46 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
       createdAt: new Date().toISOString(), // Record creation timestamp
       startIndex: highlightedText?.startIndex || 0, // Use the start index from the highlighted text
       endIndex: highlightedText?.endIndex || 0, // Use the end index from the highlighted text
+
+      // Persist the selected text on the tag itself.  When tagging a PDF
+      // page, the report block may not contain the page text (content is
+      // empty). Without a content string, the substring computed for
+      // TaggedFactsList would be empty.  Adding the selected text here
+      // ensures the tagged text can be displayed even when content is
+      // missing.  This field is optional and will be ignored by the XBRL
+      // export logic.
+      ...(highlightedText?.text !== undefined
+        ? { selectedText: highlightedText.text }
+        : {}),
     };
 
-    // Update the report with the new tag added to the correct block
+    // Update the report with the new tag added to the correct block.  If the
+    // selected block is not found (which can happen for PDF pages that
+    // haven't been initialised as report blocks), create a new block to
+    // hold the tag.  Without this fallback, tags would be lost when
+    // tagging PDF pages with no existing block.
+    const blockExists = report.blocks.some(
+      (block) => block.id === selectedBlockId
+    );
+    const updatedBlocks = blockExists
+      ? report.blocks.map((block) =>
+          block.id === selectedBlockId
+            ? { ...block, tags: [...block.tags, newTag] }
+            : block
+        )
+      : [
+          ...report.blocks,
+          {
+            id: selectedBlockId!,
+            content: '',
+            type: 'paragraph',
+            tags: [newTag],
+          },
+        ];
     const updatedReport: ReportDocument = {
       ...report,
-      blocks: report.blocks.map((block) =>
-        block.id === selectedBlockId
-          ? { ...block, tags: [...block.tags, newTag] } // Add the new tag to the block's tags
-          : block
-      ),
-      updatedAt: new Date().toISOString(), // Update the report's last modified timestamp
+      blocks: updatedBlocks,
+      updatedAt: new Date().toISOString(),
     };
 
     // Apply the updated report to the global state (or parent component)
@@ -815,9 +867,20 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     }
   }, [isSuccess]);
 
+  // Determine whether any selection exists.  The tagging panel normally
+  // displays a placeholder prompting the user to select text when no block
+  // has been chosen.  However, in certain cases (e.g. PDF pages rendered
+  // on canvas) a highlighted selection may exist without a corresponding
+  // block ID.  To avoid incorrectly showing the "Select Text to Tag"
+  // message when text has been highlighted, compute a boolean flag that
+  // becomes true if either a block is selected or highlighted text
+  // exists.  This ensures the panel displays the selection details even
+  // when the block ID is temporarily unavailable.
+  const hasSelection = Boolean(selectedBlockId) || Boolean(highlightedText);
+
   return (
     <div className='w-full space-y-6'>
-      {!selectedBlock ? (
+      {!hasSelection ? (
         <Card className='border-0 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900'>
           <CardContent className='p-8 text-center'>
             <div className='flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10'>

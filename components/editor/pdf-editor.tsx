@@ -18,7 +18,7 @@ import React, {
   useCallback,
 } from 'react';
 import { axiosInstance } from '@/lib/axios';
-import type { ReportDocument } from '@/types/report';
+import type { ReportDocument, ReportBlock } from '@/types/report';
 import { useRecommendations } from '@/features/recommender/api/get-recommendations';
 import { usePostFeedback } from '@/features/recommender/api/post-feedback';
 import { useTaggingStore } from '@/store/tagging-store';
@@ -57,11 +57,20 @@ interface PageData {
 interface PdfEditorProps {
   report: ReportDocument;
   onReportChange: (report: ReportDocument) => void;
+  /**
+   * Callback invoked when the user highlights text on a PDF page.  In
+   * addition to the blockId, selected text and character indices, this
+   * function optionally receives an array of word indices corresponding to
+   * the highlighted words.  Implementations may ignore the final
+   * argument if it is undefined (e.g., when highlighting plain text in
+   * the TextEditor where word indices are not applicable).
+   */
   onTextHighlight: (
     blockId: string,
     selectedText: string,
     startIndex: number,
-    endIndex: number
+    endIndex: number,
+    wordIndices?: number[]
   ) => void;
 }
 
@@ -99,6 +108,14 @@ export function PdfEditor({
     endIndex: number;
   } | null>(null);
   const [highlightedText, setHighlightedText] = useState('');
+
+  // Hover state: stores the tag under the cursor and its position for the popover.
+  const [hoverData, setHoverData] = useState<{
+    pageIndex: number;
+    wordIndex: number;
+    tag: any;
+    pos: { offsetTop: number; offsetLeft: number };
+  } | null>(null);
   // Page load progress (0..1)
   const [progress, setProgress] = useState(0);
   // Allow user to trigger loading all pages at once
@@ -196,6 +213,7 @@ export function PdfEditor({
     },
     [pagesInfo, loadedPages, loadingPages, report]
   );
+
   // Ref to hold latest loadPage function to avoid stale closure in effects
   const loadPageRef = useRef(loadPage);
   useEffect(() => {
@@ -209,8 +227,7 @@ export function PdfEditor({
     });
   const { mutate: sendFeedback } = usePostFeedback();
   const selectedTaxonomy = useTaxonomyStore((state) => state.selectedTaxonomy);
-  const { setPendingConcept, selectedContextId, setSelection } =
-    useTaggingStore();
+  const { setPendingConcept, selectedContextId } = useTaggingStore();
 
   // Update progress whenever loaded pages or metadata changes
   useEffect(() => {
@@ -357,22 +374,195 @@ export function PdfEditor({
   const taggedWordIndicesByPage = useMemo(() => {
     const result: Record<number, Set<number>> = {};
     if (!report?.blocks) return result;
+    // Build a lookup of block IDs by their string representation.  For PDF pages,
+    // block.id corresponds exactly to the page index as a string ('0', '1', etc.).
+    // Avoid parsing block IDs as numbers because other report blocks may have
+    // numeric IDs that collide with PDF page indices.  By using a string
+    // comparison, only blocks explicitly created for PDF pages will match.
+    const blockMapByStringId = new Map<string, ReportBlock>();
+    report.blocks.forEach((blk) => {
+      if (blk && blk.id !== undefined && blk.id !== null) {
+        blockMapByStringId.set(String(blk.id), blk);
+      }
+    });
     Object.entries(loadedPages).forEach(([key, page]) => {
-      const pIdx = parseInt(key, 10);
-      if (isNaN(pIdx)) return;
-      const block = report.blocks?.[pIdx];
+      // `key` comes from the `loadedPages` record and is the page index as a string
+      // (e.g. '0', '1', etc.).  Build the corresponding PDF page block ID by
+      // prefixing with `pdf-page-`.  This matches the block IDs assigned in
+      // handleMouseUp and EditorPage when creating placeholder blocks for
+      // PDF pages.
+      const blockId = `pdf-page-${key}`;
+      const block = blockMapByStringId.get(blockId);
       if (!block || !block.tags || block.tags.length === 0) return;
       const set = new Set<number>();
       block.tags.forEach((tag) => {
-        const tagStart = tag.startIndex ?? 0;
-        const tagEnd = tag.endIndex ?? block.content?.length ?? 0;
-        page.words.forEach((word, wIdx) => {
-          if (word.start_index < tagEnd && word.end_index > tagStart) {
-            set.add(wIdx);
+        /*
+         * Determine which words this tag covers.  In most cases the tag
+         * includes explicit startIndex and endIndex fields that define a
+         * character range within the page.  However, PDF pages often lack
+         * actual text content in the report blocks, so the indices may be
+         * undefined or relative to a different string.  To provide robust
+         * highlighting the following precedence is used:
+         *   1. If the tag includes a `wordIndices` property (an array of
+         *      numbers), each index in the array corresponds directly to a
+         *      word in the page and is highlighted.  This field can be
+         *      attached when the tag is created in the PDF editor.
+         *   2. If the tag has defined startIndex and endIndex values,
+         *      highlight any word whose [start_index, end_index] range
+         *      intersects the tag’s range.  This mirrors the previous
+         *      behaviour and works when the indices are consistent with
+         *      the page’s word boundaries.
+         *   3. If the tag lacks indices but has a `selectedText` string,
+         *      attempt to locate sequences of words whose concatenated
+         *      text matches the selected text.  This approach allows
+         *      highlighting when only the raw selected text is available.
+         */
+        // Case 1: use explicit word indices if provided
+        const wordIndices: number[] | undefined = (tag as any).wordIndices;
+        if (Array.isArray(wordIndices) && wordIndices.length > 0) {
+          wordIndices.forEach((idx) => {
+            if (
+              typeof idx === 'number' &&
+              idx >= 0 &&
+              idx < page.words.length
+            ) {
+              set.add(idx);
+            }
+          });
+          return;
+        }
+        // Case 2: character indices are present.  Only use this method
+        // for blocks that contain actual text content (i.e. non-PDF
+        // blocks).  For PDF pages, the block content is empty and the
+        // indices may not align with the page’s word list, which can
+        // result in all words being highlighted.  Therefore, skip this
+        // case when the block has no content.
+        const hasStart = typeof tag.startIndex === 'number';
+        const hasEnd = typeof tag.endIndex === 'number';
+        if (hasStart && hasEnd && block.content && block.content.length > 0) {
+          const tagStart = tag.startIndex as number;
+          const tagEnd = tag.endIndex as number;
+          page.words.forEach((word, wIdx) => {
+            // A word is covered if its range intersects the tag range
+            if (word.start_index < tagEnd && word.end_index > tagStart) {
+              set.add(wIdx);
+            }
+          });
+          return;
+        }
+        // Case 3: match the selectedText to word sequences.  This is used
+        // for PDF pages where we only know the raw selected text.
+        const selectedText: string | undefined = (tag as any).selectedText;
+        if (selectedText && selectedText.trim().length > 0) {
+          const target = selectedText.trim();
+          // Split the target by whitespace to get individual words
+          const parts = target.split(/\s+/);
+          const n = parts.length;
+          // Iterate through possible starting positions in the page
+          for (let i = 0; i <= page.words.length - n; i++) {
+            // Build candidate phrase from consecutive words
+            const candidate = page.words
+              .slice(i, i + n)
+              .map((w) => w.text)
+              .join(' ');
+            if (candidate === target) {
+              for (let j = i; j < i + n; j++) {
+                set.add(j);
+              }
+              // Continue searching in case the phrase appears multiple times
+            }
           }
+        }
+      });
+      // Convert the page index string to a number for the result key
+      const pIdxNum = parseInt(key, 10);
+      if (!isNaN(pIdxNum)) result[pIdxNum] = set;
+    });
+    return result;
+  }, [loadedPages, report]);
+
+  /**
+   * Build a mapping from each word index on a page to the array of tags
+   * that apply to that word.  This mirrors the logic in
+   * `taggedWordIndicesByPage` but stores the actual tag objects rather
+   * than just the indices.  The mapping is used to display tag
+   * information when hovering over highlighted text.  Only the tags for
+   * loaded PDF pages are included.  When computing coverage, the same
+   * precedence rules apply:
+   *   1. Use `wordIndices` on the tag if present.
+   *   2. Use character ranges when the block has non-empty content.
+   *   3. Fallback to matching `selectedText` against sequences of words.
+   */
+  const tagsByWordByPage = useMemo(() => {
+    const result: Record<number, Record<number, any[]>> = {};
+    if (!report?.blocks) return result;
+    // Map block ID strings to blocks for quick lookup
+    const blockMapByStringId = new Map<string, ReportBlock>();
+    report.blocks.forEach((blk) => {
+      if (blk && blk.id !== undefined && blk.id !== null) {
+        blockMapByStringId.set(String(blk.id), blk);
+      }
+    });
+    Object.entries(loadedPages).forEach(([key, page]) => {
+      const pageIndex = parseInt(key, 10);
+      if (isNaN(pageIndex)) return;
+      const wordMap: Record<number, any[]> = {};
+      const blockId = `pdf-page-${key}`;
+      const block = blockMapByStringId.get(blockId);
+      if (!block || !block.tags || block.tags.length === 0) {
+        result[pageIndex] = wordMap;
+        return;
+      }
+      block.tags.forEach((tag: any) => {
+        // Determine the indices of words this tag covers on the page
+        let covered: number[] = [];
+        // Case 1: explicit word indices
+        const wordIndices: number[] | undefined = (tag as any).wordIndices;
+        if (Array.isArray(wordIndices) && wordIndices.length > 0) {
+          covered = wordIndices.filter(
+            (idx) => idx >= 0 && idx < page.words.length
+          );
+        } else {
+          // Case 2: character indices if block has content
+          const hasStart = typeof tag.startIndex === 'number';
+          const hasEnd = typeof tag.endIndex === 'number';
+          if (hasStart && hasEnd && block.content && block.content.length > 0) {
+            const tagStart = tag.startIndex as number;
+            const tagEnd = tag.endIndex as number;
+            for (let wIdx = 0; wIdx < page.words.length; wIdx++) {
+              const word = page.words[wIdx];
+              if (word.start_index < tagEnd && word.end_index > tagStart) {
+                covered.push(wIdx);
+              }
+            }
+          } else {
+            // Case 3: match selectedText against sequences of words
+            const selectedText: string | undefined = (tag as any).selectedText;
+            if (selectedText && selectedText.trim().length > 0) {
+              const parts = selectedText.trim().split(/\s+/);
+              const n = parts.length;
+              for (let i = 0; i <= page.words.length - n; i++) {
+                const candidate = page.words
+                  .slice(i, i + n)
+                  .map((w) => w.text)
+                  .join(' ');
+                if (candidate === selectedText.trim()) {
+                  for (let j = 0; j < n; j++) {
+                    covered.push(i + j);
+                  }
+                  // Continue searching for additional occurrences
+                }
+              }
+            }
+          }
+        }
+        // Assign tag to each covered index
+        covered.forEach((idx) => {
+          if (!wordMap[idx]) wordMap[idx] = [];
+          wordMap[idx].push(tag);
         });
       });
-      result[pIdx] = set;
+      result[pageIndex] = wordMap;
     });
     return result;
   }, [loadedPages, report]);
@@ -384,13 +574,6 @@ export function PdfEditor({
     setPopoverTriggerElement(null);
     setSelectedWords(null);
     // Clear selection in global tagging store if available
-    try {
-      if (setSelection) {
-        setSelection(null as any);
-      }
-    } catch {
-      // ignore
-    }
   }
 
   // Hit-test words at a given point on a canvas
@@ -433,24 +616,79 @@ export function PdfEditor({
     pageIndex: number,
     event: React.MouseEvent<HTMLCanvasElement>
   ) => {
-    if (!selectionAnchor || selectionAnchor.pageIndex !== pageIndex) return;
-    if (!loadedPages[pageIndex]) return;
+    const page = loadedPages[pageIndex];
+    if (!page) return;
     const canvas = canvasRefs.current[pageIndex];
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     const wordIndex = getWordIndexAtPoint(pageIndex, x, y);
-    if (wordIndex === null || isNaN(wordIndex)) return;
-    const start = selectionAnchor.wordIndex;
-    const end = wordIndex;
-    const indices: number[] = [];
-    if (start <= end) {
-      for (let i = start; i <= end; i++) indices.push(i);
-    } else {
-      for (let i = start; i >= end; i--) indices.push(i);
+    // If a selection drag is in progress, update the selection range
+    if (selectionAnchor && selectionAnchor.pageIndex === pageIndex) {
+      if (wordIndex === null || isNaN(wordIndex)) return;
+      const start = selectionAnchor.wordIndex;
+      const end = wordIndex;
+      const indices: number[] = [];
+      if (start <= end) {
+        for (let i = start; i <= end; i++) indices.push(i);
+      } else {
+        for (let i = start; i >= end; i--) indices.push(i);
+      }
+      setSelectedWords({ pageIndex, indices });
+      // Clear any hover popover while dragging
+      if (hoverData) setHoverData(null);
+      return;
     }
-    setSelectedWords({ pageIndex, indices });
+    // Do not show hover popover when a selection highlight exists or the
+    // recommendation popover is visible.  This prevents overlapping popovers
+    // and avoids confusion while tagging.
+    if (
+      showPopover ||
+      (selectedWords && selectedWords.pageIndex === pageIndex)
+    ) {
+      if (hoverData) setHoverData(null);
+      return;
+    }
+    // Handle hover when not dragging: determine if the cursor is over a
+    // tagged word and display the tag info in a popover.  If the word
+    // under the cursor has no tag, clear the hover state.
+    if (wordIndex === null || isNaN(wordIndex)) {
+      if (hoverData) setHoverData(null);
+      return;
+    }
+    const tagsForWord = tagsByWordByPage[pageIndex]?.[wordIndex];
+    if (tagsForWord && tagsForWord.length > 0) {
+      // Compute popover position relative to the viewport.  Position
+      // the popover just below the bottom of the word bounding box.
+      const word = page.words[wordIndex];
+      const [bx0, by0, bx1, by1] = word.bbox;
+      const container = document.getElementById(`pdf-page-${pageIndex}`);
+      let offsetTop = by1;
+      let offsetLeft = bx0;
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        offsetTop = containerRect.top + by1 + 4;
+        offsetLeft = containerRect.left + bx0;
+      }
+      const tag = tagsForWord[0];
+      // Update hoverData only if it differs from the current state to avoid
+      // unnecessary re-renders.
+      if (
+        !hoverData ||
+        hoverData.pageIndex !== pageIndex ||
+        hoverData.wordIndex !== wordIndex
+      ) {
+        setHoverData({
+          pageIndex,
+          wordIndex,
+          tag,
+          pos: { offsetTop, offsetLeft },
+        });
+      }
+    } else {
+      if (hoverData) setHoverData(null);
+    }
   };
 
   // Finalise selection on mouse up
@@ -479,45 +717,25 @@ export function PdfEditor({
     }
     const startIndex = startWord.start_index;
     const endIndex = endWord.end_index;
-    // Determine the block ID for this page.  In some cases (e.g. when
-    // placeholder blocks have not been persisted), the block may be
-    // undefined.  Avoid using an empty string as the block ID because
-    // downstream components treat a falsy ID as "no block selected".  When
-    // no block exists for a page, fall back to a synthetic ID based on
-    // the page index (e.g. "page-0").  This ensures the tagging panel
-    // receives a non-empty block identifier and the Add Tag button can
-    // become enabled.
-    const block = report.blocks?.[pageIndex];
-    let blockId: string;
-    if (block && block.id) {
-      blockId = block.id;
-    } else if (report.blocks && report.blocks[pageIndex]) {
-      // If a block exists but has no ID (unlikely), use its index
-      blockId = String(pageIndex);
-    } else {
-      // Fallback synthetic ID
-      blockId = `page-${pageIndex}`;
-    }
+    // Assign a unique block ID for each PDF page.  Use a prefix to avoid
+    // collisions with existing report block IDs that may be numeric or
+    // otherwise conflict with page indices.  This ensures that tags for
+    // PDF pages are stored separately from other blocks in the report.
+    const blockId: string = `pdf-page-${pageIndex}`;
     const selectedText = sorted
       .map((i) => {
         const w = page.words[i];
         return w?.text || '';
       })
       .join(' ');
-    onTextHighlight(blockId, selectedText, startIndex, endIndex);
+    // Pass the selected word indices to the onTextHighlight callback.  This
+    // allows downstream components (e.g. tagging panel) to persist the
+    // exact indices on the tag, enabling precise highlights even when
+    // character offsets are unreliable.  Spread the sorted array to
+    // avoid external mutation.
+    onTextHighlight(blockId, selectedText, startIndex, endIndex, [...sorted]);
     // Update global tagging store with current selection if available
-    try {
-      if (setSelection) {
-        setSelection({
-          blockId,
-          startIndex,
-          endIndex,
-          selectedText,
-        });
-      }
-    } catch (e) {
-      // ignore if setSelection not available
-    }
+
     setHighlightRange({ blockId, startIndex, endIndex });
     setHighlightedText(selectedText);
     // Compute popover position
@@ -591,20 +809,56 @@ export function PdfEditor({
     const finalizeTag = () => {
       if (localContextId) {
         const context = sampleContexts.find((c) => c.id === localContextId);
-        const newTag = {
+        const newTag: any = {
           id: `${Date.now()}`,
           concept,
           startIndex,
           endIndex,
           ...(context ? { context } : {}),
+          // Persist the selected text on the tag itself.  When tagging a
+          // PDF page, the report block may not contain the page text
+          // (content is empty).  Without this field, the tagged text
+          // displayed in the tagged facts list may be empty.  Note that
+          // highlightedText holds the text selected on the page (not the
+          // highlight range object), so we assign it directly.  This
+          // property is optional and can be ignored by the export logic.
+          selectedText: highlightedText,
+          // Capture the indices of the selected words when available.  The
+          // selectedWords state holds the indices of the words on the
+          // current page that were highlighted.  Storing these indices
+          // enables precise highlighting later on without relying on
+          // character offsets that may not be accurate for PDF pages.
+          ...(selectedWords?.indices && Array.isArray(selectedWords.indices)
+            ? { wordIndices: [...selectedWords.indices] }
+            : {}),
         };
+        // If a block matching the blockId exists, update its tags. Otherwise, append a new
+        // block to hold tags for this page.  Without this check tags would be lost for
+        // PDF pages that do not yet have corresponding report blocks.
+        // Normalise block ID comparison by converting both to strings.  Without
+        // this, numeric and string IDs for the same page would not match,
+        // causing duplicate blocks and tags being applied to the wrong page.
+        const blockExists = report.blocks.some(
+          (blk) => String(blk.id) === String(blockId)
+        );
+        const updatedBlocks = blockExists
+          ? report.blocks.map((blk) =>
+              String(blk.id) === String(blockId)
+                ? { ...blk, tags: [...(blk.tags || []), newTag] }
+                : blk
+            )
+          : [
+              ...report.blocks,
+              {
+                id: blockId,
+                content: '',
+                type: 'paragraph',
+                tags: [newTag],
+              },
+            ];
         const updatedReport: ReportDocument = {
           ...report,
-          blocks: report.blocks.map((blk) =>
-            blk.id === blockId
-              ? { ...blk, tags: [...(blk.tags || []), newTag] }
-              : blk
-          ),
+          blocks: updatedBlocks,
           updatedAt: new Date().toISOString(),
         };
         onReportChange(updatedReport);
@@ -696,6 +950,40 @@ export function PdfEditor({
 
   const percent = Math.round(progress * 100);
 
+  // Clear the current selection whenever tags are added or removed.  When a
+  // new tag is created via the tagging panel, the report object received
+  // here will update with the new tag appended.  Without clearing the
+  // selection, the previous highlight remains drawn on the canvas because
+  // selectedWords and selectionAnchor are still set.  This effect
+  // monitors the total number of tags across all blocks and resets the
+  // selection state whenever that count changes.  It also hides the
+  // recommendation popover and clears the highlight range so the
+  // tagging panel accurately reflects the new state.
+  const prevTagCountRef = useRef<number>(0);
+  useEffect(() => {
+    // Compute the total number of tags in the report
+    const totalTags =
+      report?.blocks?.reduce((sum, blk) => {
+        return sum + (blk.tags ? blk.tags.length : 0);
+      }, 0) ?? 0;
+    if (prevTagCountRef.current !== totalTags) {
+      // Tag count changed; clear current selection
+      setSelectedWords(null);
+      setSelectionAnchor(null);
+      setHighlightRange(null);
+      setHighlightedText('');
+      setShowPopover(false);
+    }
+    prevTagCountRef.current = totalTags;
+  }, [report]);
+
+  // Reset hover state whenever selection, recommendation popover, or loaded
+  // pages change.  This prevents stale popovers from lingering when the
+  // user begins a new selection or when tags are updated.
+  useEffect(() => {
+    setHoverData(null);
+  }, [selectedWords, showPopover, loadedPages]);
+
   return (
     <div
       ref={containerRef}
@@ -758,6 +1046,24 @@ export function PdfEditor({
               style={{ position: 'absolute', top: 0, left: 0, cursor: 'text' }}
               onMouseDown={(e) => handleCanvasMouseDown(pIdx, e)}
               onMouseMove={(e) => handleCanvasMouseMove(pIdx, e)}
+              /* React's event bubbling normally delivers mouseup events from
+               * the canvas to the parent container.  However, when using
+               * absolute positioned canvases and custom selection logic, some
+               * browsers may fail to propagate the mouseup when the user
+               * releases the button directly over the canvas.  Without the
+               * mouseup, the selection never finalises and the onTextHighlight
+               * callback is never invoked, leading to the tagging panel
+               * prompting the user to select text.  Attaching the mouseup
+               * handler to the canvas explicitly ensures the selection is
+               * finalised regardless of event bubbling behaviour.
+               */
+              onMouseUp={() => handleMouseUp()}
+              onMouseLeave={() => {
+                // Clear hover information when leaving the canvas to hide
+                // the tag popover.  Without this, the popover may linger
+                // if the cursor exits the page region.
+                if (hoverData) setHoverData(null);
+              }}
             />
           )}
           {/* Recommendation popover */}
@@ -856,6 +1162,60 @@ export function PdfEditor({
                           No suggestions found
                         </p>
                         <p className='text-xs'>Try selecting different text</p>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+          {/* Tag info popover (hover) */}
+          {page.imageUrl &&
+            hoverData &&
+            hoverData.pageIndex === pIdx &&
+            hoverData.tag && (
+              <Popover
+                open={true}
+                onOpenChange={(open) => {
+                  // If the popover is manually closed (e.g., via ESC), clear hover
+                  if (!open && hoverData) setHoverData(null);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  {/* The trigger is hidden because we programmatically control the popover */}
+                  <div style={{ display: 'none' }} />
+                </PopoverTrigger>
+                <PopoverContent
+                  side='bottom'
+                  align='start'
+                  sideOffset={4}
+                  className='p-2 w-80'
+                  style={{
+                    position: 'fixed',
+                    top: hoverData.pos.offsetTop,
+                    left: hoverData.pos.offsetLeft,
+                  }}
+                >
+                  <div className='space-y-1'>
+                    {/* Concept label and ID */}
+                    <div className='text-sm font-semibold text-foreground'>
+                      {hoverData.tag?.concept?.label || 'Untitled concept'}
+                    </div>
+                    {hoverData.tag?.concept?.id && (
+                      <div className='font-mono text-xs text-muted-foreground'>
+                        {hoverData.tag.concept.id}
+                      </div>
+                    )}
+                    {/* Show context label if present */}
+                    {hoverData.tag?.context?.label && (
+                      <div className='text-xs text-muted-foreground'>
+                        {hoverData.tag.context.label}
+                      </div>
+                    )}
+                    {/* Show selected text snippet */}
+                    {hoverData.tag?.selectedText && (
+                      <div className='text-xs italic text-muted-foreground'>
+                        “{hoverData.tag.selectedText.slice(0, 120)}”
                       </div>
                     )}
                   </div>
