@@ -606,7 +606,11 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     () =>
       selectedBlockId
         ? (report.blocks.find((b) => b.id === selectedBlockId) ?? null)
-        : null,
+        : {
+            id: 'default ',
+            text: 'default',
+            content: 'default',
+          },
     [report.blocks, selectedBlockId]
   );
 
@@ -858,9 +862,9 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
                         Full Block
                       </Badge>
                       <p className='text-sm break-words'>
-                        {selectedBlock.content.length > 150
-                          ? `${selectedBlock.content.substring(0, 150)}...`
-                          : selectedBlock.content}
+                        {selectedBlock?.content?.length > 150
+                          ? `${selectedBlock?.content?.substring(0, 150)}...`
+                          : selectedBlock?.content}
                       </p>
                     </div>
                   )}
