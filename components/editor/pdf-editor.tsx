@@ -16,9 +16,11 @@ import React, {
   useMemo,
   useRef,
   useCallback,
+  forwardRef,
+  useImperativeHandle,
 } from 'react';
 import { axiosInstance } from '@/lib/axios';
-import type { ReportDocument, ReportBlock } from '@/types/report';
+import type { ReportDocument, ReportBlock, SavedPage } from '@/types/report';
 import { useRecommendations } from '@/features/recommender/api/get-recommendations';
 import { usePostFeedback } from '@/features/recommender/api/post-feedback';
 import { useTaggingStore } from '@/store/tagging-store';
@@ -54,6 +56,21 @@ interface PageData {
   words: WordEntry[];
 }
 
+const isNewLineBetweenWords = (prev: WordEntry, current: WordEntry): boolean => {
+  if (!prev || !current) return false;
+  const [prevX0, prevY0, prevX1, prevY1] = prev.bbox || [0, 0, 0, 0];
+  const [currX0, currY0, currX1, currY1] = current.bbox || [0, 0, 0, 0];
+  const prevHeight = prevY1 - prevY0;
+  const currHeight = currY1 - currY0;
+  const verticalGap = Math.abs(currY0 - prevY0);
+  const threshold = Math.max(prevHeight, currHeight) * 0.6 || 4;
+  if (verticalGap > threshold) {
+    return true;
+  }
+  const horizontalGap = currX0 - prevX1;
+  return horizontalGap > Math.max(prevHeight, currHeight) * 0.8;
+};
+
 interface PdfEditorProps {
   report: ReportDocument;
   onReportChange: (report: ReportDocument) => void;
@@ -74,11 +91,14 @@ interface PdfEditorProps {
   ) => void;
 }
 
-export function PdfEditor({
-  report,
-  onReportChange,
-  onTextHighlight,
-}: PdfEditorProps) {
+export interface PdfEditorHandle {
+  loadAllPages: () => void;
+  extractPages: () => Promise<SavedPage[]>;
+  getProgress: () => number;
+}
+
+export const PdfEditor = forwardRef<PdfEditorHandle, PdfEditorProps>(
+  function PdfEditor({ report, onReportChange, onTextHighlight }, ref) {
   // Metadata for each page (width, height, page_number)
   const [pagesInfo, setPagesInfo] = useState<any[]>([]);
   // Loaded page data keyed by index
@@ -493,6 +513,36 @@ export function PdfEditor({
    *   2. Use character ranges when the block has non-empty content.
    *   3. Fallback to matching `selectedText` against sequences of words.
    */
+  const deriveWordIndicesFromText = useCallback(
+    (selectedText: string, page: PageData): number[] => {
+      if (!selectedText || !page || !Array.isArray(page.words)) {
+        return [];
+      }
+      const target = selectedText.trim().toLowerCase();
+      if (!target) return [];
+      const targetParts = target.split(/\s+/);
+      const wordsLower = page.words.map((word) =>
+        String(word?.text ?? '').trim().toLowerCase()
+      );
+      const n = targetParts.length;
+      if (n === 0 || wordsLower.length < n) return [];
+      for (let i = 0; i <= wordsLower.length - n; i++) {
+        let match = true;
+        for (let j = 0; j < n; j++) {
+          if (wordsLower[i + j] !== targetParts[j]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) {
+          return Array.from({ length: n }, (_, idx) => i + idx);
+        }
+      }
+      return [];
+    },
+    []
+  );
+
   const tagsByWordByPage = useMemo(() => {
     const result: Record<number, Record<number, any[]>> = {};
     if (!report?.blocks) return result;
@@ -513,6 +563,15 @@ export function PdfEditor({
         result[pageIndex] = wordMap;
         return;
       }
+      const uniqueStarts = new Set<number>();
+      if (Array.isArray(page.words)) {
+        page.words.forEach((word: any) => {
+          if (typeof word?.start_index === 'number') {
+            uniqueStarts.add(word.start_index);
+          }
+        });
+      }
+      const hasUsefulOffsets = uniqueStarts.size > 1;
       block.tags.forEach((tag: any) => {
         // Determine the indices of words this tag covers on the page
         let covered: number[] = [];
@@ -523,10 +582,16 @@ export function PdfEditor({
             (idx) => idx >= 0 && idx < page.words.length
           );
         } else {
-          // Case 2: character indices if block has content
+          // Case 2: character indices if block has content and offsets are usable
           const hasStart = typeof tag.startIndex === 'number';
           const hasEnd = typeof tag.endIndex === 'number';
-          if (hasStart && hasEnd && block.content && block.content.length > 0) {
+          if (
+            hasStart &&
+            hasEnd &&
+            block.content &&
+            block.content.length > 0 &&
+            hasUsefulOffsets
+          ) {
             const tagStart = tag.startIndex as number;
             const tagEnd = tag.endIndex as number;
             for (let wIdx = 0; wIdx < page.words.length; wIdx++) {
@@ -539,20 +604,7 @@ export function PdfEditor({
             // Case 3: match selectedText against sequences of words
             const selectedText: string | undefined = (tag as any).selectedText;
             if (selectedText && selectedText.trim().length > 0) {
-              const parts = selectedText.trim().split(/\s+/);
-              const n = parts.length;
-              for (let i = 0; i <= page.words.length - n; i++) {
-                const candidate = page.words
-                  .slice(i, i + n)
-                  .map((w) => w.text)
-                  .join(' ');
-                if (candidate === selectedText.trim()) {
-                  for (let j = 0; j < n; j++) {
-                    covered.push(i + j);
-                  }
-                  // Continue searching for additional occurrences
-                }
-              }
+              covered = deriveWordIndicesFromText(selectedText, page);
             }
           }
         }
@@ -565,7 +617,7 @@ export function PdfEditor({
       result[pageIndex] = wordMap;
     });
     return result;
-  }, [loadedPages, report]);
+  }, [deriveWordIndicesFromText, loadedPages, report]);
 
   // Close popover and clear selection
   function closePopover() {
@@ -806,6 +858,15 @@ export function PdfEditor({
       type: item.datatype,
       periodType: '',
     };
+    const pageIndexFromBlock = (() => {
+      if (!blockId) return NaN;
+      const suffix = String(blockId).replace('pdf-page-', '');
+      const parsed = Number.parseInt(suffix, 10);
+      return Number.isNaN(parsed) ? NaN : parsed;
+    })();
+    const pagePlainText = Number.isNaN(pageIndexFromBlock)
+      ? ''
+      : computePagePlainText(pageIndexFromBlock);
     const finalizeTag = () => {
       if (localContextId) {
         const context = sampleContexts.find((c) => c.id === localContextId);
@@ -844,14 +905,18 @@ export function PdfEditor({
         const updatedBlocks = blockExists
           ? report.blocks.map((blk) =>
               String(blk.id) === String(blockId)
-                ? { ...blk, tags: [...(blk.tags || []), newTag] }
+                ? {
+                    ...blk,
+                    content: pagePlainText || blk.content || '',
+                    tags: [...(blk.tags || []), newTag],
+                  }
                 : blk
             )
           : [
               ...report.blocks,
               {
                 id: blockId,
-                content: '',
+                content: pagePlainText,
                 type: 'paragraph',
                 tags: [newTag],
               },
@@ -894,6 +959,206 @@ export function PdfEditor({
       } as PageData;
     });
   }, [pagesInfo, loadedPages]);
+
+  const computePagePlainText = useCallback(
+    (pageIndex: number): string => {
+      const page = loadedPages[pageIndex] ?? pages[pageIndex];
+      if (!page || !Array.isArray(page.words)) {
+        return '';
+      }
+      let text = '';
+      let previousWord: WordEntry | null = null;
+      page.words.forEach((word: WordEntry) => {
+        const raw = typeof word?.text === 'string' ? word.text : '';
+        const trimmed = raw.trim();
+        if (!trimmed) return;
+        let prefix = '';
+        if (previousWord) {
+          prefix = isNewLineBetweenWords(previousWord, word) ? '\n' : ' ';
+        }
+        text += prefix ? `${prefix}${trimmed}` : trimmed;
+        previousWord = word;
+      });
+      return text;
+    },
+    [loadedPages, pages]
+  );
+
+  const convertToDataUrl = useCallback(async (url: string) => {
+    if (!url || url.startsWith('data:')) {
+      return url;
+    }
+    if (typeof window === 'undefined') {
+      return url;
+    }
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.error('Failed to convert page image to data URL', err);
+      return url;
+    }
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      loadAllPages: () => {
+        setLoadAllPages(true);
+        if (pagesInfo && pagesInfo.length > 0) {
+          for (let i = 0; i < pagesInfo.length; i++) {
+            loadPageRef.current(i);
+          }
+        }
+      },
+      extractPages: async () => {
+        const saved: SavedPage[] = [];
+        const total = pagesInfo?.length ?? 0;
+        for (let idx = 0; idx < total; idx++) {
+          const page = loadedPages[idx] ?? pages[idx];
+          if (!page) continue;
+          const imageSource = page.imageUrl || '';
+          const image = await convertToDataUrl(imageSource);
+          saved.push({
+            pageNumber: page.pageNumber ?? idx,
+            width: page.width,
+            height: page.height,
+            image,
+            imageUrl: image,
+            words: Array.isArray(page.words) ? [...page.words] : [],
+          });
+        }
+        return saved;
+      },
+      getProgress: () => progress,
+    }),
+    [convertToDataUrl, loadedPages, pages, pagesInfo, progress]
+  );
+
+  useEffect(() => {
+    const savedPages = (report as any)?.pages as SavedPage[] | undefined;
+    if (!Array.isArray(savedPages) || savedPages.length === 0) {
+      return;
+    }
+    setLoadedPages((prev) => {
+      if (Object.keys(prev).length > 0) {
+        return prev;
+      }
+      const next: Record<number, PageData> = {};
+      savedPages.forEach((page, idx) => {
+        next[idx] = {
+          pageNumber: page.pageNumber ?? idx,
+          width: page.width,
+          height: page.height,
+          imageUrl: page.image || page.imageUrl || '',
+          words: Array.isArray(page.words) ? [...page.words] : [],
+        } as PageData;
+      });
+      return next;
+    });
+  }, [report]);
+
+  useEffect(() => {
+    if (!report || !Array.isArray(report.blocks) || report.blocks.length === 0) {
+      return;
+    }
+    let needsUpdate = false;
+    const nextBlocks = report.blocks.map((block) => {
+      if (
+        typeof block.content === 'string' &&
+        block.content.trim().length > 0
+      ) {
+        return block;
+      }
+      const idString = String(block.id);
+      if (!idString.startsWith('pdf-page-')) {
+        return block;
+      }
+      const suffix = idString.replace('pdf-page-', '');
+      const pageIndex = Number.parseInt(suffix, 10);
+      if (Number.isNaN(pageIndex)) {
+        return block;
+      }
+      const plain = computePagePlainText(pageIndex);
+      if (!plain || plain.trim().length === 0 || block.content === plain) {
+        return block;
+      }
+      needsUpdate = true;
+      return {
+        ...block,
+        content: plain,
+      };
+    });
+    if (needsUpdate) {
+      onReportChange({
+        ...report,
+        blocks: nextBlocks,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }, [computePagePlainText, loadedPages, onReportChange, report]);
+
+  useEffect(() => {
+    if (!report || !Array.isArray(report.blocks) || report.blocks.length === 0) {
+      return;
+    }
+    let blocksChanged = false;
+    const patchedBlocks = report.blocks.map((block) => {
+      const idString = String(block.id ?? '');
+      if (!idString.startsWith('pdf-page-') || !Array.isArray(block.tags)) {
+        return block;
+      }
+      const suffix = idString.replace('pdf-page-', '');
+      const pageIndex = Number.parseInt(suffix, 10);
+      if (Number.isNaN(pageIndex)) {
+        return block;
+      }
+      const page = loadedPages[pageIndex] ?? pages[pageIndex];
+      if (!page) {
+        return block;
+      }
+      let tagsChanged = false;
+      const updatedTags = block.tags.map((tag: any) => {
+        if (Array.isArray(tag?.wordIndices) && tag.wordIndices.length > 0) {
+          return tag;
+        }
+        const text = typeof tag?.selectedText === 'string' ? tag.selectedText.trim() : '';
+        if (!text) {
+          return tag;
+        }
+        const indices = deriveWordIndicesFromText(text, page);
+        if (indices.length === 0) {
+          return tag;
+        }
+        tagsChanged = true;
+        return {
+          ...tag,
+          wordIndices: indices,
+        };
+      });
+      if (!tagsChanged) {
+        return block;
+      }
+      blocksChanged = true;
+      return {
+        ...block,
+        tags: updatedTags,
+      };
+    });
+    if (blocksChanged) {
+      onReportChange({
+        ...report,
+        blocks: patchedBlocks,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }, [deriveWordIndicesFromText, loadedPages, onReportChange, pages, report]);
 
   // Draw highlights onto canvases whenever loaded pages, selections or tags change
   useEffect(() => {
@@ -1261,4 +1526,4 @@ export function PdfEditor({
       )}
     </div>
   );
-}
+});

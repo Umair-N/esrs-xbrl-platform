@@ -25,9 +25,11 @@ preprocessed using :func:`preprocess_pdf` from
 
 from __future__ import annotations
 
+import io
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse, JSONResponse
-import io
 
 from services.pdf_cache_service import (
     get_page_info,
@@ -38,29 +40,32 @@ from services.pdf_cache_service import (
 router = APIRouter()
 
 
-@router.get("/{report_id}/pages_info")
-async def pages_info(report_id: str):
-    info = get_page_info(report_id)
+@router.get("/{report_id:uuid}/pages_info")
+async def pages_info(report_id: UUID):
+    report_id_str = str(report_id)
+    info = get_page_info(report_id_str)
     if info is None:
         raise HTTPException(status_code=404, detail="Report not preprocessed")
     return {"pages": info}
 
 
-@router.get("/{report_id}/pages/{page_number}/image")
+@router.get("/{report_id:uuid}/pages/{page_number}/image")
 async def page_image(
-    report_id: str,
+    report_id: UUID,
     page_number: int,
     scale: float = Query(1.0, ge=0.5, le=2.0),
 ):
-    img = get_page_image(report_id, page_number, scale)
+    report_id_str = str(report_id)
+    img = get_page_image(report_id_str, page_number, scale)
     if img is None:
         raise HTTPException(status_code=404, detail="Page image not cached")
     return StreamingResponse(io.BytesIO(img), media_type="image/jpeg")
 
 
-@router.get("/{report_id}/pages/{page_number}/words")
-async def page_words(report_id: str, page_number: int):
-    data = get_page_words(report_id, page_number)
+@router.get("/{report_id:uuid}/pages/{page_number}/words")
+async def page_words(report_id: UUID, page_number: int):
+    report_id_str = str(report_id)
+    data = get_page_words(report_id_str, page_number)
     if data is None:
         raise HTTPException(status_code=404, detail="Page words not cached")
     return JSONResponse(content=data)

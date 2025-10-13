@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from api.dep import get_current_user
 from database.session import get_db
@@ -161,11 +162,11 @@ async def get_user_reports(
     ]
 
 
-@router.get("/{report_id}", response_model=ReportResponse)
+@router.get("/{report_id:uuid}", response_model=ReportResponse)
 async def get_report(
-    report_id: str, current_user=Depends(get_current_user), db=Depends(get_db)
+    report_id: UUID, current_user=Depends(get_current_user), db=Depends(get_db)
 ):
-    report = report_service.get_report_by_id(report_id, current_user.id, db)
+    report = report_service.get_report_by_id(str(report_id), current_user.id, db)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return ReportResponse(
@@ -190,11 +191,11 @@ async def get_report(
     )
 
 
-@router.delete("/{report_id}")
+@router.delete("/{report_id:uuid}")
 async def delete_report(
-    report_id: str, current_user=Depends(get_current_user), db=Depends(get_db)
+    report_id: UUID, current_user=Depends(get_current_user), db=Depends(get_db)
 ):
-    file_path = report_service.delete_report(report_id, current_user.id, db)
+    file_path = report_service.delete_report(str(report_id), current_user.id, db)
     from utils.file_utils import cleanup_file
 
     cleanup_file(file_path)
@@ -208,13 +209,13 @@ async def delete_report(
 # with their original layout. They expose page dimensions, rendered
 # page images and word-level bounding boxes using the caching service.
 
-def _get_report_and_file(report_id: str, user_id: int, db):
+def _get_report_and_file(report_id: UUID, user_id: int, db):
     """Fetch a report by ID and return its file path and SQLAlchemy model.
 
     Raises a 404 error if the report does not exist or if it is
     missing a file_path (i.e., was created from pasted text).
     """
-    report = report_service.get_report_by_id(report_id, user_id, db)
+    report = report_service.get_report_by_id(str(report_id), user_id, db)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     if not report.file_path:
@@ -225,9 +226,9 @@ def _get_report_and_file(report_id: str, user_id: int, db):
     return report, file_path
 
 
-@router.get("/{report_id}/pages_info")
+@router.get("/{report_id:uuid}/pages_info")
 async def get_pages_info(
-    report_id: str,
+    report_id: UUID,
     current_user=Depends(get_current_user),
     db=Depends(get_db),
 ):
@@ -244,9 +245,9 @@ async def get_pages_info(
     return {"pages": pages}
 
 
-@router.get("/{report_id}/pages/{page_number}/image")
+@router.get("/{report_id:uuid}/pages/{page_number}/image")
 async def get_page_image(
-    report_id: str,
+    report_id: UUID,
     page_number: int,
     current_user=Depends(get_current_user),
     db=Depends(get_db),
@@ -265,9 +266,9 @@ async def get_page_image(
     return StreamingResponse(BytesIO(img_bytes), media_type="image/jpeg")
 
 
-@router.get("/{report_id}/pages/{page_number}/words")
+@router.get("/{report_id:uuid}/pages/{page_number}/words")
 async def get_page_words(
-    report_id: str,
+    report_id: UUID,
     page_number: int,
     current_user=Depends(get_current_user),
     db=Depends(get_db),

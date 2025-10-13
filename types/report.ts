@@ -16,32 +16,29 @@ export interface ReportDocument {
   blocks: ReportBlock[];
 
   /**
-   * Optional cache of rasterised PDF pages used by the `PdfEditor`. When a
-   * report originates from a PDF, each page is rendered into a canvas and
-   * converted to a data URL.  Storing these images and their word
-   * information allows previously viewed pages to be restored instantly on
-   * subsequent loads without re‑fetching from the server.  The object
-   * keys correspond to the zero‑based page index and the value stores
-   * dimensions, data URL and word boxes for that page.
+   * Optional array of saved page images and associated word data. When a
+   * report is saved via the canvas API, the frontend serializes each
+   * rendered PDF page into a data URL along with the word metadata.
+   * Including this in the report allows the editor to rehydrate the
+   * canvas instantly without re-fetching or re-rendering the original
+   * PDF. This property is undefined for reports that have not been
+   * persisted with a canvas snapshot.
    */
-  pageCache?: {
-    [pageIndex: number]: {
-      pageNumber: number;
-      width: number;
-      height: number;
-      imageUrl: string;
-      words: any[];
-    };
-  };
+  pages?: SavedPage[];
+}
 
-  /**
-   * Optional cache of page metadata (width and height) for PDF reports.  This
-   * mirrors the response from the `/pages_info` endpoint and is saved
-   * alongside a session so that the editor can avoid re‑fetching this
-   * lightweight information on reload.  It contains an array of objects
-   * with the same shape as returned by the backend service.
-   */
-  pageInfoCache?: any[];
+/**
+ * Represents a saved PDF page with its rendered image and word metadata.
+ * The image property contains a data URL (e.g. data:image/png;base64,...)
+ * which can be used directly in an <img> or canvas element.
+ */
+export interface SavedPage {
+  pageNumber: number;
+  width: number;
+  height: number;
+  image: string;
+  imageUrl?: string;
+  words: any[];
 }
 
 export interface ReportBlock {
@@ -60,6 +57,19 @@ export interface XbrlTag {
   // Optional: indices of the highlighted text in the content
   startIndex?: number; // Start index of the highlighted text
   endIndex?: number; // End index of the highlighted text
+  /**
+   * Optional text that was explicitly selected by the user when creating
+   * the tag. This is particularly important for PDF-derived blocks where
+   * the underlying block content may be empty.
+   */
+  selectedText?: string;
+  /**
+   * Optional list of word indices captured when tagging PDF content. These
+   * indices reference the word positions within the associated PDF page
+   * (see ``ReportDocument.pages``) and allow consumers to rebuild the
+   * tagged phrase even when character offsets are unavailable.
+   */
+  wordIndices?: number[];
 
   /**
    * Optional feedback ID returned from the AI recommender when a user

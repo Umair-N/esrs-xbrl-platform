@@ -1,19 +1,13 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Suspense } from "react";
+// This legacy editor page wrapper has been deprecated. When users
+// navigate to /editor/page1 (which may have been bookmarked under
+// previous versions), immediately redirect to the current editor
+// implementation located at /editor. This ensures stale routes still
+// resolve correctly after the refactor.
+import { redirect } from 'next/navigation';
 
-const LazyEditorPage = dynamic(
-  () => import("@/components/editor/editor-page"),
-  {
-    ssr: false,
-  }
-);
-
-export default function EditorPageWrapper() {
-  return (
-    <Suspense fallback={<div>Loading editor...</div>}>
-      <LazyEditorPage />
-    </Suspense>
-  );
+export default function DeprecatedEditorPageWrapper() {
+  redirect('/editor');
+  return null;
 }

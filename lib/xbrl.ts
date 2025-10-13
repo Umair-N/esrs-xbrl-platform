@@ -313,6 +313,21 @@ ${namespaces}>
       height: 3px;
       border-radius: 2px;
     }
+
+    .unplaced-tags {
+      margin-top: 16px;
+      padding: 12px;
+      background: #fef2f2;
+      border-left: 3px solid #ef4444;
+      border-radius: 4px;
+      color: #991b1b;
+      font-size: 13px;
+    }
+
+    .unplaced-tags ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
   </style>
 </head>
 <body>
@@ -571,42 +586,174 @@ function generateBlockContentWithTaxonomyAwareness(
   block: any,
   enabledTaxonomies: string[]
 ): string {
-  if (block.tags.length === 0) {
-    return `    <div class="content-block">${escapeHTML(
-      block.content
-    )}</div>\n`;
+  const textContent = ensureBlockText(block);
+  if (!textContent) {
+    return '    <div class="content-block"></div>\n';
   }
-  const sortedTags = [...block.tags].sort(
-    (a, b) => (a.startIndex || 0) - (b.startIndex || 0)
+
+  const tags: XbrlTag[] = Array.isArray(block.tags) ? [...block.tags] : [];
+  const htmlWithTags = renderTextWithTags(
+    textContent,
+    tags,
+    enabledTaxonomies
   );
-  const content = block.content;
-  let processedContent = '';
-  let lastIndex = 0;
-  sortedTags.forEach((tag: XbrlTag, index: number) => {
-    const startIndex = tag.startIndex || 0;
-    const endIndex = tag.endIndex || startIndex;
-    if (startIndex !== endIndex && startIndex < content.length) {
-      processedContent += escapeHTML(content.substring(lastIndex, startIndex));
-      const taggedText = content.substring(startIndex, endIndex);
-      const ixbrlTag = generateEnhancediXBRLTag(
-        tag,
-        taggedText,
-        enabledTaxonomies
-      );
-      processedContent += ixbrlTag;
-      lastIndex = endIndex;
-    }
-  });
-  processedContent += escapeHTML(content.substring(lastIndex));
-  processedContent = processedContent.replace(/\n/g, '<br/>');
-  return `    <div class="content-block">${processedContent}</div>\n\n`;
+
+  return `    <div class="content-block">${htmlWithTags}</div>\n\n`;
 }
 
+function ensureBlockText(block: any): string {
+  if (block && typeof block.content === 'string' && block.content.trim().length > 0) {
+    return block.content;
+  }
+  if (Array.isArray(block?.tags)) {
+    const fromTags = block.tags
+      .map((tag: any) =>
+        typeof tag?.selectedText === 'string' ? tag.selectedText.trim() : ''
+      )
+      .filter(Boolean)
+      .join(' ');
+    if (fromTags.trim().length > 0) {
+      return fromTags;
+    }
+  }
+  return '';
+}
+
+interface TagPlacement {
+  start: number;
+  end: number;
+  tag: XbrlTag;
+}
+
+function renderTextWithTags(
+  text: string,
+  tags: XbrlTag[],
+  enabledTaxonomies: string[]
+): string {
+  if (!tags || tags.length === 0) {
+    return escapeWithLineBreaks(text);
+  }
+
+  const { placements, leftovers } = planTagPlacements(text, tags);
+
+  if (placements.length === 0) {
+    const base = escapeWithLineBreaks(text);
+    return base + renderUnplacedTags(leftovers, enabledTaxonomies);
+  }
+
+  let cursor = 0;
+  let html = '';
+  placements.forEach(({ start, end, tag }) => {
+    if (start > cursor) {
+      html += escapeWithLineBreaks(text.substring(cursor, start));
+    }
+    const snippet = text.substring(start, end);
+    html += generateEnhancediXBRLTag(tag, snippet, enabledTaxonomies);
+    cursor = end;
+  });
+  if (cursor < text.length) {
+    html += escapeWithLineBreaks(text.substring(cursor));
+  }
+  return html + renderUnplacedTags(leftovers, enabledTaxonomies);
+}
+
+function planTagPlacements(
+  text: string,
+  tags: XbrlTag[]
+): { placements: TagPlacement[]; leftovers: XbrlTag[] } {
+  const placements: TagPlacement[] = [];
+  const leftovers: XbrlTag[] = [];
+  const occupied: Array<{ start: number; end: number }> = [];
+  const lowerText = text.toLowerCase();
+
+  const sorted = [...tags].sort((a, b) => {
+    const aIdx = typeof a.startIndex === 'number' ? a.startIndex : Number.MAX_SAFE_INTEGER;
+    const bIdx = typeof b.startIndex === 'number' ? b.startIndex : Number.MAX_SAFE_INTEGER;
+    if (aIdx === bIdx) {
+      const aTime = typeof a.createdAt === 'string' ? Date.parse(a.createdAt) : Number(a.createdAt ?? 0);
+      const bTime = typeof b.createdAt === 'string' ? Date.parse(b.createdAt) : Number(b.createdAt ?? 0);
+      return aTime - bTime;
+    }
+    return aIdx - bIdx;
+  });
+
+  const isFree = (start: number, end: number) =>
+    occupied.every((range) => end <= range.start || start >= range.end);
+
+  sorted.forEach((tag) => {
+    let start =
+      typeof tag.startIndex === 'number' && tag.startIndex >= 0
+        ? tag.startIndex
+        : null;
+    let end =
+      typeof tag.endIndex === 'number' && tag.endIndex > (start ?? -1)
+        ? Math.min(tag.endIndex, text.length)
+        : null;
+
+    if (
+      start !== null &&
+      end !== null &&
+      end > start &&
+      isFree(start, end)
+    ) {
+      placements.push({ start, end, tag });
+      occupied.push({ start, end });
+      return;
+    }
+
+    const candidate = (tag.selectedText || tag.concept?.label || tag.concept?.id || '').trim();
+    if (candidate) {
+      const needle = candidate.toLowerCase();
+      let idx = lowerText.indexOf(needle);
+      while (idx !== -1) {
+        const endIdx = idx + needle.length;
+        if (isFree(idx, endIdx)) {
+          placements.push({ start: idx, end: endIdx, tag });
+          occupied.push({ start: idx, end: endIdx });
+          return;
+        }
+        idx = lowerText.indexOf(needle, idx + 1);
+      }
+    }
+
+    leftovers.push(tag);
+  });
+
+  placements.sort((a, b) => a.start - b.start || a.end - b.end);
+  return { placements, leftovers };
+}
+
+function renderUnplacedTags(tags: XbrlTag[], enabledTaxonomies: string[]): string {
+  if (!tags || tags.length === 0) {
+    return '';
+  }
+  const items = tags
+    .map((tag, idx) => {
+      const label =
+        (typeof tag.selectedText === 'string' && tag.selectedText.trim()) ||
+        tag.concept?.label ||
+        tag.concept?.id ||
+        `Tag ${idx + 1}`;
+      return `<li>${generateEnhancediXBRLTag(tag, label, enabledTaxonomies)}</li>`;
+    })
+    .join('');
+  return `<div class="unplaced-tags"><p>Unplaced tags</p><ul>${items}</ul></div>`;
+}
 function generateEnhancediXBRLTag(
   tag: any,
   value: string,
   enabledTaxonomies: string[]
 ): string {
+  const hasContent = (text: string | undefined): boolean =>
+    typeof text === 'string' && text.replace(/\s+/g, '').length > 0;
+  const rawValue =
+    typeof value === 'string' && hasContent(value) ? value : undefined;
+  const fallbackValue =
+    typeof tag?.selectedText === 'string' && hasContent(tag.selectedText)
+      ? tag.selectedText
+      : '';
+  const resolvedValue = rawValue ?? fallbackValue ?? '';
+
   const concept = tag.concept;
   const isNumeric = isNumericConcept(concept);
   const conceptName = parseConceptNameWithTaxonomy(
@@ -618,11 +765,12 @@ function generateEnhancediXBRLTag(
   // Enhanced validation with taxonomy-specific rules
   if (!isValidConceptForTaxonomies(conceptName, enabledTaxonomies)) {
     console.warn(`Invalid concept: ${conceptName}, using fallback`);
-    return escapeHTML(value);
+    return escapeWithLineBreaks(resolvedValue || value);
   }
 
   if (isNumeric) {
-    const cleanValue = cleanFactValue(value, concept.dataType);
+    const numericSource = (resolvedValue || value || '').replace(/\s+/g, ' ');
+    const cleanValue = cleanFactValue(numericSource, concept.dataType);
     const unitRef = determineUnitRefWithTaxonomy(
       conceptName,
       concept.dataType,
@@ -642,7 +790,9 @@ function generateEnhancediXBRLTag(
     const attributes = [`name="${conceptName}"`, `contextRef="${contextRef}"`]
       .filter(Boolean)
       .join(' ');
-    return `<ix:nonNumeric ${attributes}>${escapeHTML(value)}</ix:nonNumeric>`;
+    return `<ix:nonNumeric ${attributes}>${escapeWithLineBreaks(
+      resolvedValue || value
+    )}</ix:nonNumeric>`;
   }
 }
 
@@ -824,6 +974,14 @@ function escapeHTML(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function escapeWithLineBreaks(text: string): string {
+  if (!text) return '';
+  return escapeHTML(text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')).replace(
+    /\n/g,
+    '<br/>'
+  );
 }
 
 // Enhanced validation functions

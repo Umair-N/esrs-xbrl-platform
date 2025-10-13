@@ -1,14 +1,15 @@
-// 'EditorPage' is dedicated to editing and tagging a loaded report. The
-// document is fetched from the backend based on the ``reportId`` query
-// parameter. Previously this page relied on ``localStorage`` to persist
-// session state; in this refactored version the state lives purely
-// in memory until the user chooses to persist it via the "Save
-// Session" button.
+// Dynamic page for loading and editing a previously saved canvas. The
+// ``id`` parameter corresponds to a record in the backend's
+// ``canvas_states`` table (mounted under ``/reports/canvas``). When
+// visiting ``/reports/[id]`` the canvas is fetched and the editor is
+// hydrated without reprocessing the original PDF. Users can continue
+// tagging and even save a new copy which will generate its own unique
+// identifier.
 
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -52,11 +53,10 @@ import {
 import { axiosInstance } from '@/lib/axios';
 import { toast } from 'sonner';
 
-/**
- * Merge multiple blocks of a report into a single block. This combines the
- * content of all blocks with double newline separators and adjusts the start
- * and end indices of each tag to account for the offset in the merged content.
- */
+// Reuse the block merging helper for text‑based reports. Saved canvases
+// should already be in the correct shape, but if a record was created
+// from a non‑PDF source and blocks were not merged prior to saving,
+// merging here ensures consistency.
 function mergeReportBlocks(report: ReportDocument): ReportDocument {
   if (!report.blocks || report.blocks.length <= 1) {
     return report;
@@ -93,7 +93,8 @@ function mergeReportBlocks(report: ReportDocument): ReportDocument {
   };
 }
 
-export default function EditorPage() {
+export default function CanvasPage() {
+  const params = useParams();
   const router = useRouter();
   const [report, setReport] = useState<ReportDocument | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -108,68 +109,56 @@ export default function EditorPage() {
   // Ref to interact with the PdfEditor component. Enables loading all pages
   // and extracting page images for persistence.
   const pdfEditorRef = useRef<PdfEditorHandle | null>(null);
-  const pathname = usePathname();
 
-  // Refs used for auto‑saving. ``canvasIdRef`` holds the ID returned from
-  // the backend after the first save. ``pagesRef`` stores the extracted
-  // page images to avoid repeated conversions. ``skipInitialAutoSave``
-  // prevents auto saving on the first render, and
-  // ``autoSaveTimeoutRef`` debounces consecutive changes.
+  // Track the ID of the current canvas for updates. This ref is set
+  // once the page parameter is available and persists across renders. If
+  // null, auto‑saves will create a new canvas record on the backend.
   const canvasIdRef = useRef<string | null>(null);
+  // Hold the extracted pages so that auto‑saves can reuse the same
+  // images instead of re-extracting them on every change. When the
+  // user manually saves (handles Save Report), this ref is updated.
   const pagesRef = useRef<any[] | undefined>(undefined);
+  // Skip auto‑saving on the first render to avoid saving before the
+  // report has been loaded from the backend. This ref flips after
+  // initial mount.
   const skipInitialAutoSave = useRef(true);
+  // Store timeout ID for debouncing auto saves.
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // When the editor first mounts, attempt to fetch the report based on
-  // the ``reportId`` query parameter. If present, the report is
-  // retrieved from the backend. If the parameter is missing or the
-  // fetch fails, the user is redirected to the upload page.
-  const searchParams = useSearchParams();
+  // Fetch the saved canvas based on the dynamic route parameter. The
+  // backend returns an object with an ``id`` and the serialized
+  // report under ``data``. The data is deserialized for the editor.
   useEffect(() => {
-    // Only execute on client side and if a report hasn't been loaded yet
-    if (typeof window === 'undefined' || report) return;
-    const id = searchParams.get('reportId');
+    const { id } = params as { id?: string };
+    // Capture the canvas ID into a ref for auto‑save updates
     if (id) {
-      (async () => {
-        try {
-          const res = await axiosInstance.get(`/reports/${id}`);
-          const data = res.data;
-          // Transform the API response into the ReportDocument shape. The
-          // backend returns ``created_at`` and ``updated_at`` keys,
-          // whereas the frontend uses camelCase.
-          const doc: ReportDocument = {
-            id: data.id,
-            title: data.title,
-            createdAt: data.created_at,
-            updatedAt: data.updated_at,
-            file_path: data.file_path,
-            file_size: data.file_size,
-            file_type: data.file_type,
-            // Blocks come back as an array of objects with ``content``, ``type`` and ``tags``.
-            blocks: (data.blocks || []).map((b: any) => ({
-              id: b.id,
-              content: b.content,
-              type: b.type,
-              tags: Array.isArray(b.tags) ? b.tags : [],
-            })),
-          };
-          const isPdf = doc.file_type?.toLowerCase().includes('pdf');
-          const restored = isPdf ? doc : mergeReportBlocks(doc);
-          setReport(restored);
-          if (restored.blocks && restored.blocks.length > 0) {
-            setSelectedBlockId(restored.blocks[0].id);
-          }
-        } catch (err) {
-          console.error('Failed to fetch report', err);
-          toast.error('Failed to load report');
-          router.replace('/upload');
-        }
-      })();
-    } else {
-      // No reportId in the query string; redirect to upload
-      router.replace('/upload');
+      canvasIdRef.current = id;
     }
-  }, [report, router, searchParams]);
+    if (!id) return;
+    (async () => {
+      try {
+        const res = await axiosInstance.get(`/reports/canvas/${id}`);
+        const resp = res.data;
+        const doc: ReportDocument = resp.data;
+        // If the report isn't a PDF, merge its blocks for consistency
+        const isPdf = doc.file_type?.toLowerCase().includes('pdf');
+        const restored = isPdf ? doc : mergeReportBlocks(doc);
+        if (Array.isArray((doc as any)?.pages)) {
+          pagesRef.current = (doc as any).pages;
+        } else {
+          pagesRef.current = undefined;
+        }
+        setReport(restored);
+        if (restored.blocks && restored.blocks.length > 0) {
+          setSelectedBlockId(restored.blocks[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch canvas', err);
+        toast.error('Failed to load saved report');
+        router.replace('/upload');
+      }
+    })();
+  }, [params, router]);
 
   const handleBlockSelect = (blockId: string) => {
     setSelectedBlockId(blockId);
@@ -186,17 +175,11 @@ export default function EditorPage() {
   };
 
   /**
-   * Persist the current canvas state to the backend. The report is
-   * serialized and sent to the ``/reports/canvas`` endpoint. On
-   * success the user is redirected to a new route that represents
-   * the saved canvas (``/reports/[id]``). If an error occurs a toast
-   * notification is shown.
+   * Save the current report. When editing an existing canvas the record
+   * is updated in place; otherwise a brand new canvas is created and the
+   * user is redirected to that ID.
    */
-  // Persist the current report to the backend. This handler wraps
-  // saving logic and redirects to the saved canvas when done.
   const handleSaveSession = async () => {
-    // Renamed below to handleSaveReport; this function is preserved for backward
-    // compatibility but delegates to the new handler.
     if (!report) return;
     setIsSaving(true);
     try {
@@ -206,7 +189,6 @@ export default function EditorPage() {
       let pages: any[] | undefined = pagesRef.current;
       if (editor) {
         editor.loadAllPages();
-        // Wait until all pages are loaded
         while (editor.getProgress() < 1) {
           // eslint-disable-next-line no-await-in-loop
           await new Promise((resolve) => setTimeout(resolve, 200));
@@ -226,15 +208,10 @@ export default function EditorPage() {
         await axiosInstance.put(`/reports/canvas/${existingCanvasId}`, payload);
         pagesRef.current = pages ?? pagesRef.current;
         toast.success('Report saved successfully');
-        const targetPath = `/reports/${existingCanvasId}`;
-        if (pathname !== targetPath) {
-          router.push(targetPath);
-        }
       } else {
         const res = await axiosInstance.post('/reports/canvas', payload);
         const newId = res.data?.id;
         if (newId) {
-          // Persist the newly created canvas ID and pages for auto‑save updates
           canvasIdRef.current = newId;
           pagesRef.current = pages;
           toast.success('Report saved successfully');
@@ -251,39 +228,33 @@ export default function EditorPage() {
     }
   };
 
-  // Remove legacy handler definitions. The updated handler is defined
-  // above; the following line prevents unused variable warnings.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleSave = (_: ReportDocument) => {};
-
   const handleReportChange = (updatedReport: ReportDocument) => {
     setReport(updatedReport);
   };
 
-  const handleNewDocument = () => {
-    router.push('/upload');
-    setIsMenuOpen(false);
-  };
-
-  // Auto‑save effect: whenever the report changes after initial load,
-  // schedule an update to the backend. If a canvas ID has been set
-  // (via a previous save), the update endpoint is used; otherwise
-  // a new canvas record is created. The pages are reused from
-  // ``pagesRef`` if available. This effect is debounced to avoid
-  // sending too many requests in quick succession. On the first run
-  // the effect does nothing to prevent saving before data is loaded.
+  // Debounced auto‑save. Whenever the report state changes after the
+  // initial load, schedule a save to the backend. If a canvas ID is
+  // already known (i.e. the user is editing an existing saved report),
+  // the update endpoint is called. Otherwise a new canvas is created.
   useEffect(() => {
     if (!report) return;
+    // Skip the initial effect run after mount
     if (skipInitialAutoSave.current) {
       skipInitialAutoSave.current = false;
       return;
     }
+    // Clear any pending auto save
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     autoSaveTimeoutRef.current = setTimeout(async () => {
       try {
         const editor = pdfEditorRef.current;
+        // Use previously extracted pages if available; otherwise
+        // extract pages if all pages are loaded. This avoids
+        // repeatedly converting images to data URLs. If pages are
+        // partially loaded the report will still be saved without the
+        // pages field. Users can manually save to capture all pages.
         let pages: any[] | undefined = pagesRef.current;
         if (!pages && editor && editor.getProgress() >= 1) {
           pages = await editor.extractPages();
@@ -298,11 +269,13 @@ export default function EditorPage() {
           report_id: report.id,
         };
         if (canvasIdRef.current) {
+          // Update existing canvas
           await axiosInstance.put(`/reports/canvas/${canvasIdRef.current}`, payload);
           if (pages) {
             pagesRef.current = pages;
           }
         } else {
+          // Create a new canvas record (will not redirect)
           const res = await axiosInstance.post('/reports/canvas', payload);
           const newId = res.data?.id;
           if (newId) {
@@ -318,6 +291,7 @@ export default function EditorPage() {
         toast.error('Failed to auto‑save');
       }
     }, 2000);
+    // Cleanup function clears timeout on unmount or when report changes
     return () => {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
@@ -325,9 +299,13 @@ export default function EditorPage() {
     };
   }, [report]);
 
-  // Navigate to the reports listing page. Previously this handler was a
-  // no‑op when sessions were hidden. Now that reports can be
-  // managed, this pushes ``/reports`` and closes the menu.
+  const handleNewDocument = () => {
+    router.push('/upload');
+    setIsMenuOpen(false);
+  };
+
+  // Navigate to the reports listing page and close the popover menu. Allows
+  // users to view all of their saved reports from within an open report.
   const handleViewReports = () => {
     router.push('/reports');
     setIsMenuOpen(false);
@@ -501,7 +479,9 @@ export default function EditorPage() {
                     </DialogContent>
                   </Dialog>
 
-                  {/* Menu Popover */}
+                  {/* Menu Popover: only show New Document; saved sessions are
+                      accessed via their URLs so there is no listing
+                      available */}
                   <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -577,9 +557,8 @@ export default function EditorPage() {
                   className='mx-4 mt-0 mb-4 flex-1 min-h-0'
                 >
                   <div className='h-full overflow-y-auto'>
-                    {/* SaveExportPanel still supports exporting XBRL. The onSave
-                        handler is a no‑op because session persistence is
-                        handled via handleSaveSession. */}
+                    {/* SaveExportPanel still supports exporting XBRL. The onSave handler is a no‑op
+                        because saving sessions is handled via handleSaveSession above. */}
                     <SaveExportPanel report={report} onSave={() => {}} />
                   </div>
                 </TabsContent>

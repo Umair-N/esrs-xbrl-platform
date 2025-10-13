@@ -131,17 +131,9 @@ export function TextEditor({
     onReportChange(updatedReport);
     setEditingBlockId(null);
 
-    // Persist the updated report to localStorage.
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(
-          'xbrl-editor-session',
-          JSON.stringify(updatedReport)
-        );
-      } catch (err) {
-        console.error('Failed to persist updated report:', err);
-      }
-    }
+    // In the refactored architecture, unsaved reports are no longer
+    // persisted to localStorage. State is maintained in memory and
+    // can be explicitly saved via the "Save Session" button.
   };
 
   const cancelEditing = () => setEditingBlockId(null);
@@ -149,71 +141,129 @@ export function TextEditor({
   /**
    * Handles highlighting text in a block.  Invokes the recommendations API
    * with the selected text and positions a popover next to the selection.
-   */
+  */
   const handleTextSelection = (blockId: string) => {
     if (window.getSelection) {
       const selection = window.getSelection();
-      if (selection && selection.toString().length > 0) {
+      if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         const selectedText = selection.toString();
-        const parentElement = range.commonAncestorContainer.parentElement;
+        if (!selectedText) return;
 
+        const parentElement =
+          range.commonAncestorContainer instanceof HTMLElement
+            ? range.commonAncestorContainer
+            : range.commonAncestorContainer.parentElement;
+        const blockElement =
+          parentElement?.closest<HTMLElement>(`[data-block-id="${blockId}"]`) ??
+          null;
+        if (!blockElement) return;
+
+        const contentElement = blockElement.querySelector<HTMLElement>(
+          '[data-block-content="true"]'
+        );
+        if (!contentElement) return;
+        if (!contentElement.contains(range.commonAncestorContainer)) return;
+
+        const preRangeStart = document.createRange();
+        preRangeStart.selectNodeContents(contentElement);
+        preRangeStart.setEnd(range.startContainer, range.startOffset);
+        const precedingText = preRangeStart.toString();
+
+        const blockContent =
+          report.blocks.find((b) => b.id === blockId)?.content ?? '';
+
+        const escapeRegExp = (value: string) =>
+          value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const countOccurrences = (source: string, needle: string) => {
+          if (!needle) return 0;
+          const pattern = new RegExp(escapeRegExp(needle), 'g');
+          const matches = source.match(pattern);
+          return matches ? matches.length : 0;
+        };
+
+        const occurrenceIndex = countOccurrences(precedingText, selectedText);
+
+        const findNthOccurrence = (
+          source: string,
+          needle: string,
+          n: number
+        ) => {
+          if (n < 0) return -1;
+          if (!needle) return -1;
+          const pattern = new RegExp(escapeRegExp(needle), 'g');
+          let match: RegExpExecArray | null;
+          let occurrence = 0;
+          while ((match = pattern.exec(source)) !== null) {
+            if (occurrence === n) {
+              return match.index;
+            }
+            occurrence += 1;
+          }
+          return -1;
+        };
+
+        const startIndex = findNthOccurrence(
+          blockContent,
+          selectedText,
+          occurrenceIndex
+        );
+        if (startIndex === -1) return;
+        const endIndex = startIndex + selectedText.length;
+
+        if (startIndex >= 0 && endIndex > startIndex) {
+          onTextHighlight(blockId, selectedText, startIndex, endIndex);
+          setHighlightRange({ blockId, startIndex, endIndex });
+        }
+
+        const rect = range.getBoundingClientRect();
         if (
-          parentElement &&
-          parentElement.closest(`[data-block-id="${blockId}"]`)
+          popoverTriggerElement &&
+          popoverTriggerElement.parentNode === document.body
         ) {
-          const blockContent =
-            report.blocks.find((b) => b.id === blockId)?.content || '';
-          const startIndex = blockContent.indexOf(selectedText);
-          const endIndex = startIndex + selectedText.length;
+          document.body.removeChild(popoverTriggerElement);
+        }
+        const virtualElement = document.createElement('div');
+        virtualElement.style.position = 'absolute';
+        virtualElement.style.top = `${rect.bottom + window.scrollY}px`;
+        virtualElement.style.left = `${rect.left + window.scrollX}px`;
+        virtualElement.style.width = `${rect.width}px`;
+        virtualElement.style.height = '1px';
+        virtualElement.style.pointerEvents = 'none';
+        document.body.appendChild(virtualElement);
 
-          if (startIndex >= 0) {
-            onTextHighlight(blockId, selectedText, startIndex, endIndex);
-            setHighlightRange({ blockId, startIndex, endIndex });
-          }
+        setPopoverTriggerElement(virtualElement);
+        setHighlightedText(selectedText);
 
-          const rect = range.getBoundingClientRect();
-          const virtualElement = document.createElement('div');
-          virtualElement.style.position = 'absolute';
-          virtualElement.style.top = `${rect.bottom + window.scrollY}px`;
-          virtualElement.style.left = `${rect.left + window.scrollX}px`;
-          virtualElement.style.width = `${rect.width}px`;
-          virtualElement.style.height = '1px';
-          virtualElement.style.pointerEvents = 'none';
-          document.body.appendChild(virtualElement);
-
-          setPopoverTriggerElement(virtualElement);
-          setHighlightedText(selectedText);
-
-          if (!selectedTaxonomy?.name) {
-            return showError({
-              title: 'Please select a taxonomy',
-              message: '',
-            });
-          }
-          // Query recommendations
-          if (selectedTaxonomy?.name) {
-            mutate(
-              {
-                data: {
-                  query: selectedText,
-                  taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
-                  k: 5,
-                  rerank: true,
-                },
+        if (!selectedTaxonomy?.name) {
+          return showError({
+            title: 'Please select a taxonomy',
+            message: '',
+          });
+        }
+        // Query recommendations
+        if (selectedTaxonomy?.name) {
+          mutate(
+            {
+              data: {
+                query: selectedText,
+                taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+                k: 5,
+                rerank: true,
               },
-              {
-                onSuccess: (res: any) => {
-                  // setRecommendations(res?.results ?? []);
-                  setShowPopover(true);
-                },
-                onError: () => {
-                  // setRecommendations([]);
-                  setShowPopover(true);
-                },
-              }
-            );
-          }
+            },
+            {
+              onSuccess: (res: any) => {
+                // setRecommendations(res?.results ?? []);
+                setShowPopover(true);
+              },
+              onError: () => {
+                // setRecommendations([]);
+                setShowPopover(true);
+              },
+            }
+          );
         }
       }
     }
@@ -290,7 +340,10 @@ export function TextEditor({
       // Hide the suggestion popover and clear the highlight range.
       setShowPopover(false);
       setHighlightRange(null);
-      if (popoverTriggerElement) {
+      if (
+        popoverTriggerElement &&
+        popoverTriggerElement.parentNode === document.body
+      ) {
         document.body.removeChild(popoverTriggerElement);
         setPopoverTriggerElement(null);
       }
@@ -332,7 +385,10 @@ export function TextEditor({
   const closePopover = () => {
     setShowPopover(false);
     setHighlightRange(null);
-    if (popoverTriggerElement) {
+    if (
+      popoverTriggerElement &&
+      popoverTriggerElement.parentNode === document.body
+    ) {
       document.body.removeChild(popoverTriggerElement);
       setPopoverTriggerElement(null);
     }
@@ -341,7 +397,11 @@ export function TextEditor({
   const renderTaggedContent = (block: ReportBlock) => {
     if (!block.tags || block.tags.length === 0) {
       return (
-        <p className='font-medium leading-relaxed whitespace-pre-wrap'>
+        <p
+          className='font-medium leading-relaxed whitespace-pre-wrap'
+          data-range-start={0}
+          data-range-end={block.content.length}
+        >
           {block.content}
         </p>
       );
@@ -359,7 +419,12 @@ export function TextEditor({
 
       if (startIndex > lastIndex) {
         segments.push(
-          <span key={`text-${index}`} className='font-medium leading-relaxed'>
+          <span
+            key={`text-${index}`}
+            className='font-medium leading-relaxed'
+            data-range-start={lastIndex}
+            data-range-end={startIndex}
+          >
             {block.content.substring(lastIndex, startIndex)}
           </span>
         );
@@ -368,7 +433,11 @@ export function TextEditor({
       segments.push(
         <HoverCard key={`tag-${tag.id}`}>
           <HoverCardTrigger asChild>
-            <span className='bg-primary/20 px-1 py-0.5 rounded cursor-help border-b border-dashed border-primary font-medium'>
+            <span
+              className='bg-primary/20 px-1 py-0.5 rounded cursor-help border-b border-dashed border-primary font-medium'
+              data-range-start={startIndex}
+              data-range-end={endIndex}
+            >
               {block.content.substring(startIndex, endIndex)}
             </span>
           </HoverCardTrigger>
@@ -420,7 +489,12 @@ export function TextEditor({
 
     if (lastIndex < block.content.length) {
       segments.push(
-        <span key='text-last' className='font-medium leading-relaxed'>
+        <span
+          key='text-last'
+          className='font-medium leading-relaxed'
+          data-range-start={lastIndex}
+          data-range-end={block.content.length}
+        >
           {block.content.substring(lastIndex)}
         </span>
       );
@@ -430,7 +504,12 @@ export function TextEditor({
   };
 
   /**
-   * Persist unsaved edits to localStorage if the editor unmounts.
+   * Persist unsaved edits in memory if the editor unmounts. In the new
+   * design unsaved drafts are not stored in localStorage. Instead we
+   * update the parent component's state so that any uncommitted edits
+   * remain visible during the current page lifetime. When the user
+   * navigates away these edits will be lost unless a Save Session is
+   * executed.
    */
   const latestEditingBlockId = useRef<string | null>(editingBlockId);
   const latestEditedContent = useRef<string>(editedContent);
@@ -463,16 +542,6 @@ export function TextEditor({
           updatedAt: new Date().toISOString(),
         };
         onReportChange(updatedReport);
-        if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              'xbrl-editor-session',
-              JSON.stringify(updatedReport)
-            );
-          } catch (err) {
-            console.error('Failed to persist unsaved edit on unmount:', err);
-          }
-        }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -558,7 +627,10 @@ export function TextEditor({
                     <Edit2 className='w-4 h-4' />
                   </Button>
                 </div>
-                <div className='leading-relaxed prose dark:prose-invert max-w-none'>
+                <div
+                  className='leading-relaxed prose dark:prose-invert max-w-none'
+                  data-block-content='true'
+                >
                   {renderTaggedContent(block)}
                 </div>
                 {block.tags && block.tags.length > 0 && (

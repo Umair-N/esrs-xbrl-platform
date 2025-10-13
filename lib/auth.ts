@@ -63,16 +63,16 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   return useMutation({
     mutationFn: logout,
     onSuccess: () => {
-      showSuccess({ title: 'Logout successful' })
+      showSuccess({ title: 'Logout successful' });
       queryClient.removeQueries({ queryKey: userQueryKey });
-      localStorage.removeItem('xbrl-editor-session')
-      localStorage.removeItem('xbrl-session-id')
+      // Clear any cached report state on logout. The application no longer
+      // persists sessions client‑side, so nothing needs to be removed
+      // from localStorage.
       onSuccess?.();
     },
     onSettled: () => {
-      localStorage.removeItem('xbrl-editor-session')
-      localStorage.removeItem('xbrl-session-id')
-    }
+      // No client‑side session data to clear.
+    },
   });
 };
 

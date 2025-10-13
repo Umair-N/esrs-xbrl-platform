@@ -1,7 +1,8 @@
-// 'UploadPage' provides a dedicated screen for uploading a new report. Once a
-// report is selected and processed, it is merged into a single block and
-// persisted into localStorage. The user is then redirected to the editor
-// page to begin tagging.
+// 'UploadPage' provides a dedicated screen for uploading a new report.
+// After a file is selected and processed, it is merged into a single
+// block (for non‑PDF formats) and the user is redirected to the editor
+// page with the report ID in the query string. Client‑side storage is
+// no longer used to persist session state.
 
 'use client';
 
@@ -10,8 +11,8 @@ import { useCallback } from 'react';
 import { FileUploader } from '@/components/editor/file-uploader';
 import type { ReportDocument } from '@/types/report';
 import type { ReportBlock, XbrlTag } from '@/types/report';
-import Link from 'next/link';
-import { buttonVariants } from '@/components/ui/button';
+// The legacy navigation components for viewing saved sessions have been
+// removed. We no longer import Link or button styling utilities here.
 
 /**
  * Merge multiple blocks of a report into a single block. This combines the
@@ -61,21 +62,18 @@ function mergeReportBlocks(report: ReportDocument): ReportDocument {
 export default function UploadPage() {
   const router = useRouter();
 
-  // Once a report is uploaded, merge its blocks, persist to localStorage
-  // and navigate to the editor page.
+  // Once a report is uploaded, merge its blocks if necessary and
+  // navigate to the editor page with the report ID in the query. The
+  // application no longer persists reports in localStorage; instead it
+  // relies on server‑side storage and query parameters to fetch
+  // document data.
   const handleReportLoaded = useCallback(
     (report: ReportDocument) => {
-      // When uploading a PDF, keep its pages as separate blocks to
-      // preserve character indices. For other formats or pasted text,
-      // merge all blocks into one combined block for ease of editing.
       const isPdf = report.file_type?.toLowerCase().includes('pdf');
       const merged = isPdf ? report : mergeReportBlocks(report);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xbrl-editor-session', JSON.stringify(merged));
-        // clear any existing session ID since this is a brand new upload
-        localStorage.removeItem('xbrl-session-id');
-      }
-      router.push('/editor');
+      // Redirect to the editor with the reportId query parameter. The
+      // editor page will fetch the report from the backend using this ID.
+      router.push(`/editor?reportId=${merged.id}`);
     },
     [router]
   );
@@ -83,37 +81,9 @@ export default function UploadPage() {
   return (
     <div className='flex items-center justify-center py-8 '>
       <div className='w-full max-w-3xl'>
-        <div className='flex justify-center items-center gap-6'>
-          {/* Button for viewing files */}
-          <Link
-            className={`${buttonVariants()} bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 py-2 px-6 rounded-lg shadow-xl font-bold text-white border-0 transition duration-300 ease-in-out transform hover:scale-105`}
-            href='/sessions'
-          >
-            View My Files
-          </Link>
-
-          {/* Link for continuing previous session */}
-          <Link
-            href='/editor'
-            className='flex items-center text-violet-600 hover:bg-violet-100 hover:text-violet-800 px-4 py-2 rounded-lg text-lg font-semibold transition duration-300 ease-in-out hover:shadow-md'
-          >
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              className='h-5 w-5 mr-2'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-              strokeWidth='2'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                d='M9 5l7 7-7 7'
-              ></path>
-            </svg>
-            Continue Previous Session
-          </Link>
-        </div>
+        {/* The legacy buttons for viewing saved sessions have been
+            removed. With the refactor to server‑persisted canvases, all
+            reports are edited via their unique URLs. */}
 
         <FileUploader onReportLoaded={handleReportLoaded} />
       </div>

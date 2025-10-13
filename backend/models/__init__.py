@@ -4,7 +4,11 @@ from .report import Report, ReportBlock
 from .user import User
 from .taxonomy import Taxonomy, UserTaxonomy
 from .context import XBRLContext, PeriodType, ContextStatus
-from .editor_session import EditorSession
+# Note: EditorSession has been removed in favour of CanvasState. See
+# models.canvas for the new persistent canvas storage model.
+# from .editor_session import EditorSession
+
+from .canvas import CanvasState  # import the new model for export purposes
 
 __all__ = [
     "RefreshToken",
@@ -17,5 +21,6 @@ __all__ = [
     "XBRLContext",
     "PeriodType",
     "ContextStatus",
-    "EditorSession",
+    # Export CanvasState so callers can import it from models directly
+    "CanvasState",
 ]
