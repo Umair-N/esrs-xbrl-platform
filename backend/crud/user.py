@@ -5,6 +5,7 @@ from models.user import User, UserStatus
 from psycopg2.extras import RealDictCursor
 from schemas.user import UserCreate, UserUpdate
 from datetime import datetime, timezone
+from database.resilience import with_db_retry
 
 
 class UserCRUD:
@@ -69,6 +70,7 @@ class UserCRUD:
             raise error
         finally:
             cursor.close()
+    @with_db_retry(max_retries=3, delay=0.5)
     def get_user_by_email(self, email: str, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
@@ -79,6 +81,7 @@ class UserCRUD:
         finally:
             cursor.close()
 
+    @with_db_retry(max_retries=3, delay=0.5)
     def get_user_by_id(self, user_id: int, db) -> Optional[User]:
         cursor = db.cursor(cursor_factory=RealDictCursor)
         try:
