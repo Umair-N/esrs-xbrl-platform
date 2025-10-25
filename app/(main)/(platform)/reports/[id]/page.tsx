@@ -183,37 +183,24 @@ export default function CanvasPage() {
     if (!report) return;
     setIsSaving(true);
     try {
-      // Ensure all pages are loaded and extract their images. The PdfEditor
-      // component exposes imperative methods via its ref.
-      const editor = pdfEditorRef.current;
-      let pages: any[] | undefined = pagesRef.current;
-      if (editor) {
-        editor.loadAllPages();
-        while (editor.getProgress() < 1) {
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        }
-        pages = await editor.extractPages();
-      }
+      // No need to load/extract pages - images are already in pdf_cache database
+      // Only save the report metadata, blocks, and tags
       const payload = {
         name: report.title ?? 'Untitled report',
         data: {
           ...report,
-          ...(pages ? { pages } : {}),
         },
         report_id: report.id,
       };
       const existingCanvasId = canvasIdRef.current;
       if (existingCanvasId) {
         await axiosInstance.put(`/reports/canvas/${existingCanvasId}`, payload);
-        pagesRef.current = pages ?? pagesRef.current;
         toast.success('Report saved successfully');
       } else {
         const res = await axiosInstance.post('/reports/canvas', payload);
         const newId = res.data?.id;
         if (newId) {
           canvasIdRef.current = newId;
-          pagesRef.current = pages;
           toast.success('Report saved successfully');
           router.push(`/reports/${newId}`);
         } else {

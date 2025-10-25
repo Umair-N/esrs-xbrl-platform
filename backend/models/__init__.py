@@ -9,6 +9,7 @@ from .context import XBRLContext, PeriodType, ContextStatus
 # from .editor_session import EditorSession
 
 from .canvas import CanvasState  # import the new model for export purposes
+from .pdf_cache import PDFCache
 
 __all__ = [
     "RefreshToken",
@@ -23,4 +24,5 @@ __all__ = [
     "ContextStatus",
     # Export CanvasState so callers can import it from models directly
     "CanvasState",
+    "PDFCache",
 ]

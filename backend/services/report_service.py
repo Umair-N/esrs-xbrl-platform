@@ -30,6 +30,7 @@ from .pdf_cache_service import (
     get_page_image as cache_get_page_image,
     get_page_words as cache_get_page_words,
 )
+from crud.report import ReportCRUD
 
 
 class SimpleBlock:
@@ -145,16 +146,14 @@ def create_report_from_file(
     background_tasks: Optional[BackgroundTasks] = None,
 ) -> SimpleReport:
     """
-    Create a report from an uploaded file.  This is a simplified stand-in
-    for the original database-backed implementation.  It saves the file
-    to disk under a generated UUID-based filename, registers the report
-    in an in-memory store and schedules PDF preprocessing if applicable.
+    Create a report from an uploaded file.  Saves the file to disk,
+    creates a database record, and schedules PDF preprocessing if applicable.
 
     :param filename: The original filename uploaded by the user.
     :param file_content: The raw bytes of the uploaded file.
     :param file_type: MIME type of the file (e.g., ``application/pdf``).
     :param user_id: Identifier for the user uploading the report.
-    :param db: Placeholder for a database session (unused in this stub).
+    :param db: Database connection for persisting the report.
     :param background_tasks: Optional ``BackgroundTasks`` instance to
         schedule asynchronous preprocessing.
     :return: A :class:`SimpleReport` instance populated with metadata.
@@ -162,23 +161,50 @@ def create_report_from_file(
     # Ensure the uploads directory exists
     uploads_dir = os.path.join(os.getcwd(), "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
+
     # Generate a unique filename to avoid collisions
     report_id = str(uuid.uuid4())
     saved_filename = f"{report_id}_{filename}"
     file_path = os.path.join(uploads_dir, saved_filename)
+
     # Write the uploaded content to disk
     with open(file_path, "wb") as f:
         f.write(file_content)
-    # Create the report and populate metadata
-    report = create_report(file_path=file_path, file_type=file_type, report_id=report_id, background_tasks=background_tasks)
+
+    # Save report to DATABASE (critical for pdf_cache foreign key constraint)
+    report_crud = ReportCRUD()
+    db_report = report_crud.create_report_with_blocks(
+        report_id=report_id,
+        title=filename,
+        user_id=user_id,
+        file_path=file_path,
+        file_type=file_type,
+        file_size=len(file_content),
+        paragraphs=[],  # PDF reports start with no text blocks
+        db=db,
+    )
+
+    # Schedule PDF preprocessing in background
+    if background_tasks and file_type and file_type.lower().startswith("application/pdf"):
+        background_tasks.add_task(
+            cache_preprocess_pdf,
+            report_id,
+            file_path,
+            file_type,
+        )
+
+    # Convert to SimpleReport for compatibility
+    report = SimpleReport(report_id, file_path, file_type)
     report.title = filename
     report.file_size = len(file_content)
-    report.created_at = datetime.utcnow()
-    report.updated_at = report.created_at
-    report.blocks = []  # PDF reports start with no blocks; text handled separately
+    report.created_at = db_report.created_at if db_report else datetime.utcnow()
+    report.updated_at = db_report.updated_at if db_report else datetime.utcnow()
+    report.blocks = db_report.blocks if db_report else []
     report.user_id = user_id
-    # Register in memory
+
+    # Also register in memory for backward compatibility
     _register_report(user_id, report)
+
     return report
 
 

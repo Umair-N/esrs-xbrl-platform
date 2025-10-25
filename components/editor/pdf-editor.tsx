@@ -343,6 +343,7 @@ export const PdfEditor = forwardRef<PdfEditorHandle, PdfEditorProps>(
         }
         setPagesInfo(info);
         // Attempt to restore loaded pages from sessionStorage
+        let restoredPages: Record<number, PageData> = {};
         if (typeof window !== 'undefined') {
           const cacheKey = `pdf-pages-partial-${report.id}`;
           const cached = window.sessionStorage.getItem(cacheKey);
@@ -365,21 +366,22 @@ export const PdfEditor = forwardRef<PdfEditorHandle, PdfEditorProps>(
               });
               if (Object.keys(initialLoaded).length > 0) {
                 setLoadedPages(initialLoaded);
+                restoredPages = initialLoaded;
               }
             } catch {
               // ignore
             }
           }
         }
-        // Preload the first few pages unless loadAllPages is set
+        // Load all pages that aren't in sessionStorage
+        // Since pages are cached in database, loading all is fast
         if (info.length > 0) {
-          const preloadCount = Math.min(
-            loadAllPages ? info.length : 3,
-            info.length
-          );
-          for (let i = 0; i < preloadCount; i++) {
-            // Use ref to avoid re-creating effect dependency
-            loadPageRef.current(i);
+          // Load pages that weren't restored from sessionStorage
+          for (let i = 0; i < info.length; i++) {
+            if (!restoredPages[i]) {
+              // Use setTimeout to batch requests and avoid blocking UI
+              setTimeout(() => loadPageRef.current(i), i * 10);
+            }
           }
         }
       } catch (err) {
@@ -1296,9 +1298,14 @@ export const PdfEditor = forwardRef<PdfEditorHandle, PdfEditorProps>(
               style={{
                 width: `${page.width}px`,
                 height: `${page.height}px`,
-                backgroundColor: 'rgba(200, 200, 200, 0.2)',
+                backgroundColor: '#f5f5f5',
+                position: 'relative',
+                overflow: 'hidden',
               }}
-            />
+            >
+              {/* Simple skeleton loader - no spinners */}
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 animate-pulse" />
+            </div>
           )}
           {/* Canvas overlay for highlighting and selection */}
           {page.imageUrl && page.words.length > 0 && (

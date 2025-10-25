@@ -51,8 +51,8 @@ async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
-):
     db=Depends(get_db),
+):
     # Validate extension and size
     if not validate_file_type(file.filename):
         raise HTTPException(status_code=400, detail="File type not allowed")
@@ -69,16 +69,10 @@ async def upload_file(
             file_type=file.content_type,
             user_id=current_user.id,
             db=db,
+            background_tasks=background_tasks,  # Pass background_tasks to service
         )
 
-        # Schedule PDF preprocessing in background if needed
-        if file.content_type and file.content_type.lower().startswith("application/pdf"):
-            background_tasks.add_task(
-                preprocess_pdf,
-                str(report.id),
-                report.file_path,
-                report.file_type,
-            )
+        # Background task scheduling now happens inside create_report_from_file
 
         return ReportResponse(
             id=str(report.id),
@@ -234,14 +228,17 @@ async def get_pages_info(
 ):
     """Return basic information about each page of a PDF report.
 
-    The response includes the page number, width, and height. If the
-    report has not been preprocessed, a 404 error is returned.
+    The response includes the page number, width, and height for ALL pages.
+    Uses cached data where available, but reads PDF to get complete page list.
     """
-    report, _ = _get_report_and_file(report_id, current_user.id, db)
-    try:
-        pages = cache_get_page_info(str(report.id))
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Report not preprocessed")
+    report, file_path = _get_report_and_file(report_id, current_user.id, db)
+
+    # Pass file_path to get info for ALL pages, not just cached ones
+    pages = cache_get_page_info(str(report.id), file_path=file_path)
+
+    if not pages:
+        raise HTTPException(status_code=404, detail="Report not preprocessed or no page data available")
+
     return {"pages": pages}
 
 
@@ -255,14 +252,17 @@ async def get_page_image(
 ):
     """Return a JPEG image of the specified page in the PDF report.
 
-    The image is retrieved from the cache. If the page index is out of
-    range or the image is not cached, a 404 error is returned.
+    The image is retrieved from memory cache if available, otherwise
+    regenerated on-demand from the PDF file.
     """
-    report, _ = _get_report_and_file(report_id, current_user.id, db)
-    try:
-        img_bytes = cache_get_page_image(str(report.id), page_number, scale)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Page image not cached")
+    report, file_path = _get_report_and_file(report_id, current_user.id, db)
+
+    # Try to get image from cache or regenerate
+    img_bytes = cache_get_page_image(str(report.id), page_number, scale, file_path=file_path)
+
+    if not img_bytes:
+        raise HTTPException(status_code=404, detail="Page image not available and could not be regenerated")
+
     return StreamingResponse(BytesIO(img_bytes), media_type="image/jpeg")
 
 
@@ -276,12 +276,16 @@ async def get_page_words(
     """Return word-level bounding boxes for a given PDF page.
 
     The response includes the page width and height and a list of words
-    with their bounding boxes and local start/end indices. If the page
-    has not been preprocessed, a 404 error is returned.
+    with their bounding boxes and local start/end indices. Data is
+    retrieved from the database (persistent storage), or processed
+    on-demand if not yet cached.
     """
-    report, _ = _get_report_and_file(report_id, current_user.id, db)
-    try:
-        data = cache_get_page_words(str(report.id), page_number)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Page words not cached")
+    report, file_path = _get_report_and_file(report_id, current_user.id, db)
+
+    # Pass file_path to enable on-demand processing for uncached pages
+    data = cache_get_page_words(str(report.id), page_number, file_path=file_path)
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Page words not available and could not be processed")
+
     return JSONResponse(content=data)
