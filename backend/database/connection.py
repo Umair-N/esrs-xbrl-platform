@@ -14,11 +14,16 @@ class DatabaseConnection:
 
     def initialize_pool(self):
         try:
+            # Use configured pool size from settings
+            # Default: min=2, max=20 (sufficient for concurrent PDF processing)
+            min_connections = settings.DB_POOL_MIN_CONN
+            max_connections = settings.DB_POOL_MAX_CONN
+
             if settings.DATABASE_URL:
                 # If DATABASE_URL is provided in the settings, use it
                 # Add keepalive parameters to prevent stale connections
                 self.connection_pool = pool.SimpleConnectionPool(
-                    1, 10,
+                    min_connections, max_connections,
                     settings.DATABASE_URL,
                     keepalives=1,
                     keepalives_idle=30,
@@ -41,9 +46,9 @@ class DatabaseConnection:
                     "keepalives_count": 5,
                     "connect_timeout": 10,
                 }
-                self.connection_pool = pool.SimpleConnectionPool(1, 10, **db_config)
+                self.connection_pool = pool.SimpleConnectionPool(min_connections, max_connections, **db_config)
 
-            logging.info("✅ Database connection pool created successfully with keepalive enabled")
+            logging.info(f"✅ Database connection pool created successfully (min={min_connections}, max={max_connections}) with keepalive enabled")
         except Exception as error:
             logging.error(f"❌ Error creating database connection pool: {error}")
             raise
@@ -52,6 +57,13 @@ class DatabaseConnection:
         """Retrieve a connection from the pool with health validation."""
         max_retries = 3
         last_error = None
+
+        # Log pool statistics before attempting to get connection
+        try:
+            pool_info = self.get_pool_stats()
+            logging.debug(f"Pool stats before get_connection: {pool_info}")
+        except Exception as e:
+            logging.warning(f"Could not get pool stats: {e}")
 
         for attempt in range(max_retries):
             try:
@@ -80,6 +92,15 @@ class DatabaseConnection:
                     last_error = e
                     continue
 
+            except pool.PoolError as e:
+                # Pool exhausted - log detailed stats
+                pool_stats = self.get_pool_stats()
+                logging.error(f"❌ Connection pool exhausted (attempt {attempt + 1}/{max_retries}): {pool_stats}")
+                last_error = e
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(0.1)  # Brief wait before retry
+                    continue
             except Exception as e:
                 logging.error(f"❌ Error getting connection from pool (attempt {attempt + 1}/{max_retries}): {e}")
                 last_error = e
@@ -87,9 +108,10 @@ class DatabaseConnection:
                     continue
 
         # All retries exhausted
-        error_msg = f"Failed to get healthy connection after {max_retries} attempts"
+        pool_stats = self.get_pool_stats()
+        error_msg = f"Failed to get healthy connection after {max_retries} attempts. Pool stats: {pool_stats}"
         if last_error:
-            error_msg += f": {last_error}"
+            error_msg += f". Last error: {last_error}"
         logging.error(f"❌ {error_msg}")
         raise psycopg2.OperationalError(error_msg)
 
@@ -161,6 +183,29 @@ class DatabaseConnection:
                 self.initialize_pool()
             except Exception as reinit_error:
                 logging.error(f"❌ Failed to reinitialize pool: {reinit_error}")
+
+    def get_pool_stats(self) -> dict:
+        """Get current connection pool statistics for monitoring."""
+        if not self.connection_pool:
+            return {"status": "not_initialized"}
+
+        try:
+            # SimpleConnectionPool stores connections in _pool (list)
+            # and tracks used connections in _used (dict)
+            pool_obj = self.connection_pool
+            total_connections = len(pool_obj._pool) + len(pool_obj._used)
+            available = len(pool_obj._pool)
+            in_use = len(pool_obj._used)
+
+            return {
+                "total": total_connections,
+                "available": available,
+                "in_use": in_use,
+                "minconn": pool_obj.minconn,
+                "maxconn": pool_obj.maxconn,
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
 # Singleton instance
 db_manager = DatabaseConnection()

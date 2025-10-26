@@ -100,12 +100,11 @@ def preprocess_pdf(report_id: str, file_path: str, file_type: str, scale: float 
     if report_id not in _image_cache:
         _image_cache[report_id] = {}
 
-    pages_processed = 0
-
-    # Process ALL pages - this ensures instant loading on all future accesses
+    # Collect all page data for batch insert
+    batch_entries = []
     pages_to_process = total_pages
 
-    # Process pages
+    # Process pages and collect data
     for i in range(pages_to_process):
         page = doc.load_page(i)
         rect = page.rect
@@ -137,32 +136,33 @@ def preprocess_pdf(report_id: str, file_path: str, file_type: str, scale: float 
             pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
             img_bytes = pix.tobytes("jpeg")
 
-            # 3. Save words + image to DATABASE (persistent cache)
-            cache_entry = pdf_cache_crud.create_pdf_cache_entry(
-                report_id=report_uuid,
-                page_number=page_number,
-                page_width=rect.width,
-                page_height=rect.height,
-                words=result_words,
-                scale=scale,
-                image=img_bytes,  # Save image to database!
-            )
+            # 3. Collect for batch insert
+            batch_entries.append({
+                "report_id": report_uuid,
+                "page_number": page_number,
+                "page_width": rect.width,
+                "page_height": rect.height,
+                "words": result_words,
+                "scale": scale,
+                "image": img_bytes,
+            })
 
-            if cache_entry:
-                pages_processed += 1
-                # Also cache image in memory for faster access during this session
-                key = _image_key(page_number, scale)
-                _image_cache[report_id][key] = img_bytes
-                logger.debug(f"Saved page {page_number} (words + image) to database")
-            else:
-                logger.warning(f"Failed to save page {page_number}")
+            # Also cache image in memory for faster access during this session
+            key = _image_key(page_number, scale)
+            _image_cache[report_id][key] = img_bytes
+            logger.debug(f"Prepared page {page_number} for batch insert")
 
         except Exception as e:
             logger.error(f"Failed to process page {page_number} for report {report_id}: {e}")
 
     doc.close()
 
-    logger.info(f"✅ Preprocessing complete for report {report_id}: {pages_processed}/{total_pages} pages saved to database. All future loads will be INSTANT!")
+    # Batch insert all pages in a single transaction to minimize connection usage
+    if batch_entries:
+        pages_processed = pdf_cache_crud.batch_create_pdf_cache_entries(batch_entries)
+        logger.info(f"✅ Preprocessing complete for report {report_id}: {pages_processed}/{total_pages} pages saved to database. All future loads will be INSTANT!")
+    else:
+        logger.warning(f"No pages were successfully processed for report {report_id}")
 
 
 def get_page_info(report_id: str, file_path: Optional[str] = None) -> Optional[list[dict[str, Any]]]:

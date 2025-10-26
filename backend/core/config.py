@@ -52,8 +52,8 @@ class Settings(BaseSettings):
     PGCHANNELBINDING: str = "prefer"  # Changed from 'require' to 'prefer'
 
     # Connection Pool Settings
-    DB_POOL_MIN_CONN: int = 1
-    DB_POOL_MAX_CONN: int = 10
+    DB_POOL_MIN_CONN: int = 2
+    DB_POOL_MAX_CONN: int = 20  # Increased from 10 to handle concurrent PDF processing
     DB_CONNECT_TIMEOUT: int = 10
     DB_COMMAND_TIMEOUT: int = 30
 

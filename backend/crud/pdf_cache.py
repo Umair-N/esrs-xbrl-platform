@@ -5,7 +5,7 @@ Provides database operations for storing and retrieving preprocessed PDF page da
 """
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Optional, Dict, Any
 from database.connection import db_manager
 from models.pdf_cache import PDFCache
@@ -43,11 +43,14 @@ def create_pdf_cache_entry(
             # Wrap words array in a dict for JSONB storage
             words_json = json.dumps({"words": words})
 
+            # Generate UUID explicitly for raw SQL insert
+            entry_id = uuid4()
+
             cursor.execute(
                 """
                 INSERT INTO pdf_cache
-                (report_id, page_number, page_width, page_height, words, scale, image)
-                VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s)
+                (id, report_id, page_number, page_width, page_height, words, scale, image)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s)
                 ON CONFLICT (report_id, page_number, scale)
                 DO UPDATE SET
                     page_width = EXCLUDED.page_width,
@@ -57,7 +60,7 @@ def create_pdf_cache_entry(
                     updated_at = NOW()
                 RETURNING id, report_id, page_number, page_width, page_height, words, scale, image, created_at, updated_at
                 """,
-                (str(report_id), page_number, page_width, page_height, words_json, scale, image),
+                (str(entry_id), str(report_id), page_number, page_width, page_height, words_json, scale, image),
             )
             row = cursor.fetchone()
             conn.commit()
@@ -71,6 +74,74 @@ def create_pdf_cache_entry(
         conn.rollback()
         logger.error(f"Error creating PDF cache entry: {e}", exc_info=True)
         return None
+    finally:
+        db_manager.return_connection(conn)
+
+
+def batch_create_pdf_cache_entries(
+    entries: List[Dict[str, Any]],
+) -> int:
+    """
+    Batch create multiple PDF cache entries in a single transaction.
+
+    This is optimized for bulk inserts (e.g., during PDF preprocessing)
+    to reduce connection pool pressure.
+
+    Args:
+        entries: List of dicts with keys: report_id, page_number, page_width,
+                 page_height, words, scale, image
+
+    Returns:
+        Number of entries successfully created
+    """
+    if not entries:
+        return 0
+
+    conn = db_manager.get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Build batch insert values
+            values = []
+            for entry in entries:
+                entry_id = uuid4()
+                words_json = json.dumps({"words": entry["words"]})
+                values.append((
+                    str(entry_id),
+                    str(entry["report_id"]),
+                    entry["page_number"],
+                    entry["page_width"],
+                    entry["page_height"],
+                    words_json,
+                    entry.get("scale", 1.0),
+                    entry.get("image"),
+                ))
+
+            # Execute batch insert with executemany for better performance
+            cursor.executemany(
+                """
+                INSERT INTO pdf_cache
+                (id, report_id, page_number, page_width, page_height, words, scale, image)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+                ON CONFLICT (report_id, page_number, scale)
+                DO UPDATE SET
+                    page_width = EXCLUDED.page_width,
+                    page_height = EXCLUDED.page_height,
+                    words = EXCLUDED.words,
+                    image = EXCLUDED.image,
+                    updated_at = NOW()
+                """,
+                values,
+            )
+
+            rows_affected = cursor.rowcount
+            conn.commit()
+            logger.info(f"Batch created/updated {rows_affected} PDF cache entries")
+            return rows_affected
+
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error batch creating PDF cache entries: {e}", exc_info=True)
+        return 0
     finally:
         db_manager.return_connection(conn)
 
