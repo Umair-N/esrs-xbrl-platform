@@ -28,17 +28,20 @@ class UserCRUD:
                     email, username, hashed_password, full_name,
                     is_active, is_verified, role, company, designation,
                     status, last_login, last_accessed_at,
-                    created_at, updated_at, platform_access
+                    created_at, updated_at, platform_access,
+                    password_changed_at, password_history, mfa_enabled, mfa_secret
                 )
                 VALUES (
                     %(email)s, %(username)s, %(hashed_password)s, %(full_name)s,
                     %(is_active)s, %(is_verified)s, %(role)s, %(company)s, %(designation)s,
                     %(status)s, %(last_login)s, %(last_accessed_at)s,
-                    %(created_at)s, %(updated_at)s, %(platform_access)s
+                    %(created_at)s, %(updated_at)s, %(platform_access)s,
+                    %(password_changed_at)s, %(password_history)s, %(mfa_enabled)s, %(mfa_secret)s
                 )
                 RETURNING id, email, username, hashed_password, full_name,
                         is_active, is_verified, role, created_at, updated_at,
-                        company, designation, status, last_login, last_accessed_at, platform_access
+                        company, designation, status, last_login, last_accessed_at, platform_access,
+                        password_changed_at, password_history, mfa_enabled, mfa_secret
             """
             cursor.execute(
                 query,
@@ -57,7 +60,12 @@ class UserCRUD:
                     "last_accessed_at": now_utc,
                     "created_at": now_utc,
                     "updated_at": now_utc,
-                    "platform_access": False,  
+                    "platform_access": False,
+                    # NEW: Password security and MFA fields
+                    "password_changed_at": now_utc,
+                    "password_history": "[]",  # Empty JSON array
+                    "mfa_enabled": False,
+                    "mfa_secret": None,
                 },
             )
 
