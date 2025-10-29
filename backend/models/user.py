@@ -12,7 +12,6 @@ class UserStatus(enum.Enum):
     pending = "pending"
     disabled = "disabled"
 
-
 class User(Base):
     __tablename__ = "users"
 
@@ -32,3 +31,15 @@ class User(Base):
     )
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_accessed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # Password security fields
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, 
+        nullable=True, 
+        default=lambda: datetime.now(timezone.utc)
+    )
+    password_history: Mapped[Optional[str]] = mapped_column(String, nullable=True) 
+    
+    # MFA for production environment access
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_secret: Mapped[Optional[str]] = mapped_column(String, nullable=True)
