@@ -62,14 +62,14 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: List[str] = [
-        "https://frontend-pentest-171009084156.asia-east1.run.app"
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "https://esrs-xbrl-platform.vercel.app",
         "https://briskbold.vercel.app",
         "https://xbrl.briskbold.ai",
-        "https://frontend-build-171009084156.asia-east1.run.app"
+        "https://frontend-build-171009084156.asia-east1.run.app",
+        "https://frontend-pentest-171009084156.asia-east1.run.app"
     ]
 
     # File Upload
