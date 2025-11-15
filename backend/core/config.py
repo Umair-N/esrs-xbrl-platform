@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = [
         "https://pentest.xbrl.briskflow.ai",
         "https://uat.xbrl.briskflow.ai",
-        "https://xbrl.briskflow.ai/"
+        "https://xbrl.briskflow.ai"
     ] 
 
     ALLOWED_ORIGIN_REGEX: str = (
