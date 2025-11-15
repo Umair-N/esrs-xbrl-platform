@@ -61,7 +61,11 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = []  # Not used with regex
+    ALLOWED_ORIGINS: List[str] = [
+        "https://pentest.xbrl.briskflow.ai",
+        "https://uat.xbrl.briskflow.ai",
+        "https://xbrl.briskflow.ai/"
+    ] 
 
     ALLOWED_ORIGIN_REGEX: str = (
         r"https://([a-zA-Z0-9-]+\.)?briskflow\.ai|"   
