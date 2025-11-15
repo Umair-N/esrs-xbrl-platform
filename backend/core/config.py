@@ -69,6 +69,7 @@ class Settings(BaseSettings):
         "https://briskbold.vercel.app",
         "https://xbrl.briskbold.ai",
         "https://frontend-build-171009084156.asia-east1.run.app"
+        "https://frontend-pentest-171009084156.asia-east1.run.app"
     ]
 
     # File Upload
