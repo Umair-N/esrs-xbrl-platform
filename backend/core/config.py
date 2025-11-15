@@ -61,15 +61,12 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "https://esrs-xbrl-platform.vercel.app",
-        "https://briskbold.vercel.app",
-        "https://xbrl.briskbold.ai",
-        "https://frontend-build-171009084156.asia-east1.run.app"
-    ]
+    ALLOWED_ORIGINS: List[str] = []  # Not used with regex
+
+    ALLOWED_ORIGIN_REGEX: str = (
+        r"https://([a-zA-Z0-9-]+\.)?briskflow\.ai|"   
+        r"https://([a-zA-Z0-9-]+\.)?briskbold\.ai"    
+)
 
     # File Upload
     UPLOAD_DIRECTORY: str = "uploads"

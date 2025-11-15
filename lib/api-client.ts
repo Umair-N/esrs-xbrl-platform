@@ -14,7 +14,7 @@ type RequestOptions = {
 const CONFIG = {
   coreBackend: {
     local: 'http://localhost:8000/api/v1',
-    gcp: 'https://api.briskbold.ai/api/v1',
+    gcp: `${process.env.NEXT_PUBLIC_API_URL}/api/v1` ,
   },
   aiRecommender: {
     local: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
