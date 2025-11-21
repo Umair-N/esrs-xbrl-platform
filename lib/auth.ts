@@ -10,6 +10,7 @@ import { AuthResponse, User } from '@/types/api';
 
 import { api } from './api-client';
 import { showSuccess } from '@/components/heads-up';
+import getErrorMessage from './get-server-error';
 
 export const getUser = async (): Promise<User> => {
   const response = (await api.get('/users/me')) as User;
@@ -30,7 +31,13 @@ export const getUserQueryOptions = () => {
 
 export const useUser = () => useQuery(getUserQueryOptions());
 
-export const useLogin = ({ onSuccess, onError }: { onSuccess?: () => void, onError?: (err: Error) => void }) => {
+export const useLogin = ({
+  onSuccess,
+  onError,
+}: {
+  onSuccess?: () => void;
+  onError?: (err: Error) => void;
+}) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: loginWithEmailAndPassword,
@@ -39,12 +46,19 @@ export const useLogin = ({ onSuccess, onError }: { onSuccess?: () => void, onErr
       onSuccess?.();
     },
     onError: (err) => {
-      onError?.(err);
+      const message = getErrorMessage(err);
+      onError?.(new Error(message));
     },
   });
 };
 
-export const useRegister = ({ onSuccess, onError }: { onSuccess?: () => void, onError?: (err: Error) => void }) => {
+export const useRegister = ({
+  onSuccess,
+  onError,
+}: {
+  onSuccess?: () => void;
+  onError?: (err: Error) => void;
+}) => {
   // const queryClient = useQueryClient();
   return useMutation({
     mutationFn: registerUser,
@@ -63,16 +77,16 @@ export const useLogout = ({ onSuccess }: { onSuccess?: () => void }) => {
   return useMutation({
     mutationFn: logout,
     onSuccess: () => {
-      showSuccess({ title: 'Logout successful' })
+      showSuccess({ title: 'Logout successful' });
       queryClient.removeQueries({ queryKey: userQueryKey });
-      localStorage.removeItem('xbrl-editor-session')
-      localStorage.removeItem('xbrl-session-id')
+      localStorage.removeItem('xbrl-editor-session');
+      localStorage.removeItem('xbrl-session-id');
       onSuccess?.();
     },
     onSettled: () => {
-      localStorage.removeItem('xbrl-editor-session')
-      localStorage.removeItem('xbrl-session-id')
-    }
+      localStorage.removeItem('xbrl-editor-session');
+      localStorage.removeItem('xbrl-session-id');
+    },
   });
 };
 
@@ -92,18 +106,23 @@ const loginWithEmailAndPassword = (data: LoginInput): Promise<AuthResponse> => {
 
 export const registerInputSchema = z
   .object({
-
     email: z.string().min(1, 'Required'),
     username: z.string().min(1, 'Required'),
     full_name: z.string(),
     password: z
       .string()
       .min(6, 'Password must be at least 6 characters')
-      .regex(/^(?=.*[A-Z])(?=.*\d).*/, 'Password must contain at least one uppercase letter and one digit'),
+      .regex(
+        /^(?=.*[A-Z])(?=.*\d).*/,
+        'Password must contain at least one uppercase letter and one digit'
+      ),
     confirmPassword: z
       .string()
       .min(6, 'Password must be at least 6 characters')
-      .regex(/^(?=.*[A-Z])(?=.*\d).*/, 'Password must contain at least one uppercase letter and one digit'),
+      .regex(
+        /^(?=.*[A-Z])(?=.*\d).*/,
+        'Password must contain at least one uppercase letter and one digit'
+      ),
     company: z.string(),
     designation: z.string(),
   })
@@ -114,14 +133,12 @@ export const registerInputSchema = z
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 
-const registerUser = (
-  data: RegisterInput,
-): Promise<AuthResponse> => {
+const registerUser = (data: RegisterInput): Promise<AuthResponse> => {
   return api.post('/auth/register', data);
 };
 
 export const forgotPasswordInputSchema = z.object({
-  email: z.string().email({ message: "Invalid email address" }),
-})
+  email: z.string().email({ message: 'Invalid email address' }),
+});
 
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;

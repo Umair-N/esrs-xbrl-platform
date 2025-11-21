@@ -2,17 +2,31 @@ import os
 import logging
 from contextlib import asynccontextmanager
 import time
+import uuid
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from rich.traceback import install
 from rich.logging import RichHandler
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.v1.api import api_router
 from core.config import settings
 from database.connection import db_manager
+from core.exceptions import BaseCustomException
+from core.error_handlers import (
+    custom_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    sqlalchemy_exception_handler,
+    unhandled_exception_handler,
+    value_error_handler,
+    type_error_handler,
+    key_error_handler,
+)
 
 # Enable pretty tracebacks for easier debugging
 install(show_locals=True)
@@ -79,6 +93,18 @@ app.add_middleware(
 )
 
 
+# Request ID middleware - adds unique ID to each request for tracking
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+
+    return response
+
+
 @app.middleware("http")
 async def auto_refresh_tokens(request: Request, call_next):
     response = await call_next(request)
@@ -138,20 +164,25 @@ async def health_check():
         "version": settings.VERSION,
     }
 
-# Global HTTPException handler
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    logger.warning(f"HTTP error occurred: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail, "error": "A handled HTTP error occurred"},
-    )
+# Register global exception handlers
+# Order matters: more specific handlers should be registered before generic ones
 
-# Global unhandled exception handler
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception on {request.method} {request.url.path}", exc_info=exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error", "error": str(exc)},
-    )
+# Custom application exceptions
+app.add_exception_handler(BaseCustomException, custom_exception_handler)
+
+# Validation errors (Pydantic)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+# Database errors (SQLAlchemy)
+app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
+
+# HTTP exceptions (FastAPI/Starlette)
+app.add_exception_handler(HTTPException, http_exception_handler)
+
+# Python built-in exceptions
+app.add_exception_handler(ValueError, value_error_handler)
+app.add_exception_handler(TypeError, type_error_handler)
+app.add_exception_handler(KeyError, key_error_handler)
+
+# Catch-all for any unhandled exceptions (must be last)
+app.add_exception_handler(Exception, unhandled_exception_handler)

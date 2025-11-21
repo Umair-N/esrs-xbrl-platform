@@ -14,7 +14,7 @@ type RequestOptions = {
 const CONFIG = {
   coreBackend: {
     local: 'http://localhost:8000/api/v1',
-    gcp: `${process.env.NEXT_PUBLIC_API_URL}/api/v1` ,
+    gcp: `${process.env.NEXT_PUBLIC_API_URL}/api/v1`,
   },
   aiRecommender: {
     local: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
@@ -120,9 +120,15 @@ async function fetchApi<T>(
   // Handle non-OK with safer parsing (could be text/html or empty)
   if (!response.ok) {
     let message: string;
+
     try {
       const data = await response.json();
-      message = (data && (data.message || data.detail)) || response.statusText;
+
+      message =
+        data?.error?.message ||
+        data?.message ||
+        data?.detail ||
+        response.statusText;
     } catch {
       try {
         message = await response.text();
@@ -130,10 +136,7 @@ async function fetchApi<T>(
         message = response.statusText;
       }
     }
-    if (typeof window !== 'undefined') {
-      // showError({ title: 'Error!', message, duration: 2000 });
-      throw new Error(message);
-    }
+
     throw new Error(message);
   }
 

@@ -25,8 +25,9 @@ export function LoginForm({ loginForm }: any) {
       showSuccess({ title: 'Login successful', message: 'Welcome back!' });
       router.push('/');
     },
+
     onError: (err) => {
-      showError({ title: (err as Error).message || 'Login failed' });
+      showError({ title: err.message });
     },
   });
   type LoginSchema = z.infer<typeof loginInputSchema>;
