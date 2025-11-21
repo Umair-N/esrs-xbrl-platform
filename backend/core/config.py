@@ -61,7 +61,9 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = []  # Not used with regex
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:3000",
+    ]  # Not used with regex
 
     ALLOWED_ORIGIN_REGEX: str = (
         r"https://([a-zA-Z0-9-]+\.)?briskflow\.ai|"   

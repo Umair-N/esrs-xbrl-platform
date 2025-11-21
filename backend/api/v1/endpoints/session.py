@@ -72,13 +72,37 @@ async def create_session(
     should include a name and the session data (report document).
     """
     import json
+    import logging
 
-    row = session_crud.create_session(
-        user_id=current_user.id,
-        name=session.name,
-        data=json.dumps(session.data),
-        db=db,
-    )
+    logger = logging.getLogger(__name__)
+    logger.info(f"Creating session for user {current_user.id} with name: {session.name}")
+
+    try:
+        # Serialize the session data to JSON string, with default handling for non-serializable types
+        data_json = json.dumps(session.data, default=str, ensure_ascii=False)
+        logger.debug(f"Serialized data length: {len(data_json)} characters")
+    except (TypeError, ValueError) as e:
+        logger.error(f"JSON serialization error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid session data format: {str(e)}",
+        )
+
+    try:
+        row = session_crud.create_session(
+            user_id=current_user.id,
+            name=session.name,
+            data=data_json,
+            db=db,
+        )
+        logger.info(f"Session created successfully with ID: {row['id']}")
+    except Exception as e:
+        logger.error(f"Database error while creating session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create session: {str(e)}",
+        )
+
     return EditorSessionResponse(
         id=str(row["id"]),
         name=row["name"],
@@ -100,13 +124,29 @@ async def update_session(
     """
     import json
 
-    row = session_crud.update_session(
-        session_id=session_id,
-        user_id=current_user.id,
-        name=session.name,
-        data=json.dumps(session.data),
-        db=db,
-    )
+    try:
+        # Serialize the session data to JSON string, with default handling for non-serializable types
+        data_json = json.dumps(session.data, default=str, ensure_ascii=False)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid session data format: {str(e)}",
+        )
+
+    try:
+        row = session_crud.update_session(
+            session_id=session_id,
+            user_id=current_user.id,
+            name=session.name,
+            data=data_json,
+            db=db,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update session: {str(e)}",
+        )
+
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

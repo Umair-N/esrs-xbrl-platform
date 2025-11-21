@@ -1,12 +1,15 @@
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class SessionCreate(BaseModel):
     """
     Pydantic model for creating or updating an editor session.
+    Accepts any fields in the data dictionary to be flexible with different payload structures.
     """
+    model_config = ConfigDict(extra='allow')
+
     name: str
     data: Dict[str, Any]
 
