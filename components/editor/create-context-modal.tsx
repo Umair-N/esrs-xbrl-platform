@@ -46,6 +46,7 @@ const formSchema = z
     end_date: z.string().optional(),
     instant_date: z.string().optional(),
     entity_scheme: z.string().default('http://www.sec.gov/CIK'),
+    taxonomy_id: z.string().optional(),
   })
   .refine(
     (data) => {
@@ -79,6 +80,7 @@ export function CreateContextModal() {
       end_date: '',
       instant_date: '',
       entity_scheme: 'http://www.sec.gov/CIK',
+      taxonomy_id: '',
     },
   });
 
@@ -97,6 +99,7 @@ export function CreateContextModal() {
         instant_date:
           values.period_type === 'instant' ? values.instant_date : null,
         entity_scheme: values.entity_scheme,
+        taxonomy_id: values.taxonomy_id ? Number(values.taxonomy_id) : null,
         // Default values for other fields
         is_default_context: false,
         status: 'valid',
@@ -183,6 +186,20 @@ export function CreateContextModal() {
 
             <FormField
               control={form.control}
+              name='entity_scheme'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Entity Scheme</FormLabel>
+                  <FormControl>
+                    <Input placeholder='http://www.sec.gov/CIK' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name='period_type'
               render={({ field }) => (
                 <FormItem>
@@ -253,6 +270,20 @@ export function CreateContextModal() {
                 )}
               />
             )}
+
+            <FormField
+              control={form.control}
+              name='taxonomy_id'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Taxonomy ID (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type='number' placeholder='e.g., 3' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type='submit' disabled={createContextMutation.isPending}>
