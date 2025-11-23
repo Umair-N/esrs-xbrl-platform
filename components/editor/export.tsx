@@ -3,20 +3,15 @@
 import { useState } from 'react';
 import {
   Download,
-  Save,
   FileText,
   AlertCircle,
   Eye,
-  CheckCircle,
   XCircle,
-  Shield,
-  Zap,
   BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
@@ -28,7 +23,11 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ReportDocument } from '@/types/report';
-import { downloadXBRLFile, previewXBRLContent } from '@/lib/xbrl';
+import {
+  downloadXBRLFile,
+  previewXBRLContent,
+  generateOptimizediXBRLDocument,
+} from '@/lib/xbrl';
 
 interface SaveExportPanelProps {
   report: ReportDocument;
@@ -112,6 +111,21 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
     } catch (error) {
       console.error('Error generating preview:', error);
       alert('Error generating preview. Please check the console for details.');
+    }
+  };
+
+  const handleViewInViewer = () => {
+    try {
+      const result = generateOptimizediXBRLDocument(report, [
+        'esrs',
+        'gri',
+        'sasb',
+      ]);
+      localStorage.setItem('xbrl_preview_content', result.content);
+      window.open('/xbrl-preview', '_blank');
+    } catch (error) {
+      console.error('Error opening viewer:', error);
+      alert('Error opening viewer. Please check the console for details.');
     }
   };
 
@@ -256,6 +270,17 @@ export function SaveExportPanel({ report, onSave }: SaveExportPanelProps) {
               Export iXBRL
             </>
           )}
+        </Button>
+
+        {/* View in Viewer Button */}
+        <Button
+          onClick={handleViewInViewer}
+          disabled={totalTags === 0}
+          className='w-full text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+          size='sm'
+        >
+          <Eye className='w-3 h-3 mr-2' />
+          View in Viewer
         </Button>
 
         <div className='grid grid-cols-1'>

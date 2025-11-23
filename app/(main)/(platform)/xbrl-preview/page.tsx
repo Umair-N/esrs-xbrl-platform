@@ -1,7 +1,7 @@
 'use client';
 import type React from 'react';
 import type { JSX } from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -119,6 +119,22 @@ const IXBRLViewer: React.FC = () => {
     useState<ValidationResults | null>(null);
   const [validating, setValidating] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+
+  useEffect(() => {
+    const storedContent = localStorage.getItem('xbrl_preview_content');
+    if (storedContent) {
+      try {
+        const parsed = parseIXBRL(storedContent);
+        setParsedData(parsed);
+        setViewMode('document');
+        // Optional: Clear storage after loading so it doesn't persist on refresh if not desired
+        // localStorage.removeItem('xbrl_preview_content');
+      } catch (err) {
+        console.error('Failed to load stored XBRL content:', err);
+        setError('Failed to load stored XBRL content');
+      }
+    }
+  }, []);
 
   const parseIXBRL = (content: string): ParsedData => {
     try {
