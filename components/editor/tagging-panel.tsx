@@ -49,6 +49,7 @@ import { useSwitchTaxonomy } from '@/features/taxonomy/api/switch-taxonomies';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { ContextOut, useContexts } from '@/features/contexts/api/list-contexts';
+import { CreateContextModal } from './create-context-modal';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -914,45 +915,50 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
           {/* Context Selection */}
           <Card className='p-0 mt-0 border-t shadow-sm'>
             <CardHeader>
-              <CardTitle className='flex items-center gap-2 text-base'>
-                Context Selection{' '}
-                <Badge variant='secondary' className='text-xs'>
-                  Optional
-                </Badge>
+              <CardTitle className='flex items-center justify-between gap-2 text-base'>
+                <div>
+                  Context Selection{' '}
+                  <Badge variant='secondary' className='text-xs ml-2'>
+                    Optional
+                  </Badge>
+                </div>
+                <CreateContextModal />
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-3'>
               {isInitialLoading ? (
                 <Skeleton className='w-full h-10' />
               ) : (
-                <Select
-                  value={selectedContextId || ''}
-                  onValueChange={setSelectedContextId}
-                >
-                  <SelectTrigger className='h-10'>
-                    <SelectValue placeholder='Select a reporting context (optional)' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contexts?.map((context) => (
-                      <SelectItem key={context.id} value={context.context_id}>
-                        <div className='flex items-end '>
-                          <div className='flex flex-col items-start'>
-                            <span className='font-medium'>
-                              {context.entity_name || 'Unnamed Entity'}
-                            </span>
-                            <span className='text-xs text-muted-foreground'>
-                              {context.entity_identifier} •{' '}
-                              {context.period_type}
+                <div className='flex gap-2'>
+                  <Select
+                    value={selectedContextId || ''}
+                    onValueChange={setSelectedContextId}
+                  >
+                    <SelectTrigger className='h-10 flex-1'>
+                      <SelectValue placeholder='Select a reporting context (optional)' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contexts?.map((context) => (
+                        <SelectItem key={context.id} value={context.context_id}>
+                          <div className='flex items-end '>
+                            <div className='flex flex-col items-start'>
+                              <span className='font-medium'>
+                                {context.entity_name || 'Unnamed Entity'}
+                              </span>
+                              <span className='text-xs text-muted-foreground'>
+                                {context.entity_identifier} •{' '}
+                                {context.period_type}
+                              </span>
+                            </div>
+                            <span className='text-[10px] text-muted-foreground'>
+                              Context ID: {context.context_id}
                             </span>
                           </div>
-                          <span className='text-[10px] text-muted-foreground'>
-                            Context ID: {context.context_id}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </CardContent>
           </Card>
