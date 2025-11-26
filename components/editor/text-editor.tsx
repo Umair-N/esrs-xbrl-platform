@@ -1,12 +1,12 @@
 'use client';
 
-import type { ReportDocument, ReportBlock } from '@/types/report';
+import type { ReportDocument, ReportBlock, XbrlTag } from '@/types/report';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Lightbulb, LucideInfo } from 'lucide-react';
+import { Edit2, Check, X, Lightbulb, LucideInfo, Bot, Loader2, CheckCircle2 } from 'lucide-react';
 import {
   HoverCard,
   HoverCardContent,
@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import type { JSX } from 'react/jsx-runtime';
 import { useRecommendations } from '@/features/recommender/api/get-recommendations';
 import { usePostFeedback } from '@/features/recommender/api/post-feedback';
+import { usePredictEntities, NEREntity } from '@/features/agent';
 import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { sampleContexts } from '@/lib/sample-data';
@@ -30,7 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
-import { showError } from '../heads-up';
+import { showError, showSuccess } from '../heads-up';
 
 /**
  * Tag structure in a ReportBlock:
@@ -85,7 +86,7 @@ export function TextEditor({
   // The tagging panel reads this and preselects the concept for context
   // assignment. We also expose the currently selected context ID should we
   // choose to automatically create tags when a context is already selected.
-  const { setPendingConcept, selectedContextId } = useTaggingStore();
+  const { setPendingConcept, selectedContextId, agentMode } = useTaggingStore();
 
   // const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
@@ -106,6 +107,34 @@ export function TextEditor({
   // Hook for submitting feedback to the AI recommender. When a user selects
   // a suggestion, we will use this to notify the service about the choice.
   const { mutate: sendFeedback } = usePostFeedback();
+
+  // NER Agent hook for automatic entity detection
+  const { mutate: predictEntities, isPending: isAgentLoading } = usePredictEntities({
+    mutationConfig: {},
+  });
+
+  // State for agent mode - detected entities displayed inline with highlights
+  const [agentEntities, setAgentEntities] = useState<NEREntity[]>([]);
+  // Track which block the agent entities belong to and their absolute positions
+  const [agentHighlightBlock, setAgentHighlightBlock] = useState<{
+    blockId: string;
+    selectionStart: number; // Start position of the selected text in the block
+  } | null>(null);
+
+  // Store entity-to-recommendations mapping for agent mode (lazy loaded on hover)
+  // Key: entity index, Value: array of recommendations or null if failed
+  const [entityRecommendations, setEntityRecommendations] = useState<Map<number, {
+    tag: string;
+    reference: string;
+    datatype: string;
+    score: number;
+  }[] | null>>(new Map());
+
+  // Track which entity indices are currently loading recommendations
+  const [loadingEntityIndices, setLoadingEntityIndices] = useState<Set<number>>(new Set());
+
+  // Track if we're showing expanded recommendations for an entity
+  const [expandedEntityIndex, setExpandedEntityIndex] = useState<number | null>(null);
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
@@ -149,6 +178,7 @@ export function TextEditor({
   /**
    * Handles highlighting text in a block.  Invokes the recommendations API
    * with the selected text and positions a popover next to the selection.
+   * When agent mode is enabled, it uses the NER agent for automatic tagging.
    */
   const handleTextSelection = (blockId: string) => {
     if (window.getSelection) {
@@ -185,6 +215,65 @@ export function TextEditor({
           setPopoverTriggerElement(virtualElement);
           setHighlightedText(selectedText);
 
+          // Agent Mode: Use NER for entity detection (recommendations loaded on hover)
+          if (agentMode.enabled) {
+            if (!selectedTaxonomy?.name) {
+              return showError({
+                title: 'Please select a taxonomy',
+                message: 'A taxonomy is required for AI Agent tagging.',
+              });
+            }
+
+            // Clear previous agent state
+            setAgentEntities([]);
+            setEntityRecommendations(new Map());
+            setLoadingEntityIndices(new Set());
+            setExpandedEntityIndex(null);
+
+            // Show loading notification
+            showSuccess({
+              title: 'Detecting entities...',
+              message: 'AI Agent is analyzing the selected text.',
+              duration: 2000,
+            });
+
+            predictEntities(
+              { data: { text: selectedText } },
+              {
+                onSuccess: async (res) => {
+                  const entities = res?.entities ?? [];
+                  setAgentEntities(entities);
+                  // Store the block and selection start for inline highlighting
+                  setAgentHighlightBlock({ blockId, selectionStart: startIndex });
+
+                  if (entities.length === 0) {
+                    showError({
+                      title: 'No entities detected',
+                      message: 'AI Agent could not detect any entities in the selected text.',
+                    });
+                    return;
+                  }
+
+                  showSuccess({
+                    title: `${entities.length} entit${entities.length > 1 ? 'ies' : 'y'} detected`,
+                    message: 'Hover over highlighted text to see XBRL tag suggestions.',
+                    duration: 3000,
+                  });
+                },
+                onError: () => {
+                  setAgentEntities([]);
+                  setAgentHighlightBlock(null);
+                  showError({
+                    title: 'Detection failed',
+                    message: 'AI Agent failed to detect entities. Please try again.',
+                  });
+                },
+              }
+            );
+            return;
+          }
+
+          // Standard recommendation mode
           if (!selectedTaxonomy?.name) {
             return showError({
               title: 'Please select a taxonomy',
@@ -220,6 +309,142 @@ export function TextEditor({
   };
 
   /**
+   * Clear agent mode highlights and state
+   */
+  const clearAgentHighlights = () => {
+    setAgentEntities([]);
+    setAgentHighlightBlock(null);
+    setEntityRecommendations(new Map());
+    setLoadingEntityIndices(new Set());
+    setExpandedEntityIndex(null);
+  };
+
+  /**
+   * Fetch XBRL tag recommendations for a specific entity (called on hover)
+   */
+  const fetchEntityRecommendations = (entityIndex: number, entityText: string) => {
+    // Skip if already loaded or loading
+    if (entityRecommendations.has(entityIndex) || loadingEntityIndices.has(entityIndex)) {
+      return;
+    }
+
+    // Mark as loading
+    setLoadingEntityIndices(prev => new Set(prev).add(entityIndex));
+
+    mutate(
+      {
+        data: {
+          query: entityText,
+          taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
+          k: 5, // Get top 5 recommendations
+          rerank: true,
+        },
+      },
+      {
+        onSuccess: (recRes: any) => {
+          const recs = recRes?.results ?? [];
+          setEntityRecommendations(prev => {
+            const newMap = new Map(prev);
+            newMap.set(entityIndex, recs.length > 0 ? recs : null);
+            return newMap;
+          });
+          setLoadingEntityIndices(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(entityIndex);
+            return newSet;
+          });
+        },
+        onError: () => {
+          setEntityRecommendations(prev => {
+            const newMap = new Map(prev);
+            newMap.set(entityIndex, null);
+            return newMap;
+          });
+          setLoadingEntityIndices(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(entityIndex);
+            return newSet;
+          });
+        },
+      }
+    );
+  };
+
+  /**
+   * Apply a tag from agent mode recommendations
+   */
+  const applyAgentTag = (
+    entityIndex: number,
+    entity: NEREntity,
+    recommendation: { tag: string; reference: string; datatype: string; }
+  ) => {
+    if (!agentHighlightBlock) return;
+
+    const { blockId, selectionStart } = agentHighlightBlock;
+    const entityStart = selectionStart + entity.start;
+    const entityEnd = selectionStart + entity.end;
+
+    // Get context if selected
+    const context = selectedContextId
+      ? sampleContexts.find((c) => c.id === selectedContextId)
+      : undefined;
+
+    const newTag: XbrlTag = {
+      id: `${Date.now()}-${entity.start}`,
+      concept: {
+        id: recommendation.tag,
+        label: recommendation.reference,
+        definition: `Detected as ${entity.label}: "${entity.text}"`,
+        type: recommendation.datatype,
+        dataType: recommendation.datatype,
+        periodType: 'duration' as const,
+        abstract: false,
+      },
+      startIndex: entityStart,
+      endIndex: entityEnd,
+      createdAt: new Date().toISOString(),
+      ...(context ? { context } : {}),
+    };
+
+    // Update report with new tag
+    const updatedReport: ReportDocument = {
+      ...report,
+      blocks: report.blocks.map((blk) =>
+        blk.id === blockId
+          ? { ...blk, tags: [...(blk.tags || []), newTag] }
+          : blk
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+
+    onReportChange(updatedReport);
+
+    // Remove the entity from agent highlights since it's now tagged
+    const remainingEntities = agentEntities.filter((_, idx) => idx !== entityIndex);
+    if (remainingEntities.length === 0) {
+      clearAgentHighlights();
+    } else {
+      setAgentEntities(remainingEntities);
+      // Update recommendations map indices
+      const newRecsMap = new Map<number, typeof entityRecommendations extends Map<number, infer V> ? V : never>();
+      entityRecommendations.forEach((value, key) => {
+        if (key < entityIndex) {
+          newRecsMap.set(key, value);
+        } else if (key > entityIndex) {
+          newRecsMap.set(key - 1, value);
+        }
+      });
+      setEntityRecommendations(newRecsMap);
+    }
+
+    showSuccess({
+      title: 'Tag applied',
+      message: `Tagged "${entity.text}" with ${recommendation.tag}`,
+      duration: 2000,
+    });
+  };
+
+  /**
    * Apply a selected tag from the recommendations to the highlighted text.
    */
   const applyTag = (item: {
@@ -244,7 +469,9 @@ export function TextEditor({
       label: item.reference,
       definition: '',
       type: item.datatype,
-      periodType: '',
+      dataType: item.datatype,
+      periodType: 'duration' as const,
+      abstract: false,
     };
 
     /**
@@ -263,16 +490,16 @@ export function TextEditor({
           concept,
           startIndex,
           endIndex,
+          createdAt: new Date().toISOString(),
           ...(context ? { context } : {}),
           ...(feedbackId !== undefined ? { feedbackId } : {}),
         };
         const updatedReport: ReportDocument = {
           ...report,
-          blocks: report.blocks.map(
-            (
-              blk //@ts-ignore
-            ) =>
-              blk.id === blockId ? { ...blk, tags: [...blk.tags, newTag] } : blk
+          blocks: report.blocks.map((blk) =>
+            blk.id === blockId
+              ? { ...blk, tags: [...(blk.tags || []), newTag] }
+              : blk
           ),
           updatedAt: new Date().toISOString(),
         };
@@ -338,7 +565,212 @@ export function TextEditor({
     }
   };
 
+  /**
+   * Render content with agent-detected entity highlights.
+   * Shows detected entities with colored backgrounds and HoverCards for recommendations.
+   * Recommendations are lazy-loaded when hovering over an entity.
+   */
+  const renderAgentHighlights = (block: ReportBlock) => {
+    if (!agentHighlightBlock || agentHighlightBlock.blockId !== block.id || agentEntities.length === 0) {
+      return null;
+    }
+
+    const content = block.content;
+    const selectionStart = agentHighlightBlock.selectionStart;
+
+    // Sort entities by start position
+    const sortedEntities = [...agentEntities].sort((a, b) => a.start - b.start);
+    const segments: JSX.Element[] = [];
+
+    // Label color mapping for different entity types
+    const labelColors: Record<string, string> = {
+      'ENTITY': 'bg-blue-200 dark:bg-blue-800/50 border-blue-400',
+      'CONCEPT': 'bg-emerald-200 dark:bg-emerald-800/50 border-emerald-400',
+      'CHANGE': 'bg-amber-200 dark:bg-amber-800/50 border-amber-400',
+      'METRIC': 'bg-purple-200 dark:bg-purple-800/50 border-purple-400',
+      'VALUE': 'bg-rose-200 dark:bg-rose-800/50 border-rose-400',
+      'DATE': 'bg-cyan-200 dark:bg-cyan-800/50 border-cyan-400',
+    };
+
+    // Render text before the first entity highlight area
+    if (selectionStart > 0) {
+      segments.push(
+        <span key='before-selection' className='font-medium leading-relaxed'>
+          {content.substring(0, selectionStart)}
+        </span>
+      );
+    }
+
+    // Render entities within the selection
+    sortedEntities.forEach((entity, index) => {
+      const entityAbsStart = selectionStart + entity.start;
+      const entityAbsEnd = selectionStart + entity.end;
+      const recs = entityRecommendations.get(index);
+      const isLoading = loadingEntityIndices.has(index);
+      const hasLoaded = entityRecommendations.has(index);
+
+      // Text between last position and this entity
+      const gapStart = index === 0 ? selectionStart : selectionStart + sortedEntities[index - 1].end;
+      if (entityAbsStart > gapStart) {
+        segments.push(
+          <span key={`gap-${index}`} className='font-medium leading-relaxed'>
+            {content.substring(gapStart, entityAbsStart)}
+          </span>
+        );
+      }
+
+      // Render the highlighted entity with HoverCard
+      const colorClass = labelColors[entity.label] || 'bg-violet-200 dark:bg-violet-800/50 border-violet-400';
+
+      segments.push(
+        <HoverCard
+          key={`entity-${index}`}
+          onOpenChange={(open) => {
+            if (open) {
+              // Lazy load recommendations when hovering
+              fetchEntityRecommendations(index, entity.text);
+            }
+          }}
+        >
+          <HoverCardTrigger asChild>
+            <span
+              className={cn(
+                'px-1 py-0.5 rounded cursor-pointer border-b-2 font-medium transition-all hover:opacity-80',
+                colorClass,
+                isLoading && 'animate-pulse'
+              )}
+            >
+              {content.substring(entityAbsStart, entityAbsEnd)}
+            </span>
+          </HoverCardTrigger>
+          <HoverCardContent className='w-80 p-0' align='start'>
+            <div className='p-3 space-y-3'>
+              {/* Entity header */}
+              <div className='flex items-center justify-between gap-2'>
+                <span className='font-semibold text-sm'>{entity.text}</span>
+                <Badge
+                  variant='outline'
+                  className={cn(
+                    'text-xs',
+                    entity.label === 'ENTITY' && 'bg-blue-100 text-blue-700',
+                    entity.label === 'CONCEPT' && 'bg-emerald-100 text-emerald-700',
+                    entity.label === 'CHANGE' && 'bg-amber-100 text-amber-700',
+                    entity.label === 'METRIC' && 'bg-purple-100 text-purple-700',
+                    entity.label === 'VALUE' && 'bg-rose-100 text-rose-700',
+                    entity.label === 'DATE' && 'bg-cyan-100 text-cyan-700',
+                  )}
+                >
+                  {entity.label}
+                </Badge>
+              </div>
+
+              <Separator />
+
+              {/* Recommendations section */}
+              <div className='space-y-2'>
+                <div className='text-xs font-medium text-muted-foreground'>XBRL Tag Suggestions</div>
+
+                {!hasLoaded && !isLoading ? (
+                  <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
+                    <Loader2 className='w-3 h-3 animate-spin' />
+                    <span>Loading suggestions...</span>
+                  </div>
+                ) : isLoading ? (
+                  <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
+                    <Loader2 className='w-3 h-3 animate-spin' />
+                    <span>Finding XBRL tags...</span>
+                  </div>
+                ) : recs && recs.length > 0 ? (
+                  <div className='space-y-1 max-h-48 overflow-y-auto'>
+                    {(expandedEntityIndex === index ? recs : recs.slice(0, 3)).map((rec, recIndex) => (
+                      <Button
+                        key={rec.tag}
+                        variant='ghost'
+                        size='sm'
+                        className='w-full justify-start h-auto p-2 text-left hover:bg-muted/80'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          applyAgentTag(index, entity, rec);
+                        }}
+                      >
+                        <div className='flex-1 min-w-0'>
+                          <div className='text-xs font-mono truncate text-primary'>
+                            {rec.tag}
+                          </div>
+                          <div className='text-xs text-muted-foreground truncate'>
+                            {rec.reference}
+                          </div>
+                        </div>
+                        <CheckCircle2 className='w-4 h-4 ml-2 text-green-500 flex-shrink-0 opacity-0 group-hover:opacity-100' />
+                      </Button>
+                    ))}
+                    {recs.length > 3 && expandedEntityIndex !== index && (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='w-full text-xs text-muted-foreground'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedEntityIndex(index);
+                        }}
+                      >
+                        Show {recs.length - 3} more suggestions...
+                      </Button>
+                    )}
+                    {expandedEntityIndex === index && recs.length > 3 && (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='w-full text-xs text-muted-foreground'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedEntityIndex(null);
+                        }}
+                      >
+                        Show less
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className='flex items-center gap-1 text-xs text-amber-600 py-2'>
+                    <X className='w-3 h-3' />
+                    <span>No matching XBRL tags found</span>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Help text */}
+              <p className='text-xs text-muted-foreground'>
+                Click a suggestion to apply it as a tag
+              </p>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      );
+    });
+
+    // Remaining text after the last entity
+    const lastEntity = sortedEntities[sortedEntities.length - 1];
+    const lastEntityEnd = selectionStart + lastEntity.end;
+    if (lastEntityEnd < content.length) {
+      segments.push(
+        <span key='after-selection' className='font-medium leading-relaxed'>
+          {content.substring(lastEntityEnd)}
+        </span>
+      );
+    }
+
+    return <div className='whitespace-pre-wrap'>{segments}</div>;
+  };
+
   const renderTaggedContent = (block: ReportBlock) => {
+    // If agent mode has highlights for this block, render with agent highlights
+    if (agentHighlightBlock?.blockId === block.id && agentEntities.length > 0) {
+      return renderAgentHighlights(block);
+    }
+
     if (!block.tags || block.tags.length === 0) {
       return (
         <p className='font-medium leading-relaxed whitespace-pre-wrap'>
@@ -669,6 +1101,33 @@ export function TextEditor({
           </div>
         </PopoverContent>
       </Popover>
+
+      {/* Agent mode floating info bar - shows when entities are detected */}
+      {agentHighlightBlock && agentEntities.length > 0 && (
+        <div className='fixed bottom-4 left-1/2 -translate-x-1/2 z-50'>
+          <div className='bg-white dark:bg-slate-800 rounded-lg shadow-lg border px-4 py-3 flex items-center gap-4'>
+            <div className='flex items-center gap-2'>
+              <div className='p-1.5 bg-gradient-to-r from-violet-500 to-purple-500 rounded-md'>
+                <Bot className='w-3 h-3 text-white' />
+              </div>
+              <span className='text-sm font-medium'>
+                {agentEntities.length} entit{agentEntities.length > 1 ? 'ies' : 'y'} detected
+              </span>
+              {isAgentLoading && (
+                <Loader2 className='w-4 h-4 animate-spin text-violet-500' />
+              )}
+            </div>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={clearAgentHighlights}
+            >
+              <X className='w-4 h-4 mr-1' />
+              Clear Labels
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -66,8 +66,9 @@ class Settings(BaseSettings):
     ]  # Not used with regex
 
     ALLOWED_ORIGIN_REGEX: str = (
-        r"https://([a-zA-Z0-9-]+\.)?briskflow\.ai|"   
-        r"https://([a-zA-Z0-9-]+\.)?briskbold\.ai"    
+        r"http://localhost:3000|"
+        r"https://([a-zA-Z0-9-]+\.)?briskflow\.ai|"
+        r"https://([a-zA-Z0-9-]+\.)?briskbold\.ai"
 )
 
     # File Upload

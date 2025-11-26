@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 /**
  * A global store used to coordinate tagging interactions between the text editor
@@ -8,6 +9,9 @@ import { create } from 'zustand';
  * allowing the user to choose a context before finalising the tag. The
  * selected context is also persisted in this store so that other parts of
  * the application, such as the editor, can access it when needed.
+ *
+ * Additionally, this store manages the AI Agent mode settings which enable
+ * automatic XBRL tagging using NER (Named Entity Recognition) predictions.
  */
 type RecommendationConcept = {
     /**
@@ -47,6 +51,23 @@ type RecommendationConcept = {
     feedbackId?: number;
 };
 
+/**
+ * Agent mode settings for automatic XBRL tagging
+ */
+type AgentModeSettings = {
+    /**
+     * Whether agent mode is currently enabled. When enabled, the NER agent
+     * will automatically detect and tag entities in selected text instead
+     * of showing manual recommendations.
+     */
+    enabled: boolean;
+    /**
+     * Whether to automatically apply detected tags without user confirmation.
+     * When false, a preview/confirmation dialog will be shown before applying tags.
+     */
+    autoApply: boolean;
+};
+
 type TaggingStore = {
     /**
      * A concept that has been selected from the recommendation popover but has
@@ -70,11 +91,45 @@ type TaggingStore = {
      * whenever the user changes the context selection.
      */
     setSelectedContextId: (contextId: string | null) => void;
+    /**
+     * Agent mode settings for automatic NER-based tagging.
+     */
+    agentMode: AgentModeSettings;
+    /**
+     * Toggle agent mode on/off.
+     */
+    setAgentModeEnabled: (enabled: boolean) => void;
+    /**
+     * Toggle auto-apply setting for agent mode.
+     */
+    setAgentModeAutoApply: (autoApply: boolean) => void;
 };
 
-export const useTaggingStore = create<TaggingStore>((set) => ({
-    pendingConcept: null,
-    setPendingConcept: (concept) => set({ pendingConcept: concept }),
-    selectedContextId: null,
-    setSelectedContextId: (contextId) => set({ selectedContextId: contextId }),
-}));
+export const useTaggingStore = create<TaggingStore>()(
+    persist(
+        (set) => ({
+            pendingConcept: null,
+            setPendingConcept: (concept) => set({ pendingConcept: concept }),
+            selectedContextId: null,
+            setSelectedContextId: (contextId) => set({ selectedContextId: contextId }),
+            agentMode: {
+                enabled: false,
+                autoApply: true,
+            },
+            setAgentModeEnabled: (enabled) =>
+                set((state) => ({
+                    agentMode: { ...state.agentMode, enabled },
+                })),
+            setAgentModeAutoApply: (autoApply) =>
+                set((state) => ({
+                    agentMode: { ...state.agentMode, autoApply },
+                })),
+        }),
+        {
+            name: 'tagging-store',
+            partialize: (state) => ({
+                agentMode: state.agentMode,
+            }),
+        }
+    )
+);

@@ -32,7 +32,17 @@ import {
   BookOpen,
   Sparkles,
   GripVertical,
+  Bot,
+  Zap,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { useTaggingStore } from '@/store/tagging-store';
 import { axiosInstance } from '@/lib/axios';
 import { toast } from 'sonner';
 
@@ -105,6 +115,15 @@ export default function EditorPage() {
   // List of saved sessions for the current user. `null` means they haven't been loaded yet.
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
+
+  // Agent mode state from global store
+  const agentMode = useTaggingStore((state) => state.agentMode);
+  const setAgentModeEnabled = useTaggingStore(
+    (state) => state.setAgentModeEnabled
+  );
+  const setAgentModeAutoApply = useTaggingStore(
+    (state) => state.setAgentModeAutoApply
+  );
 
   /**
    * When the editor first mounts, attempt to restore any previously saved
@@ -391,17 +410,99 @@ export default function EditorPage() {
         <ResizablePanel defaultSize={50} minSize={40}>
           <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none'>
             <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-1 pt-1 pl-3'>
-              <CardTitle className='flex items-center gap-3 text-lg'>
-                <div className='p-2 bg-blue-500 rounded-lg'>
-                  <BookOpen className='h-5 w-5 text-white' />
+              <CardTitle className='flex items-center justify-between gap-3 text-lg'>
+                <div className='flex items-center gap-3'>
+                  <div className='p-2 bg-blue-500 rounded-lg'>
+                    <BookOpen className='h-5 w-5 text-white' />
+                  </div>
+                  <div>
+                    <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
+                      Document Content
+                    </span>
+                    <p className='text-sm text-muted-foreground font-normal mt-1'>
+                      Select text to add tags
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
-                    Document Content
-                  </span>
-                  <p className='text-sm text-muted-foreground font-normal mt-1'>
-                    Select text to add tags
-                  </p>
+                {/* Agent Mode Toggle */}
+                <div className='flex items-center gap-2'>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={agentMode.enabled ? 'default' : 'outline'}
+                        size='sm'
+                        className={`gap-2 h-9 px-4 transition-colors flex-shrink-0 ${
+                          agentMode.enabled
+                            ? 'bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white border-0'
+                            : 'hover:bg-violet-50 hover:border-violet-300 dark:hover:bg-violet-900/20'
+                        }`}
+                      >
+                        <Bot className='h-4 w-4' />
+                        AI Agent
+                        {agentMode.enabled && (
+                          <Badge
+                            variant='secondary'
+                            className='ml-1 bg-white/20 text-white text-xs'
+                          >
+                            ON
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-72' align='end'>
+                      <div className='space-y-4'>
+                        <div className='flex items-center gap-2'>
+                          <div className='p-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg'>
+                            <Bot className='h-4 w-4 text-white' />
+                          </div>
+                          <div>
+                            <h4 className='font-medium text-sm'>
+                              AI Agent Mode
+                            </h4>
+                            <p className='text-xs text-muted-foreground'>
+                              Automatic XBRL tagging with NER
+                            </p>
+                          </div>
+                        </div>
+                        <div className='space-y-3'>
+                          <div className='flex items-center justify-between'>
+                            <Label htmlFor='agent-enabled' className='text-sm'>
+                              Enable Agent Mode
+                            </Label>
+                            <Switch
+                              id='agent-enabled'
+                              checked={agentMode.enabled}
+                              onCheckedChange={setAgentModeEnabled}
+                            />
+                          </div>
+                          <div className='flex items-center justify-between'>
+                            <div className='space-y-0.5'>
+                              <Label htmlFor='auto-apply' className='text-sm'>
+                                Auto-apply tags
+                              </Label>
+                              <p className='text-xs text-muted-foreground'>
+                                Apply detected tags without confirmation
+                              </p>
+                            </div>
+                            <Switch
+                              id='auto-apply'
+                              checked={agentMode.autoApply}
+                              onCheckedChange={setAgentModeAutoApply}
+                              disabled={!agentMode.enabled}
+                            />
+                          </div>
+                        </div>
+                        {agentMode.enabled && (
+                          <div className='pt-2 border-t'>
+                            <div className='flex items-center gap-2 text-xs text-violet-600 dark:text-violet-400'>
+                              <Zap className='h-3 w-3' />
+                              <span>Agent will auto-tag selected text</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </CardTitle>
             </CardHeader>

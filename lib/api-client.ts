@@ -8,7 +8,7 @@ type RequestOptions = {
   params?: Record<string, string | number | boolean | undefined | null>;
   cache?: RequestCache;
   next?: NextFetchRequestConfig;
-  serviceType?: 'coreBackend' | 'aiRecommender';
+  serviceType?: 'coreBackend' | 'aiRecommender' | 'nerAgent';
 };
 
 const CONFIG = {
@@ -19,6 +19,10 @@ const CONFIG = {
   aiRecommender: {
     local: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
     gcp: 'https://xbrl-tag-171009084156.europe-west1.run.app/api/v1',
+  },
+  nerAgent: {
+    local: 'https://ner-backend-171009084156.europe-west1.run.app',
+    gcp: 'https://ner-backend-171009084156.europe-west1.run.app',
   },
 };
 

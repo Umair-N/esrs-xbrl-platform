@@ -45,7 +45,11 @@ import {
   GripVertical,
   MoreHorizontal,
   Loader2,
+  Bot,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { useTaggingStore } from '@/store/tagging-store';
 import { axiosInstance } from '@/lib/axios';
 import { toast } from 'sonner';
 
@@ -102,6 +106,10 @@ export default function EditorPage() {
   const [isTaggedFactsOpen, setIsTaggedFactsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
+
+  // Agent mode state from Zustand store
+  const { agentMode, setAgentModeEnabled } = useTaggingStore();
 
   // Load the report from localStorage on mount. If none exists, redirect.
   useEffect(() => {
@@ -255,18 +263,72 @@ export default function EditorPage() {
         <ResizablePanel defaultSize={50} minSize={40}>
           <Card className='h-full shadow-none border-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm flex flex-col rounded-none overflow-hidden'>
             <CardHeader className='flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 pb-2 pt-2 pl-3'>
-              <CardTitle className='flex items-center gap-3 text-lg'>
-                <div className='p-2 bg-blue-500 rounded-lg'>
-                  <BookOpen className='h-5 w-5 text-white' />
+              <CardTitle className='flex items-center justify-between gap-3 text-lg'>
+                <div className='flex items-center gap-3'>
+                  <div className='p-2 bg-blue-500 rounded-lg'>
+                    <BookOpen className='h-5 w-5 text-white' />
+                  </div>
+                  <div>
+                    <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
+                      Document Content Editor
+                    </span>
+                    <p className='text-sm text-muted-foreground font-normal mt-1'>
+                      Select text to add tags
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className='bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent p-0'>
-                    Document Content
-                  </span>
-                  <p className='text-sm text-muted-foreground font-normal mt-1'>
-                    Select text to add tags
-                  </p>
-                </div>
+                {/* AI Agent Toggle */}
+                <Popover open={isAgentMenuOpen} onOpenChange={setIsAgentMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={agentMode.enabled ? 'default' : 'outline'}
+                      size='sm'
+                      className={`gap-2 h-9 px-3 transition-colors flex-shrink-0 ${
+                        agentMode.enabled
+                          ? 'bg-violet-600 hover:bg-violet-700 text-white'
+                          : 'hover:bg-violet-50 hover:border-violet-300 dark:hover:bg-violet-900/20'
+                      }`}
+                    >
+                      <Bot className='h-4 w-4' />
+                      AI Agent
+                      {agentMode.enabled && (
+                        <Badge
+                          variant='secondary'
+                          className='ml-1 bg-violet-200 text-violet-800 dark:bg-violet-800 dark:text-violet-200 text-xs'
+                        >
+                          ON
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-72 p-4' align='end'>
+                    <div className='space-y-4'>
+                      <div className='flex items-center gap-2'>
+                        <Bot className='h-5 w-5 text-violet-600' />
+                        <h4 className='font-medium'>AI Agent Settings</h4>
+                      </div>
+                      <div className='space-y-3'>
+                        <div className='flex items-center justify-between'>
+                          <Label
+                            htmlFor='agent-mode'
+                            className='text-sm font-normal'
+                          >
+                            Enable Agent Mode
+                          </Label>
+                          <Switch
+                            id='agent-mode'
+                            checked={agentMode.enabled}
+                            onCheckedChange={setAgentModeEnabled}
+                          />
+                        </div>
+                        <p className='text-xs text-muted-foreground'>
+                          When enabled, AI will automatically detect and highlight
+                          entities in selected text, showing their labels.
+                        </p>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </CardTitle>
             </CardHeader>
             <CardContent className='flex-1 p-0 mt-2 overflow-hidden'>
