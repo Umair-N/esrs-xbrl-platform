@@ -1,0 +1,313 @@
+Summary,Issue Type,Priority,Story Points,Epic Name,Sprint,Description,Acceptance Criteria,Labels,Component,Assignee
+Setup NestJS project with prime-nestjs,Task,High,3,Sprint 0: Foundation Setup,Sprint 0,"Clone prime-nestjs repository and configure for ESRS XBRL Platform. Update package.json, remove unnecessary modules, configure TypeScript strict mode.","- prime-nestjs repository cloned
+- package.json updated with project name and dependencies
+- Unnecessary modules removed
+- TypeScript strict mode enabled
+- Project builds successfully",setup;backend,Backend,
+Configure PostgreSQL with Supabase,Task,High,5,Sprint 0: Foundation Setup,Sprint 0,"Set up PostgreSQL database on Supabase. Configure connection pooling, SSL settings, and create initial database.","- Supabase project created
+- PostgreSQL database initialized
+- Connection string configured in .env
+- SSL mode set to 'require'
+- Connection pool tested (min 5, max 20 connections)",setup;database,Backend,
+Create initial database migration,Task,High,3,Sprint 0: Foundation Setup,Sprint 0,"Create TypeORM migration for all 14 tables: organizations, workspaces, users, workspace_members, refresh_tokens, invitations, files, pdf_cache, reports, tags, canvases, xbrl_contexts, taxonomies, workspace_taxonomies, report_locks, audit_logs.","- Migration file generated with all 14 tables
+- UUID primary keys configured
+- Indexes created on foreign keys
+- Soft delete columns added (deleted_at)
+- Migration runs successfully
+- All tables visible in database",database;migration,Backend,
+Setup Docker configuration,Task,Medium,2,Sprint 0: Foundation Setup,Sprint 0,"Create Dockerfile for backend, docker-compose.yml for local development with PostgreSQL and Redis.","- Dockerfile created for NestJS backend
+- docker-compose.yml includes PostgreSQL, Redis, and backend
+- Environment variables configured
+- Docker build succeeds
+- Containers start successfully",setup;docker,DevOps,
+Configure CI/CD pipeline,Task,Medium,0,Sprint 0: Foundation Setup,Sprint 0,"Set up GitHub Actions for automated testing, linting, and deployment to Google Cloud Run.","- GitHub Actions workflow file created
+- Linting job configured
+- Test job configured (placeholder for now)
+- Docker build job configured
+- Deployment to Cloud Run configured
+- Pipeline runs successfully on push to dev branch",setup;cicd,DevOps,
+Implement organization entity and CRUD,Story,High,5,Sprint 1: Multi-Tenancy Foundation,Sprint 1,"Create Organization entity, DTOs, service, controller with full CRUD operations. Organizations are top-level tenants.","- Organization entity created with TypeORM
+- CreateOrganizationDto and UpdateOrganizationDto with validation
+- OrganizationsService with create, findAll, findOne, update, delete methods
+- OrganizationsController with REST endpoints
+- Swagger documentation added
+- Soft deletes implemented",multi-tenancy;backend,Backend,
+Implement workspace entity and CRUD,Story,High,5,Sprint 1: Multi-Tenancy Foundation,Sprint 1,"Create Workspace entity, DTOs, service, controller. Workspaces belong to organizations and provide isolation.","- Workspace entity with organization relationship
+- CreateWorkspaceDto and UpdateWorkspaceDto
+- WorkspacesService with CRUD + organization validation
+- WorkspacesController with REST endpoints
+- Unique constraint on (organization_id, slug)
+- Soft deletes implemented",multi-tenancy;backend,Backend,
+Setup Row-Level Security policies,Task,High,3,Sprint 1: Multi-Tenancy Foundation,Sprint 1,"Create PostgreSQL RLS policies on all workspace-scoped tables (files, pdf_cache, reports, tags, canvases, xbrl_contexts, report_locks).","- RLS enabled on 7 workspace-scoped tables
+- Policies created using app.current_workspace_id
+- Migration file for RLS policies
+- RLS tested with different workspace_id values
+- Documentation added for RLS pattern",multi-tenancy;database,Backend,
+Create workspace middleware,Task,High,3,Sprint 1: Multi-Tenancy Foundation,Sprint 1,"Implement middleware to set PostgreSQL session variable (app.current_workspace_id) from X-Workspace-Id header or user context.","- WorkspaceMiddleware class created
+- Middleware reads X-Workspace-Id header
+- Sets app.current_workspace_id session variable
+- Registered globally in AppModule
+- Tested with database queries filtered by RLS",multi-tenancy;backend,Backend,
+Implement user entity and repository,Story,High,5,Sprint 2: Authentication,Sprint 2,"Create User entity with password hashing, email validation. User belongs to organization.","- User entity with all fields (email, password_hash, first_name, last_name, role, etc.)
+- Password hashing with bcrypt (10 rounds)
+- Email uniqueness constraint
+- Role enum (super_admin, org_admin, workspace_admin, editor, viewer)
+- Soft deletes implemented",auth;backend,Backend,
+Implement JWT authentication,Story,High,5,Sprint 2: Authentication,Sprint 2,"Set up JWT authentication with RSA256 signing. Access tokens (30 min) and refresh tokens (7 days).","- JWT strategy implemented with Passport
+- RSA256 key pair generated
+- Access token expiry: 30 minutes
+- Refresh token expiry: 7 days
+- JwtAuthGuard created
+- Tokens include userId, organizationId, role",auth;backend,Backend,
+Create auth endpoints (register/login/logout),Story,High,3,Sprint 2: Authentication,Sprint 2,"Implement POST /auth/register, POST /auth/login, POST /auth/logout, POST /auth/refresh, GET /auth/me endpoints.","- POST /auth/register creates organization + admin user
+- POST /auth/login validates credentials and returns tokens
+- POST /auth/logout revokes refresh token
+- POST /auth/refresh generates new token pair
+- GET /auth/me returns current user profile
+- Tokens set in httpOnly cookies",auth;backend,Backend,
+Implement refresh token rotation,Task,Medium,0,Sprint 2: Authentication,Sprint 2,"Create RefreshToken entity and implement token rotation on refresh. Old tokens revoked.","- RefreshToken entity created
+- Token stored in database on login
+- Refresh endpoint revokes old token and creates new one
+- Expired tokens cleaned up (cron job)
+- Revoked tokens cannot be reused",auth;backend,Backend,
+Create workspace member management,Story,High,5,Sprint 3: Organization Management,Sprint 3,"Implement workspace_members CRUD: add member, list members, update role, remove member.","- WorkspaceMember entity created
+- Service methods: addMember, listMembers, updateRole, removeMember
+- Controller endpoints: POST/GET/PATCH/DELETE /workspaces/:id/members
+- Role-based validation (only workspace admins can manage)
+- Audit logs for member changes",multi-tenancy;backend,Backend,
+Implement invitation system,Story,High,5,Sprint 3: Organization Management,Sprint 3,"Create invitation flow: send invite, accept invite, revoke invite. Email invitations to join workspace.","- Invitation entity created
+- POST /invitations endpoint (sends email)
+- POST /invitations/:token/accept endpoint
+- Email service integration (SendGrid or SMTP)
+- Token expiry (7 days)
+- Status tracking (pending, accepted, expired, revoked)",multi-tenancy;backend,Backend,
+Create workspace guard,Task,High,3,Sprint 3: Organization Management,Sprint 3,"Implement WorkspaceGuard to verify user has access to workspace from X-Workspace-Id header.","- WorkspaceGuard checks workspace membership
+- Returns 403 if user not in workspace
+- Applied to all workspace-scoped endpoints
+- Sets RLS session variable
+- Custom decorator @WorkspaceId() to extract workspace ID",multi-tenancy;backend,Backend,
+Implement role-based access control,Task,Medium,3,Sprint 3: Organization Management,Sprint 3,"Create guards and decorators for role-based permissions (admin, editor, viewer).","- RolesGuard checks user role
+- @Roles() decorator for controllers
+- Role hierarchy: super_admin > org_admin > workspace_admin > editor > viewer
+- Applied to sensitive endpoints (delete, update settings)
+- Tests for permission checks",auth;backend,Backend,
+Implement file upload endpoint,Story,High,5,Sprint 4: File Management,Sprint 4,"Create POST /files/upload endpoint supporting PDF and DOCX files (max 70MB). Store in GCS or local filesystem.","- Multer configured for multipart/form-data
+- File type validation (PDF, DOCX only)
+- File size limit: 70MB
+- Storage adapter pattern (local vs GCS)
+- File entity created with metadata
+- Returns file ID and metadata",files;backend,Backend,
+Setup Google Cloud Storage integration,Task,Medium,3,Sprint 4: File Management,Sprint 4,"Configure GCS bucket, service account, and implement storage service for production.","- GCS bucket created
+- Service account with storage permissions
+- @google-cloud/storage library integrated
+- Storage service with upload/download/delete methods
+- Presigned URLs for secure downloads
+- Local filesystem fallback for development",files;backend;cloud,Backend,
+Implement file metadata extraction,Task,Medium,3,Sprint 4: File Management,Sprint 4,"Extract metadata from uploaded files: page count, dimensions, file type, MIME type.","- PDF: Extract page count using pdf-parse
+- DOCX: Extract page count estimate
+- Store in file.metadata JSONB field
+- Metadata returned in upload response
+- Error handling for corrupted files",files;backend,Backend,
+Create file download endpoint,Story,Medium,2,Sprint 4: File Management,Sprint 4,"Implement GET /files/:id/download that returns file stream or presigned GCS URL.","- GET /files/:id/download endpoint
+- For GCS: returns presigned URL (1-hour expiry)
+- For local: streams file directly
+- Workspace isolation enforced (RLS)
+- Content-Disposition header set for download",files;backend,Backend,
+Implement PDF text extraction,Story,High,5,Sprint 5: PDF Processing,Sprint 5,"Extract full text content from PDF files using pdf-parse and pdfjs-dist. Store in pdf_cache table.","- pdf-parse library integrated
+- Text extracted per page
+- pdfjs-dist for enhanced extraction
+- Text stored in pdf_cache.text_content
+- Handles multi-column layouts
+- Error handling for scanned PDFs (OCR not in MVP)",pdf;backend,Backend,
+Extract word-level bounding boxes,Story,High,8,Sprint 5: PDF Processing,Sprint 5,"Extract word positions (x, y, width, height) for each word on each page. Store as JSONB in pdf_cache.word_data.","- pdfjs-dist used for word extraction
+- Each word: {text, x, y, width, height}
+- Stored in pdf_cache.word_data as JSON array
+- Tested with complex layouts
+- Performance: <10s for 50-page PDF",pdf;backend,Backend,
+Render PDF pages to JPEG images,Story,High,5,Sprint 5: PDF Processing,Sprint 5,"Render each PDF page to JPEG image at 150 DPI. Store in pdf_cache.image_data as bytea.","- pdfjs-dist canvas rendering
+- Resolution: 150 DPI
+- Format: JPEG (quality 85)
+- Stored in pdf_cache.image_data (bytea)
+- GET /pdf-cache/:fileId/pages/:page/image endpoint
+- Image served with proper MIME type",pdf;backend,Backend,
+Create Bull queue for async processing,Task,Medium,3,Sprint 5: PDF Processing,Sprint 5,"Set up Bull queue with Redis for background PDF processing jobs. Process on upload.","- Bull library integrated
+- Redis connection configured
+- PdfProcessingQueue created
+- Job added on file upload
+- Worker processes jobs asynchronously
+- Job status tracking (queued, processing, completed, failed)",pdf;backend,Backend,
+Implement report entity and CRUD,Story,High,5,Sprint 6: Report Management,Sprint 6,"Create Report entity, DTOs, service, controller. Report links to file and taxonomy.","- Report entity with file and taxonomy relationships
+- CRUD operations (create, list, get, update, delete)
+- Status field (draft, review, approved, published)
+- Workspace isolation enforced
+- Soft deletes implemented
+- Audit logging",reports;backend,Backend,
+Create canvas persistence,Story,High,5,Sprint 6: Report Management,Sprint 6,"Implement Canvas entity to store editor state (blocks, tags, scroll position). POST/GET /reports/:id/canvas endpoints.","- Canvas entity with one-to-one report relationship
+- canvas_data JSONB field stores full state
+- POST /reports/:id/canvas saves state
+- GET /reports/:id/canvas retrieves state
+- Auto-save on frontend (debounced)
+- Version field for future conflict resolution",reports;backend,Backend,
+Implement report listing with filters,Task,Medium,3,Sprint 6: Report Management,Sprint 6,"Add filtering and sorting to GET /reports: by status, created date, taxonomy. Pagination support.","- Query parameters: status, sort, page, limit
+- Filter by status (draft, review, approved, published)
+- Sort by createdAt, updatedAt, title
+- Pagination (default 20 per page, max 100)
+- Total count returned
+- Performance tested with 1000+ reports",reports;backend,Backend,
+Create report sharing (workspace-level),Task,Low,3,Sprint 6: Report Management,Sprint 6,"Reports are automatically shared within workspace. All workspace members can view/edit based on role.","- No separate sharing table (workspace-scoped by default)
+- Viewer role: read-only
+- Editor role: create/edit own reports
+- Admin role: manage all reports
+- Documented in API_ENDPOINTS.md",reports;backend,Backend,
+Implement tag entity and CRUD,Story,High,5,Sprint 7: Tagging System,Sprint 7,"Create Tag entity with concept_id, value, unit, decimals, context reference, text position.","- Tag entity with all XBRL fields
+- Relationships: report, context, created_by
+- CRUD endpoints: POST/GET/PATCH/DELETE /tags
+- Validation: concept_id format, unit codes
+- start_index/end_index for text position
+- page_number for multi-page PDFs",tagging;backend,Backend,
+Create tag listing with grouping,Task,Medium,3,Sprint 7: Tagging System,Sprint 7,"GET /reports/:reportId/tags endpoint with grouping by page, concept, context.","- Returns all tags for a report
+- Optional grouping: by page, by concept, by context
+- Includes full context details
+- Includes creator information
+- Sorted by creation time or page number",tagging;backend,Backend,
+Implement tag validation,Task,Medium,3,Sprint 7: Tagging System,Sprint 7,"Validate tags against taxonomy schema: concept exists, unit matches, decimals are appropriate.","- Concept ID validated against taxonomy
+- Unit validated against allowed units for concept
+- Decimals within reasonable range (-6 to 6)
+- Value matches expected data type
+- Returns validation errors with details",tagging;backend,Backend,
+Add tag conflict detection,Task,Medium,5,Sprint 7: Tagging System,Sprint 7,"Detect overlapping tags on same text. Allow overlaps but warn user. Track by start/end index.","- Check for overlapping text positions
+- Allow overlaps (multiple concepts on same text)
+- Return warning if overlap detected
+- Prioritize by creation time (older tags first)
+- Visualize overlaps in frontend",tagging;backend,Backend,
+Integrate OpenAI API for recommendations,Story,High,8,Sprint 8: AI Integration,Sprint 8,"Set up OpenAI API client. Create prompt templates for XBRL concept recommendation based on selected text.","- OpenAI API key configured
+- Prompt engineering for concept suggestion
+- Input: selected text, surrounding context, taxonomy
+- Output: concept suggestions with confidence scores
+- Handles rate limiting (max 10 req/min per workspace)
+- Error handling for API failures",ai;backend,Backend,
+Create AI recommendation endpoint,Story,High,8,Sprint 8: AI Integration,Sprint 8,"POST /ai/recommend-concepts endpoint. Takes selected text, returns concept suggestions with confidence.","- Endpoint accepts text, reportId, taxonomyId
+- Calls OpenAI with engineered prompt
+- Returns array of suggestions: conceptId, label, confidence, reasoning
+- Suggests value extraction and unit
+- Suggests context (period)
+- Response time: <5 seconds",ai;backend,Backend,
+Implement context suggestion,Task,Medium,5,Sprint 8: AI Integration,Sprint 8,"POST /ai/recommend-context endpoint. Analyzes text to suggest XBRL context (entity, period, dimensions).","- Analyzes surrounding text for date references
+- Suggests period type (instant vs duration)
+- Extracts date ranges
+- Suggests dimensions if mentioned
+- Returns confidence score and reasoning",ai;backend,Backend,
+Implement XBRL context entity and CRUD,Story,High,5,Sprint 9: Context Management,Sprint 9,"Create XBRLContext entity with entity, period (instant/duration), dimensions. CRUD endpoints.","- XBRLContext entity created
+- Fields: contextId, entityIdentifier, entityScheme, periodType, dates, dimensions (JSONB)
+- POST /reports/:reportId/contexts creates context
+- GET /reports/:reportId/contexts lists all contexts
+- Context reused across tags
+- Validation: date ranges, entity format",xbrl;backend,Backend,
+Add context validation,Task,Medium,3,Sprint 9: Context Management,Sprint 9,"Validate context data: period dates are valid, instant vs duration logic, entity identifier format.","- Instant: requires instant_date only
+- Duration: requires start_date and end_date
+- end_date must be after start_date
+- Entity identifier validated (numeric or registered format)
+- Dimension values validated against taxonomy",xbrl;backend,Backend,
+Create context templates,Task,Low,2,Sprint 9: Context Management,Sprint 9,"Provide common context templates (annual report, quarterly, monthly) for quick creation.","- Templates stored in database or config
+- Common periods: FY 2023, Q4 2023, etc.
+- User can create context from template
+- Templates customizable per workspace
+- API: GET /contexts/templates",xbrl;backend,Backend,
+Auto-suggest most used contexts,Task,Low,3,Sprint 9: Context Management,Sprint 9,"When creating tag, suggest 3 most recently used contexts for the report.","- Query last 10 tags in report
+- Group by context_id
+- Return top 3 by frequency
+- Include in tag creation response
+- Speeds up tagging workflow",xbrl;backend,Backend,
+Implement taxonomy upload (admin),Story,High,5,Sprint 10: Taxonomy Management,Sprint 10,"POST /taxonomies endpoint (super_admin only). Upload ZIP file with taxonomy XSD schemas.","- Multer for ZIP upload
+- Extract ZIP to storage (GCS or local)
+- Parse taxonomy metadata (name, version, namespace)
+- Store in taxonomies table
+- Validate ZIP contains required files (.xsd)
+- Admin-only endpoint",taxonomy;backend,Backend,
+Parse taxonomy metadata,Task,Medium,5,Sprint 10: Taxonomy Management,Sprint 10,"Extract namespace, schemaRefs, concept list from uploaded taxonomy XSD files.","- XML parser for .xsd files
+- Extract namespace URI
+- Extract schema location
+- List all concepts (elements)
+- Store in taxonomy.metadata JSONB
+- Handle multiple linked schemas",taxonomy;backend,Backend,
+Implement workspace taxonomy assignment,Story,High,3,Sprint 10: Taxonomy Management,Sprint 10,"POST /workspaces/:id/taxonomies/:taxonomyId/assign endpoint. Assign taxonomy to workspace. Set default.","- Creates workspace_taxonomies record
+- Validates taxonomy is active
+- One default taxonomy per workspace
+- Admin-only operation
+- Unassign endpoint: DELETE /workspaces/:id/taxonomies/:taxonomyId",taxonomy;backend,Backend,
+Create taxonomy browsing endpoint,Task,Medium,3,Sprint 10: Taxonomy Management,Sprint 10,"GET /taxonomies/:id/concepts endpoint. Browse taxonomy structure with search and filtering.","- Returns concept tree or flat list
+- Search by concept ID or label
+- Filter by category/module (e.g., ESRS E1)
+- Paginated response
+- Cached in Redis (5 min TTL)",taxonomy;backend,Backend,
+Implement iXBRL generation service,Story,High,13,Sprint 11: XBRL Export,Sprint 11,"Create service to generate iXBRL XML from report tags and contexts. Multi-taxonomy support (ESRS, GRI, SASB).","- Generates inline XBRL HTML+XML
+- Namespace declarations for each taxonomy
+- schemaRef links to taxonomy XSD
+- Context definitions in header
+- Unit definitions (EUR, tCO2e, etc.)
+- ix:nonFraction and ix:nonNumeric elements
+- Handles tag placement in document text",xbrl;backend,Backend,
+Create export endpoint,Story,Medium,5,Sprint 11: XBRL Export,Sprint 11,"POST /reports/:id/export/ixbrl endpoint. Returns iXBRL XML file for download.","- Validates report has tags and contexts
+- Calls iXBRL generation service
+- Returns XML with proper Content-Type
+- Content-Disposition: attachment
+- Filename: report-title-ixbrl.xml
+- Logs export in audit_logs",xbrl;backend,Backend,
+Implement XBRL validation,Task,Medium,3,Sprint 11: XBRL Export,Sprint 11,"POST /reports/:id/validate endpoint. Validate report against taxonomy: missing contexts, invalid concepts, etc.","- Check all tags reference valid contexts
+- Check all concept IDs exist in taxonomy
+- Check units match concept requirements
+- Check decimals are appropriate
+- Return errors and warnings
+- Does not block export (warnings only)",xbrl;backend,Backend,
+Implement report lock acquisition,Story,High,5,Sprint 12: File Locking,Sprint 12,"POST /reports/:id/lock endpoint. Acquire edit lock. Returns 409 if already locked by another user.","- Creates record in report_locks table
+- Sets expires_at to 15 minutes from now
+- Returns lock details (locked_by, expires_at)
+- If already locked by same user: refresh lock
+- If locked by other: return 409 with lock details
+- Stores client info (IP, user agent)",locking;backend,Backend,
+Implement lock refresh (heartbeat),Story,Medium,3,Sprint 12: File Locking,Sprint 12,"PUT /reports/:id/lock/refresh endpoint. Extends lock expiry by 15 minutes. Called every 60 seconds from frontend.","- Updates last_activity_at and expires_at
+- Returns new expiry time
+- Only lock owner can refresh
+- Returns 404 if lock doesn't exist
+- Returns 403 if different user",locking;backend,Backend,
+Implement lock release,Story,Medium,2,Sprint 12: File Locking,Sprint 12,"DELETE /reports/:id/lock endpoint. Releases lock. Called on save or editor unmount.","- Deletes lock from report_locks table
+- Only lock owner can release
+- Returns 204 No Content
+- Idempotent (no error if lock doesn't exist)
+- Audit log entry",locking;backend,Backend,
+Create lock status endpoint,Story,Low,2,Sprint 12: File Locking,Sprint 12,"GET /reports/:id/lock endpoint. Check if report is locked and by whom. Used for read-only mode.","- Returns isLocked boolean
+- If locked: returns locked_by user details and expires_at
+- If not locked: returns null
+- Used by frontend to show lock banner
+- No authentication required (public within workspace)",locking;backend,Backend,
+Implement admin force unlock,Task,Low,2,Sprint 12: File Locking,Sprint 12,"DELETE /reports/:id/lock/force endpoint (admin only). Forcefully remove lock from any user.","- Admin or super_admin only
+- Deletes lock regardless of owner
+- Sends notification to lock owner (optional)
+- Audit log entry with admin user
+- Used for stuck locks",locking;backend,Backend,
+Create expired lock cleanup cron,Task,Medium,2,Sprint 12: File Locking,Sprint 12,"Cron job runs every 5 minutes. Deletes locks where expires_at < NOW().","- @Cron decorator with '*/5 * * * *' pattern
+- Queries locks with expires_at in past
+- Deletes expired locks
+- Logs count of cleaned locks
+- Tested with manual expiry times",locking;backend,Backend,
+Write unit tests for core services,Task,High,5,Sprint 13: Testing & Deployment,Sprint 13,"Write Jest unit tests for ReportsService, TagsService, AuthService, LocksService. Target 80% coverage.","- Test files created for 4 services
+- Mock repositories with jest.mock
+- Test happy paths and error cases
+- Coverage report generated
+- At least 80% coverage for services",testing;backend,Backend,
+Write E2E tests for critical flows,Task,High,5,Sprint 13: Testing & Deployment,Sprint 13,"Write E2E tests: user registration, file upload → tag → export workflow, lock acquisition/release.","- Supertest for HTTP testing
+- Test database seeded with fixtures
+- Tests isolated (separate test DB)
+- 3 critical flows tested end-to-end
+- Tests run in CI pipeline",testing;backend,Backend,
+Performance optimization,Task,Medium,3,Sprint 13: Testing & Deployment,Sprint 13,"Optimize slow queries, add database indexes, implement Redis caching for taxonomies and PDF cache metadata.","- Slow query log analyzed
+- Missing indexes added
+- Redis caching for taxonomy concepts (5 min TTL)
+- API response time < 200ms (p95)
+- PDF processing < 30s for 50 pages",performance;backend,Backend,
+Deploy to Google Cloud Run,Task,High,0,Sprint 13: Testing & Deployment,Sprint 13,"Deploy backend to Google Cloud Run. Configure secrets, environment variables, Cloud SQL connection.","- Cloud Run service created
+- Docker image pushed to Artifact Registry
+- Environment variables configured
+- Cloud SQL connector configured
+- Redis (Memorystore) connected
+- Health check endpoint responds",deployment;backend,DevOps,
