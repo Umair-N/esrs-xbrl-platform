@@ -6,7 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit2, Check, X, Lightbulb, LucideInfo, Bot, Loader2, CheckCircle2 } from 'lucide-react';
+import {
+  Edit2,
+  Check,
+  X,
+  Lightbulb,
+  LucideInfo,
+  Bot,
+  Loader2,
+  CheckCircle2,
+} from 'lucide-react';
 import {
   HoverCard,
   HoverCardContent,
@@ -109,9 +118,10 @@ export function TextEditor({
   const { mutate: sendFeedback } = usePostFeedback();
 
   // NER Agent hook for automatic entity detection
-  const { mutate: predictEntities, isPending: isAgentLoading } = usePredictEntities({
-    mutationConfig: {},
-  });
+  const { mutate: predictEntities, isPending: isAgentLoading } =
+    usePredictEntities({
+      mutationConfig: {},
+    });
 
   // State for agent mode - detected entities displayed inline with highlights
   const [agentEntities, setAgentEntities] = useState<NEREntity[]>([]);
@@ -122,25 +132,144 @@ export function TextEditor({
   } | null>(null);
 
   // Store entity-to-recommendations mapping for agent mode (lazy loaded on hover)
-  // Key: entity index, Value: array of recommendations or null if failed
-  const [entityRecommendations, setEntityRecommendations] = useState<Map<number, {
-    tag: string;
-    reference: string;
-    datatype: string;
-    score: number;
-  }[] | null>>(new Map());
+  // Key: entity key (start-end), Value: array of recommendations or null if failed
+  const [entityRecommendations, setEntityRecommendations] = useState<
+    Map<
+      string,
+      | {
+          tag: string;
+          reference: string;
+          datatype: string;
+          score: number;
+        }[]
+      | null
+    >
+  >(new Map());
 
-  // Track which entity indices are currently loading recommendations
-  const [loadingEntityIndices, setLoadingEntityIndices] = useState<Set<number>>(new Set());
+  // Track which entities are currently loading recommendations (by key)
+  const [loadingEntityKeys, setLoadingEntityKeys] = useState<Set<string>>(
+    new Set()
+  );
 
-  // Track if we're showing expanded recommendations for an entity
-  const [expandedEntityIndex, setExpandedEntityIndex] = useState<number | null>(null);
+  // Track if we're showing expanded recommendations for an entity (by key)
+  const [expandedEntityKey, setExpandedEntityKey] = useState<string | null>(
+    null
+  );
+
+  // Track if auto-detection has run for current agent mode session
+  const [hasAutoDetected, setHasAutoDetected] = useState(false);
+
+  // Helper to generate a unique key for an entity
+  const getEntityKey = (entity: NEREntity) => `${entity.start}-${entity.end}`;
+
+  /**
+   * Clear agent mode highlights and state
+   */
+  const clearAgentHighlights = () => {
+    setAgentEntities([]);
+    setAgentHighlightBlock(null);
+    setEntityRecommendations(new Map());
+    setLoadingEntityKeys(new Set());
+    setExpandedEntityKey(null);
+  };
+
+  /**
+   * Auto-detect entities in the entire block when agent mode is enabled
+   */
+  const autoDetectEntities = async () => {
+    // Get the first block's content (or selected block if available)
+    const targetBlock = selectedBlockId
+      ? report.blocks.find((b) => b.id === selectedBlockId)
+      : report.blocks[0];
+
+    if (!targetBlock || !targetBlock.content) {
+      return;
+    }
+
+    // Wait for taxonomy to be available (don't show error - useEffect will retry)
+    if (!selectedTaxonomy?.name) {
+      return;
+    }
+
+    // Clear previous state
+    setAgentEntities([]);
+    setEntityRecommendations(new Map());
+    setLoadingEntityKeys(new Set());
+    setExpandedEntityKey(null);
+
+    // Show loading notification
+    showSuccess({
+      title: 'Detecting entities...',
+      message: 'AI Agent is analyzing the document.',
+      duration: 2000,
+    });
+
+    predictEntities(
+      { data: { text: targetBlock.content } },
+      {
+        onSuccess: async (res) => {
+          const entities = res?.entities ?? [];
+          setAgentEntities(entities);
+          // Start from 0 since we're processing the entire block
+          setAgentHighlightBlock({
+            blockId: targetBlock.id,
+            selectionStart: 0,
+          });
+          setHasAutoDetected(true);
+
+          if (entities.length === 0) {
+            showError({
+              title: 'No entities detected',
+              message: 'AI Agent could not detect any entities in the document.',
+            });
+            return;
+          }
+
+          showSuccess({
+            title: `${entities.length} entit${entities.length > 1 ? 'ies' : 'y'} detected`,
+            message: 'Hover over highlighted text to see XBRL tag suggestions.',
+            duration: 3000,
+          });
+        },
+        onError: () => {
+          setAgentEntities([]);
+          setAgentHighlightBlock(null);
+          showError({
+            title: 'Detection failed',
+            message: 'AI Agent failed to detect entities. Please try again.',
+          });
+        },
+      }
+    );
+  };
+
+  // Auto-detect entities when agent mode is enabled and taxonomy is available
+  useEffect(() => {
+    if (
+      agentMode.enabled &&
+      !hasAutoDetected &&
+      report.blocks.length > 0 &&
+      selectedTaxonomy?.name
+    ) {
+      autoDetectEntities();
+    }
+    // Reset auto-detection flag when agent mode is disabled
+    if (!agentMode.enabled) {
+      setHasAutoDetected(false);
+      clearAgentHighlights();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentMode.enabled, selectedTaxonomy?.name]);
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
   };
 
   const startEditing = (block: ReportBlock) => {
+    // Clear agent highlights when entering edit mode (textarea can't show rich formatting)
+    if (agentHighlightBlock?.blockId === block.id) {
+      clearAgentHighlights();
+    }
     setEditingBlockId(block.id);
     setEditedContent(block.content);
   };
@@ -227,8 +356,8 @@ export function TextEditor({
             // Clear previous agent state
             setAgentEntities([]);
             setEntityRecommendations(new Map());
-            setLoadingEntityIndices(new Set());
-            setExpandedEntityIndex(null);
+            setLoadingEntityKeys(new Set());
+            setExpandedEntityKey(null);
 
             // Show loading notification
             showSuccess({
@@ -244,19 +373,24 @@ export function TextEditor({
                   const entities = res?.entities ?? [];
                   setAgentEntities(entities);
                   // Store the block and selection start for inline highlighting
-                  setAgentHighlightBlock({ blockId, selectionStart: startIndex });
+                  setAgentHighlightBlock({
+                    blockId,
+                    selectionStart: startIndex,
+                  });
 
                   if (entities.length === 0) {
                     showError({
                       title: 'No entities detected',
-                      message: 'AI Agent could not detect any entities in the selected text.',
+                      message:
+                        'AI Agent could not detect any entities in the selected text.',
                     });
                     return;
                   }
 
                   showSuccess({
                     title: `${entities.length} entit${entities.length > 1 ? 'ies' : 'y'} detected`,
-                    message: 'Hover over highlighted text to see XBRL tag suggestions.',
+                    message:
+                      'Hover over highlighted text to see XBRL tag suggestions.',
                     duration: 3000,
                   });
                 },
@@ -265,7 +399,8 @@ export function TextEditor({
                   setAgentHighlightBlock(null);
                   showError({
                     title: 'Detection failed',
-                    message: 'AI Agent failed to detect entities. Please try again.',
+                    message:
+                      'AI Agent failed to detect entities. Please try again.',
                   });
                 },
               }
@@ -309,32 +444,26 @@ export function TextEditor({
   };
 
   /**
-   * Clear agent mode highlights and state
-   */
-  const clearAgentHighlights = () => {
-    setAgentEntities([]);
-    setAgentHighlightBlock(null);
-    setEntityRecommendations(new Map());
-    setLoadingEntityIndices(new Set());
-    setExpandedEntityIndex(null);
-  };
-
-  /**
    * Fetch XBRL tag recommendations for a specific entity (called on hover)
    */
-  const fetchEntityRecommendations = (entityIndex: number, entityText: string) => {
+  const fetchEntityRecommendations = (entity: NEREntity) => {
+    const entityKey = getEntityKey(entity);
+
     // Skip if already loaded or loading
-    if (entityRecommendations.has(entityIndex) || loadingEntityIndices.has(entityIndex)) {
+    if (
+      entityRecommendations.has(entityKey) ||
+      loadingEntityKeys.has(entityKey)
+    ) {
       return;
     }
 
     // Mark as loading
-    setLoadingEntityIndices(prev => new Set(prev).add(entityIndex));
+    setLoadingEntityKeys((prev) => new Set(prev).add(entityKey));
 
     mutate(
       {
         data: {
-          query: entityText,
+          query: entity.text,
           taxonomy: selectedTaxonomy?.name?.toLocaleLowerCase() || '',
           k: 5, // Get top 5 recommendations
           rerank: true,
@@ -343,26 +472,26 @@ export function TextEditor({
       {
         onSuccess: (recRes: any) => {
           const recs = recRes?.results ?? [];
-          setEntityRecommendations(prev => {
+          setEntityRecommendations((prev) => {
             const newMap = new Map(prev);
-            newMap.set(entityIndex, recs.length > 0 ? recs : null);
+            newMap.set(entityKey, recs.length > 0 ? recs : null);
             return newMap;
           });
-          setLoadingEntityIndices(prev => {
+          setLoadingEntityKeys((prev) => {
             const newSet = new Set(prev);
-            newSet.delete(entityIndex);
+            newSet.delete(entityKey);
             return newSet;
           });
         },
         onError: () => {
-          setEntityRecommendations(prev => {
+          setEntityRecommendations((prev) => {
             const newMap = new Map(prev);
-            newMap.set(entityIndex, null);
+            newMap.set(entityKey, null);
             return newMap;
           });
-          setLoadingEntityIndices(prev => {
+          setLoadingEntityKeys((prev) => {
             const newSet = new Set(prev);
-            newSet.delete(entityIndex);
+            newSet.delete(entityKey);
             return newSet;
           });
         },
@@ -374,15 +503,15 @@ export function TextEditor({
    * Apply a tag from agent mode recommendations
    */
   const applyAgentTag = (
-    entityIndex: number,
     entity: NEREntity,
-    recommendation: { tag: string; reference: string; datatype: string; }
+    recommendation: { tag: string; reference: string; datatype: string }
   ) => {
     if (!agentHighlightBlock) return;
 
     const { blockId, selectionStart } = agentHighlightBlock;
     const entityStart = selectionStart + entity.start;
     const entityEnd = selectionStart + entity.end;
+    const entityKey = getEntityKey(entity);
 
     // Get context if selected
     const context = selectedContextId
@@ -420,21 +549,13 @@ export function TextEditor({
     onReportChange(updatedReport);
 
     // Remove the entity from agent highlights since it's now tagged
-    const remainingEntities = agentEntities.filter((_, idx) => idx !== entityIndex);
+    const remainingEntities = agentEntities.filter(
+      (e) => getEntityKey(e) !== entityKey
+    );
     if (remainingEntities.length === 0) {
       clearAgentHighlights();
     } else {
       setAgentEntities(remainingEntities);
-      // Update recommendations map indices
-      const newRecsMap = new Map<number, typeof entityRecommendations extends Map<number, infer V> ? V : never>();
-      entityRecommendations.forEach((value, key) => {
-        if (key < entityIndex) {
-          newRecsMap.set(key, value);
-        } else if (key > entityIndex) {
-          newRecsMap.set(key - 1, value);
-        }
-      });
-      setEntityRecommendations(newRecsMap);
     }
 
     showSuccess({
@@ -565,289 +686,298 @@ export function TextEditor({
     }
   };
 
+  // Label color mapping for different entity types (used in agent highlights)
+  const labelColors: Record<string, string> = {
+    ENTITY: 'bg-blue-200 dark:bg-blue-800/50 border-blue-400',
+    CONCEPT: 'bg-emerald-200 dark:bg-emerald-800/50 border-emerald-400',
+    CHANGE: 'bg-amber-200 dark:bg-amber-800/50 border-amber-400',
+    METRIC: 'bg-purple-200 dark:bg-purple-800/50 border-purple-400',
+    VALUE: 'bg-rose-200 dark:bg-rose-800/50 border-rose-400',
+    DATE: 'bg-cyan-200 dark:bg-cyan-800/50 border-cyan-400',
+  };
+
   /**
-   * Render content with agent-detected entity highlights.
-   * Shows detected entities with colored backgrounds and HoverCards for recommendations.
-   * Recommendations are lazy-loaded when hovering over an entity.
+   * Render a single agent entity with HoverCard for recommendations.
    */
-  const renderAgentHighlights = (block: ReportBlock) => {
-    if (!agentHighlightBlock || agentHighlightBlock.blockId !== block.id || agentEntities.length === 0) {
-      return null;
-    }
+  const renderAgentEntity = (entity: NEREntity, text: string) => {
+    const entityKey = getEntityKey(entity);
+    const recs = entityRecommendations.get(entityKey);
+    const isLoading = loadingEntityKeys.has(entityKey);
+    const hasLoaded = entityRecommendations.has(entityKey);
+    const colorClass =
+      labelColors[entity.label] ||
+      'bg-violet-200 dark:bg-violet-800/50 border-violet-400';
 
-    const content = block.content;
-    const selectionStart = agentHighlightBlock.selectionStart;
-
-    // Sort entities by start position
-    const sortedEntities = [...agentEntities].sort((a, b) => a.start - b.start);
-    const segments: JSX.Element[] = [];
-
-    // Label color mapping for different entity types
-    const labelColors: Record<string, string> = {
-      'ENTITY': 'bg-blue-200 dark:bg-blue-800/50 border-blue-400',
-      'CONCEPT': 'bg-emerald-200 dark:bg-emerald-800/50 border-emerald-400',
-      'CHANGE': 'bg-amber-200 dark:bg-amber-800/50 border-amber-400',
-      'METRIC': 'bg-purple-200 dark:bg-purple-800/50 border-purple-400',
-      'VALUE': 'bg-rose-200 dark:bg-rose-800/50 border-rose-400',
-      'DATE': 'bg-cyan-200 dark:bg-cyan-800/50 border-cyan-400',
-    };
-
-    // Render text before the first entity highlight area
-    if (selectionStart > 0) {
-      segments.push(
-        <span key='before-selection' className='font-medium leading-relaxed'>
-          {content.substring(0, selectionStart)}
-        </span>
-      );
-    }
-
-    // Render entities within the selection
-    sortedEntities.forEach((entity, index) => {
-      const entityAbsStart = selectionStart + entity.start;
-      const entityAbsEnd = selectionStart + entity.end;
-      const recs = entityRecommendations.get(index);
-      const isLoading = loadingEntityIndices.has(index);
-      const hasLoaded = entityRecommendations.has(index);
-
-      // Text between last position and this entity
-      const gapStart = index === 0 ? selectionStart : selectionStart + sortedEntities[index - 1].end;
-      if (entityAbsStart > gapStart) {
-        segments.push(
-          <span key={`gap-${index}`} className='font-medium leading-relaxed'>
-            {content.substring(gapStart, entityAbsStart)}
+    return (
+      <HoverCard
+        key={`entity-${entityKey}`}
+        onOpenChange={(open) => {
+          if (open) {
+            fetchEntityRecommendations(entity);
+          }
+        }}
+      >
+        <HoverCardTrigger asChild>
+          <span
+            className={cn(
+              'px-1 py-0.5 rounded cursor-pointer border-b-2 font-medium transition-all hover:opacity-80',
+              colorClass,
+              isLoading && 'animate-pulse'
+            )}
+          >
+            {text}
           </span>
-        );
-      }
-
-      // Render the highlighted entity with HoverCard
-      const colorClass = labelColors[entity.label] || 'bg-violet-200 dark:bg-violet-800/50 border-violet-400';
-
-      segments.push(
-        <HoverCard
-          key={`entity-${index}`}
-          onOpenChange={(open) => {
-            if (open) {
-              // Lazy load recommendations when hovering
-              fetchEntityRecommendations(index, entity.text);
-            }
-          }}
-        >
-          <HoverCardTrigger asChild>
-            <span
-              className={cn(
-                'px-1 py-0.5 rounded cursor-pointer border-b-2 font-medium transition-all hover:opacity-80',
-                colorClass,
-                isLoading && 'animate-pulse'
-              )}
-            >
-              {content.substring(entityAbsStart, entityAbsEnd)}
-            </span>
-          </HoverCardTrigger>
-          <HoverCardContent className='w-80 p-0' align='start'>
-            <div className='p-3 space-y-3'>
-              {/* Entity header */}
-              <div className='flex items-center justify-between gap-2'>
-                <span className='font-semibold text-sm'>{entity.text}</span>
-                <Badge
-                  variant='outline'
-                  className={cn(
-                    'text-xs',
-                    entity.label === 'ENTITY' && 'bg-blue-100 text-blue-700',
-                    entity.label === 'CONCEPT' && 'bg-emerald-100 text-emerald-700',
-                    entity.label === 'CHANGE' && 'bg-amber-100 text-amber-700',
-                    entity.label === 'METRIC' && 'bg-purple-100 text-purple-700',
-                    entity.label === 'VALUE' && 'bg-rose-100 text-rose-700',
-                    entity.label === 'DATE' && 'bg-cyan-100 text-cyan-700',
-                  )}
-                >
-                  {entity.label}
-                </Badge>
-              </div>
-
-              <Separator />
-
-              {/* Recommendations section */}
-              <div className='space-y-2'>
-                <div className='text-xs font-medium text-muted-foreground'>XBRL Tag Suggestions</div>
-
-                {!hasLoaded && !isLoading ? (
-                  <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
-                    <Loader2 className='w-3 h-3 animate-spin' />
-                    <span>Loading suggestions...</span>
-                  </div>
-                ) : isLoading ? (
-                  <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
-                    <Loader2 className='w-3 h-3 animate-spin' />
-                    <span>Finding XBRL tags...</span>
-                  </div>
-                ) : recs && recs.length > 0 ? (
-                  <div className='space-y-1 max-h-48 overflow-y-auto'>
-                    {(expandedEntityIndex === index ? recs : recs.slice(0, 3)).map((rec, recIndex) => (
-                      <Button
-                        key={rec.tag}
-                        variant='ghost'
-                        size='sm'
-                        className='w-full justify-start h-auto p-2 text-left hover:bg-muted/80'
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          applyAgentTag(index, entity, rec);
-                        }}
-                      >
-                        <div className='flex-1 min-w-0'>
-                          <div className='text-xs font-mono truncate text-primary'>
-                            {rec.tag}
-                          </div>
-                          <div className='text-xs text-muted-foreground truncate'>
-                            {rec.reference}
-                          </div>
-                        </div>
-                        <CheckCircle2 className='w-4 h-4 ml-2 text-green-500 flex-shrink-0 opacity-0 group-hover:opacity-100' />
-                      </Button>
-                    ))}
-                    {recs.length > 3 && expandedEntityIndex !== index && (
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        className='w-full text-xs text-muted-foreground'
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedEntityIndex(index);
-                        }}
-                      >
-                        Show {recs.length - 3} more suggestions...
-                      </Button>
-                    )}
-                    {expandedEntityIndex === index && recs.length > 3 && (
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        className='w-full text-xs text-muted-foreground'
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedEntityIndex(null);
-                        }}
-                      >
-                        Show less
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className='flex items-center gap-1 text-xs text-amber-600 py-2'>
-                    <X className='w-3 h-3' />
-                    <span>No matching XBRL tags found</span>
-                  </div>
+        </HoverCardTrigger>
+        <HoverCardContent className='w-80 p-0' align='start'>
+          <div className='p-3 space-y-3'>
+            <div className='flex items-center justify-between gap-2'>
+              <span className='font-semibold text-sm'>{entity.text}</span>
+              <Badge
+                variant='outline'
+                className={cn(
+                  'text-xs',
+                  entity.label === 'ENTITY' && 'bg-blue-100 text-blue-700',
+                  entity.label === 'CONCEPT' &&
+                    'bg-emerald-100 text-emerald-700',
+                  entity.label === 'CHANGE' && 'bg-amber-100 text-amber-700',
+                  entity.label === 'METRIC' && 'bg-purple-100 text-purple-700',
+                  entity.label === 'VALUE' && 'bg-rose-100 text-rose-700',
+                  entity.label === 'DATE' && 'bg-cyan-100 text-cyan-700'
                 )}
+              >
+                {entity.label}
+              </Badge>
+            </div>
+
+            <Separator />
+
+            <div className='space-y-2'>
+              <div className='text-xs font-medium text-muted-foreground'>
+                XBRL Tag Suggestions
               </div>
 
-              <Separator />
-
-              {/* Help text */}
-              <p className='text-xs text-muted-foreground'>
-                Click a suggestion to apply it as a tag
-              </p>
+              {!hasLoaded && !isLoading ? (
+                <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
+                  <Loader2 className='w-3 h-3 animate-spin' />
+                  <span>Loading suggestions...</span>
+                </div>
+              ) : isLoading ? (
+                <div className='flex items-center gap-1 text-xs text-muted-foreground py-2'>
+                  <Loader2 className='w-3 h-3 animate-spin' />
+                  <span>Finding XBRL tags...</span>
+                </div>
+              ) : recs && recs.length > 0 ? (
+                <div className='space-y-1 max-h-48 overflow-y-auto'>
+                  {(expandedEntityKey === entityKey
+                    ? recs
+                    : recs.slice(0, 3)
+                  ).map((rec) => (
+                    <Button
+                      key={rec.tag}
+                      variant='ghost'
+                      size='sm'
+                      className='w-full justify-start h-auto p-2 text-left hover:bg-muted/80'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        applyAgentTag(entity, rec);
+                      }}
+                    >
+                      <div className='flex-1 min-w-0'>
+                        <div className='text-xs font-mono truncate text-primary'>
+                          {rec.tag}
+                        </div>
+                        <div className='text-xs text-muted-foreground truncate'>
+                          {rec.reference}
+                        </div>
+                      </div>
+                      <CheckCircle2 className='w-4 h-4 ml-2 text-green-500 flex-shrink-0 opacity-0 group-hover:opacity-100' />
+                    </Button>
+                  ))}
+                  {recs.length > 3 && expandedEntityKey !== entityKey && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='w-full text-xs text-muted-foreground'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedEntityKey(entityKey);
+                      }}
+                    >
+                      Show {recs.length - 3} more suggestions...
+                    </Button>
+                  )}
+                  {expandedEntityKey === entityKey && recs.length > 3 && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='w-full text-xs text-muted-foreground'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedEntityKey(null);
+                      }}
+                    >
+                      Show less
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className='flex items-center gap-1 text-xs text-amber-600 py-2'>
+                  <X className='w-3 h-3' />
+                  <span>No matching XBRL tags found</span>
+                </div>
+              )}
             </div>
-          </HoverCardContent>
-        </HoverCard>
-      );
-    });
 
-    // Remaining text after the last entity
-    const lastEntity = sortedEntities[sortedEntities.length - 1];
-    const lastEntityEnd = selectionStart + lastEntity.end;
-    if (lastEntityEnd < content.length) {
-      segments.push(
-        <span key='after-selection' className='font-medium leading-relaxed'>
-          {content.substring(lastEntityEnd)}
-        </span>
-      );
-    }
+            <Separator />
 
-    return <div className='whitespace-pre-wrap'>{segments}</div>;
+            <p className='text-xs text-muted-foreground'>
+              Click a suggestion to apply it as a tag
+            </p>
+          </div>
+        </HoverCardContent>
+      </HoverCard>
+    );
+  };
+
+  /**
+   * Render a single existing XBRL tag with HoverCard showing tag details.
+   */
+  const renderExistingTag = (tag: XbrlTag, text: string) => {
+    return (
+      <HoverCard key={`tag-${tag.id}`}>
+        <HoverCardTrigger asChild>
+          <span className='bg-primary/20 px-1 py-0.5 rounded cursor-help border-b border-dashed border-primary font-medium'>
+            {text}
+          </span>
+        </HoverCardTrigger>
+        <HoverCardContent className='w-80'>
+          <div className='space-y-3'>
+            <h4 className='text-base font-semibold break-words'>
+              {tag.concept.label}
+            </h4>
+            <p className='text-sm leading-relaxed break-words text-muted-foreground'>
+              {tag.concept.definition}
+            </p>
+            <div className='flex flex-wrap gap-2 pt-1'>
+              <Badge variant='outline' className='font-medium'>
+                {tag.concept.type}
+              </Badge>
+              <Badge variant='outline' className='font-medium'>
+                {tag.concept.periodType}
+              </Badge>
+            </div>
+            {tag?.context && (
+              <>
+                <Separator />
+                <div className='space-y-1 text-xs'>
+                  <p className='font-semibold'>
+                    Context: {tag?.context?.label}
+                  </p>
+                  <p className='text-muted-foreground'>
+                    Entity: {tag?.context?.entityName} (
+                    {tag?.context?.entityIdentifier})
+                  </p>
+                  <p className='text-muted-foreground'>
+                    Period:{' '}
+                    {tag?.context?.periodType === 'instant'
+                      ? `As of ${new Date(tag.context.instantDate || '').toLocaleDateString()}`
+                      : `${new Date(tag?.context?.startDate || '').toLocaleDateString()} to ${new Date(
+                          tag?.context?.endDate || ''
+                        ).toLocaleDateString()}`}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </HoverCardContent>
+      </HoverCard>
+    );
   };
 
   const renderTaggedContent = (block: ReportBlock) => {
-    // If agent mode has highlights for this block, render with agent highlights
-    if (agentHighlightBlock?.blockId === block.id && agentEntities.length > 0) {
-      return renderAgentHighlights(block);
-    }
+    const content = block.content;
+    const tags = block.tags || [];
+    const hasAgentHighlights =
+      agentHighlightBlock?.blockId === block.id && agentEntities.length > 0;
 
-    if (!block.tags || block.tags.length === 0) {
+    // If no tags and no agent highlights, render plain text
+    if (tags.length === 0 && !hasAgentHighlights) {
       return (
         <p className='font-medium leading-relaxed whitespace-pre-wrap'>
-          {block.content}
+          {content}
         </p>
       );
     }
 
-    const sortedTags = [...block.tags].sort(
-      (a, b) => (a.startIndex || 0) - (b.startIndex || 0)
-    );
+    // Build a unified list of highlights (both tags and agent entities)
+    // Each highlight has: start, end, type ('tag' | 'entity'), data
+    type Highlight =
+      | { type: 'tag'; start: number; end: number; data: XbrlTag }
+      | { type: 'entity'; start: number; end: number; data: NEREntity };
+
+    const highlights: Highlight[] = [];
+
+    // Add existing tags
+    tags.forEach((tag) => {
+      highlights.push({
+        type: 'tag',
+        start: tag.startIndex || 0,
+        end: tag.endIndex || content.length,
+        data: tag,
+      });
+    });
+
+    // Add agent entities (with absolute positions)
+    if (hasAgentHighlights) {
+      const selectionStart = agentHighlightBlock!.selectionStart;
+      agentEntities.forEach((entity) => {
+        highlights.push({
+          type: 'entity',
+          start: selectionStart + entity.start,
+          end: selectionStart + entity.end,
+          data: entity,
+        });
+      });
+    }
+
+    // Sort by start position
+    highlights.sort((a, b) => a.start - b.start);
+
+    // Render segments
     const segments: JSX.Element[] = [];
     let lastIndex = 0;
 
-    sortedTags.forEach((tag, index) => {
-      const startIndex = tag.startIndex || 0;
-      const endIndex = tag.endIndex || block.content.length;
+    highlights.forEach((highlight, index) => {
+      // Skip if this highlight overlaps with a previous one (tags take priority)
+      if (highlight.start < lastIndex) {
+        return;
+      }
 
-      if (startIndex > lastIndex) {
+      // Add gap text before this highlight
+      if (highlight.start > lastIndex) {
         segments.push(
           <span key={`text-${index}`} className='font-medium leading-relaxed'>
-            {block.content.substring(lastIndex, startIndex)}
+            {content.substring(lastIndex, highlight.start)}
           </span>
         );
       }
 
-      segments.push(
-        <HoverCard key={`tag-${tag.id}`}>
-          <HoverCardTrigger asChild>
-            <span className='bg-primary/20 px-1 py-0.5 rounded cursor-help border-b border-dashed border-primary font-medium'>
-              {block.content.substring(startIndex, endIndex)}
-            </span>
-          </HoverCardTrigger>
-          <HoverCardContent className='w-80 '>
-            <div className='space-y-3'>
-              <h4 className='text-base font-semibold break-words'>
-                {tag.concept.label}
-              </h4>
-              <p className='text-sm leading-relaxed break-words text-muted-foreground'>
-                {tag.concept.definition}
-              </p>
-              <div className='flex flex-wrap gap-2 pt-1'>
-                <Badge variant='outline' className='font-medium'>
-                  {tag.concept.type}
-                </Badge>
-                <Badge variant='outline' className='font-medium'>
-                  {tag.concept.periodType}
-                </Badge>
-              </div>
-              <Separator />
-              <div className='space-y-1 text-xs'>
-                <p className='font-semibold'>Context: {tag?.context?.label}</p>
-                <p className='text-muted-foreground'>
-                  Entity: {tag?.context?.entityName} (
-                  {tag?.context?.entityIdentifier})
-                </p>
-                <p className='text-muted-foreground'>
-                  Period:{' '}
-                  {tag?.context?.periodType === 'instant'
-                    ? `As of ${new Date(tag.context.instantDate || '').toLocaleDateString()}`
-                    : `${new Date(tag?.context?.startDate || '').toLocaleDateString()} to ${new Date(
-                        tag?.context?.endDate || ''
-                      ).toLocaleDateString()}`}
-                </p>
-              </div>
-            </div>
-          </HoverCardContent>
-        </HoverCard>
-      );
+      // Render the highlight
+      const highlightText = content.substring(highlight.start, highlight.end);
+      if (highlight.type === 'tag') {
+        segments.push(renderExistingTag(highlight.data, highlightText));
+      } else {
+        segments.push(renderAgentEntity(highlight.data, highlightText));
+      }
 
-      lastIndex = endIndex;
+      lastIndex = highlight.end;
     });
 
-    if (lastIndex < block.content.length) {
+    // Add remaining text after last highlight
+    if (lastIndex < content.length) {
       segments.push(
         <span key='text-last' className='font-medium leading-relaxed'>
-          {block.content.substring(lastIndex)}
+          {content.substring(lastIndex)}
         </span>
       );
     }
@@ -1111,17 +1241,14 @@ export function TextEditor({
                 <Bot className='w-3 h-3 text-white' />
               </div>
               <span className='text-sm font-medium'>
-                {agentEntities.length} entit{agentEntities.length > 1 ? 'ies' : 'y'} detected
+                {agentEntities.length} entit
+                {agentEntities.length > 1 ? 'ies' : 'y'} detected
               </span>
               {isAgentLoading && (
                 <Loader2 className='w-4 h-4 animate-spin text-violet-500' />
               )}
             </div>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={clearAgentHighlights}
-            >
+            <Button variant='outline' size='sm' onClick={clearAgentHighlights}>
               <X className='w-4 h-4 mr-1' />
               Clear Labels
             </Button>
