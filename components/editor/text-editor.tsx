@@ -5,10 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Textarea } from '@/components/ui/textarea';
 import {
-  Edit2,
-  Check,
   X,
   Lightbulb,
   LucideInfo,
@@ -85,9 +82,6 @@ export function TextEditor({
   // assignment. We also expose the currently selected context ID should we
   // choose to automatically create tags when a context is already selected.
 
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState('');
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const selectedTaxonomy = useTaxonomyStore((state) => state.selectedTaxonomy);
 
   // Bring in the tagging store actions. When a recommendation is chosen, we
@@ -178,47 +172,8 @@ export function TextEditor({
   }, [agentMode.enabled]);
 
   const handleBlockClick = (blockId: string) => {
-    if (editingBlockId !== blockId) onBlockSelect(blockId);
+    onBlockSelect(blockId);
   };
-
-  const startEditing = (block: ReportBlock) => {
-    // Clear agent highlights when entering edit mode (textarea can't show rich formatting)
-    if (agentHighlightBlock?.blockId === block.id) {
-      clearAgentHighlights();
-    }
-    setEditingBlockId(block.id);
-    setEditedContent(block.content);
-  };
-
-  const saveEditing = () => {
-    if (!editingBlockId) return;
-    const updatedReport: ReportDocument = {
-      ...report,
-      blocks: report.blocks.map((block) =>
-        block.id === editingBlockId
-          ? { ...block, content: editedContent }
-          : block
-      ),
-      updatedAt: new Date().toISOString(),
-    };
-
-    onReportChange(updatedReport);
-    setEditingBlockId(null);
-
-    // Persist the updated report to localStorage.
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(
-          'xbrl-editor-session',
-          JSON.stringify(updatedReport)
-        );
-      } catch (err) {
-        console.error('Failed to persist updated report:', err);
-      }
-    }
-  };
-
-  const cancelEditing = () => setEditingBlockId(null);
 
   /**
    * Handles highlighting text in a block.  Invokes the recommendations API
@@ -887,54 +842,6 @@ export function TextEditor({
     return <div className='whitespace-pre-wrap'>{segments}</div>;
   };
 
-  /**
-   * Persist unsaved edits to localStorage if the editor unmounts.
-   */
-  const latestEditingBlockId = useRef<string | null>(editingBlockId);
-  const latestEditedContent = useRef<string>(editedContent);
-  const latestReport = useRef<ReportDocument>(report);
-
-  useEffect(() => {
-    latestEditingBlockId.current = editingBlockId;
-  }, [editingBlockId]);
-
-  useEffect(() => {
-    latestEditedContent.current = editedContent;
-  }, [editedContent]);
-
-  useEffect(() => {
-    latestReport.current = report;
-  }, [report]);
-
-  useEffect(() => {
-    return () => {
-      const blockId = latestEditingBlockId.current;
-      if (blockId) {
-        const rep = latestReport.current;
-        const updatedReport: ReportDocument = {
-          ...rep,
-          blocks: rep.blocks.map((block) =>
-            block.id === blockId
-              ? { ...block, content: latestEditedContent.current }
-              : block
-          ),
-          updatedAt: new Date().toISOString(),
-        };
-        onReportChange(updatedReport);
-        if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              'xbrl-editor-session',
-              JSON.stringify(updatedReport)
-            );
-          } catch (err) {
-            console.error('Failed to persist unsaved edit on unmount:', err);
-          }
-        }
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className='flex flex-col h-full'>
@@ -971,69 +878,34 @@ export function TextEditor({
             key={block.id}
             data-block-id={block.id}
             className={cn(
-              'p-4 rounded-lg border transition-colors h-full',
-              selectedBlockId === block.id && !editingBlockId
+              'p-4 rounded-lg border transition-colors h-full min-h-fit',
+              selectedBlockId === block.id
                 ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50',
-              editingBlockId === block.id ? 'border-primary' : 'min-h-fit'
+                : 'border-border hover:border-primary/50'
             )}
             onClick={() => handleBlockClick(block.id)}
             onMouseUp={() =>
               selectedBlockId === block.id && handleTextSelection(block.id)
             }
           >
-            {editingBlockId === block.id ? (
-              <div className='flex flex-col w-full h-full space-y-3'>
-                <Textarea
-                  ref={textAreaRef}
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className='w-full resize-none text-base font-medium leading-relaxed max-h-[calc(100dvh-9rem)] overflow-y-auto custom-scrollbar h-full'
-                  autoFocus
-                />
-                <div className='flex justify-end space-x-2'>
-                  <Button size='sm' variant='outline' onClick={cancelEditing}>
-                    <X className='w-4 h-4 mr-1' /> Cancel
-                  </Button>
-                  <Button size='sm' onClick={saveEditing}>
-                    <Check className='w-4 h-4 mr-1' /> Save
-                  </Button>
-                </div>
+            <div className='relative group max-h-[calc(100dvh-12rem)] overflow-y-auto custom-scrollbar'>
+              <div className='leading-relaxed prose dark:prose-invert max-w-none'>
+                {renderTaggedContent(block)}
               </div>
-            ) : (
-              <div className='relative group max-h-[calc(100dvh-12rem)] overflow-y-auto custom-scrollbar'>
-                <div className='sticky top-0 right-0 z-10 float-right mb-2 ml-2 transition-opacity border rounded-full group-hover:opacity-100'>
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startEditing(block);
-                    }}
-                    className='font-medium rounded-full shadow-md'
-                  >
-                    Edit
-                    <Edit2 className='w-4 h-4' />
-                  </Button>
+              {block.tags && block.tags.length > 0 && (
+                <div className='flex flex-wrap clear-both gap-2 mt-3'>
+                  {block.tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant='outline'
+                      className='inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary'
+                    >
+                      {tag.concept.label}
+                    </Badge>
+                  ))}
                 </div>
-                <div className='leading-relaxed prose dark:prose-invert max-w-none'>
-                  {renderTaggedContent(block)}
-                </div>
-                {block.tags && block.tags.length > 0 && (
-                  <div className='flex flex-wrap clear-both gap-2 mt-3'>
-                    {block.tags.map((tag) => (
-                      <Badge
-                        key={tag.id}
-                        variant='outline'
-                        className='inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary'
-                      >
-                        {tag.concept.label}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ))}
       </div>
