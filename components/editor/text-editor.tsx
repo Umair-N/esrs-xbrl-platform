@@ -89,7 +89,12 @@ export function TextEditor({
   // The tagging panel reads this and preselects the concept for context
   // assignment. We also expose the currently selected context ID should we
   // choose to automatically create tags when a context is already selected.
-  const { setPendingConcept, setPendingHighlight, selectedContextId, agentMode } = useTaggingStore();
+  const {
+    setPendingConcept,
+    setPendingHighlight,
+    selectedContextId,
+    agentMode,
+  } = useTaggingStore();
 
   // const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
@@ -171,7 +176,13 @@ export function TextEditor({
     }
   }, [agentMode.enabled]);
 
+  const selectionRef = useRef(false);
+
   const handleBlockClick = (blockId: string) => {
+    if (selectionRef.current) {
+      selectionRef.current = false;
+      return;
+    }
     onBlockSelect(blockId);
   };
 
@@ -180,7 +191,7 @@ export function TextEditor({
    * with the selected text and positions a popover next to the selection.
    * When agent mode is enabled, it uses the NER agent for automatic tagging.
    */
-  const handleTextSelection = (blockId: string) => {
+  const handleTextSelection = (blockId: string, e: React.MouseEvent) => {
     if (window.getSelection) {
       const selection = window.getSelection();
       if (selection && selection.toString().length > 0) {
@@ -192,9 +203,31 @@ export function TextEditor({
           parentElement &&
           parentElement.closest(`[data-block-id="${blockId}"]`)
         ) {
-          const blockContent =
-            report.blocks.find((b) => b.id === blockId)?.content || '';
-          const startIndex = blockContent.indexOf(selectedText);
+          // Mark that a selection has occurred to prevent handleBlockClick from clearing it
+          selectionRef.current = true;
+
+          // Ensure the block is selected
+          onBlockSelect(blockId);
+
+          // Calculate start index relative to the block content
+          let startIndex = 0;
+          const blockElement = e.currentTarget;
+          const contentContainer = blockElement.querySelector(
+            '.whitespace-pre-wrap'
+          );
+
+          if (contentContainer) {
+            const preSelectionRange = range.cloneRange();
+            preSelectionRange.selectNodeContents(contentContainer);
+            preSelectionRange.setEnd(range.startContainer, range.startOffset);
+            startIndex = preSelectionRange.toString().length;
+          } else {
+            // Fallback to indexOf if container not found (shouldn't happen)
+            const blockContent =
+              report.blocks.find((b) => b.id === blockId)?.content || '';
+            startIndex = blockContent.indexOf(selectedText);
+          }
+
           const endIndex = startIndex + selectedText.length;
 
           if (startIndex >= 0) {
@@ -842,7 +875,6 @@ export function TextEditor({
     return <div className='whitespace-pre-wrap'>{segments}</div>;
   };
 
-
   return (
     <div className='flex flex-col h-full'>
       <style
@@ -884,9 +916,7 @@ export function TextEditor({
                 : 'border-border hover:border-primary/50'
             )}
             onClick={() => handleBlockClick(block.id)}
-            onMouseUp={() =>
-              selectedBlockId === block.id && handleTextSelection(block.id)
-            }
+            onMouseUp={(e) => handleTextSelection(block.id, e)}
           >
             <div className='relative group max-h-[calc(100dvh-12rem)] overflow-y-auto custom-scrollbar'>
               <div className='leading-relaxed prose dark:prose-invert max-w-none'>

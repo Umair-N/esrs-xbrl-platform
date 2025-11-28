@@ -278,7 +278,10 @@ export default function EditorPage() {
                   </div>
                 </div>
                 {/* AI Agent Toggle */}
-                <Popover open={isAgentMenuOpen} onOpenChange={setIsAgentMenuOpen}>
+                <Popover
+                  open={isAgentMenuOpen}
+                  onOpenChange={setIsAgentMenuOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant={agentMode.enabled ? 'default' : 'outline'}
@@ -305,7 +308,10 @@ export default function EditorPage() {
                     <div className='space-y-4'>
                       <div className='flex items-center gap-2'>
                         <Bot className='h-5 w-5 text-violet-600' />
-                        <h4 className='font-medium'>AI Agent Settings</h4>
+                        <h4 className='font-medium'>
+                          AI Agent Settings
+                          <Badge variant='destructive'>Beta</Badge>
+                        </h4>
                       </div>
                       <div className='space-y-3'>
                         <div className='flex items-center justify-between'>
@@ -322,8 +328,9 @@ export default function EditorPage() {
                           />
                         </div>
                         <p className='text-xs text-muted-foreground'>
-                          When enabled, AI will automatically detect and highlight
-                          entities in selected text, showing their labels.
+                          When enabled, AI will automatically detect and
+                          highlight entities in selected text, showing their
+                          labels.
                         </p>
                       </div>
                     </div>
