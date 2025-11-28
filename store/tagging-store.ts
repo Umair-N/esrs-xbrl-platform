@@ -68,6 +68,18 @@ type AgentModeSettings = {
     autoApply: boolean;
 };
 
+/**
+ * Pending highlight info for agent mode. When the user selects a tag from
+ * the AI Agent's entity hover card, this stores the text and position info
+ * so the tagging panel can use it when creating the tag.
+ */
+type PendingHighlight = {
+    text: string;
+    startIndex: number;
+    endIndex: number;
+    blockId: string;
+};
+
 type TaggingStore = {
     /**
      * A concept that has been selected from the recommendation popover but has
@@ -80,6 +92,15 @@ type TaggingStore = {
      * clears any existing pending concept.
      */
     setPendingConcept: (concept: RecommendationConcept | null) => void;
+    /**
+     * Pending highlight info from agent mode. When set, the tagging panel
+     * will use this for the tag's position instead of the prop value.
+     */
+    pendingHighlight: PendingHighlight | null;
+    /**
+     * Set the pending highlight info for agent mode tags.
+     */
+    setPendingHighlight: (highlight: PendingHighlight | null) => void;
     /**
      * The ID of the currently selected context. This is persisted in the
      * store so that tags created outside the tagging panel (for example via
@@ -110,6 +131,8 @@ export const useTaggingStore = create<TaggingStore>()(
         (set) => ({
             pendingConcept: null,
             setPendingConcept: (concept) => set({ pendingConcept: concept }),
+            pendingHighlight: null,
+            setPendingHighlight: (highlight) => set({ pendingHighlight: highlight }),
             selectedContextId: null,
             setSelectedContextId: (contextId) => set({ selectedContextId: contextId }),
             agentMode: {

@@ -489,9 +489,13 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
   // track of a pending concept (selected via the recommendation popover) and
   // the globally selected context ID. When the tagging panel is mounted or
   // the store values change, we synchronise our local state with the store.
+  // Also pull pendingHighlight for agent mode - when set, use it instead of
+  // the highlightedText prop for positioning the tag.
   const {
     pendingConcept,
     setPendingConcept,
+    pendingHighlight,
+    setPendingHighlight,
     selectedContextId: globalContextId,
     setSelectedContextId: setGlobalContextId,
   } = useTaggingStore();
@@ -629,8 +633,12 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     };
   }
   const handleAddTag = useCallback(() => {
-    // Ensure both selectedBlockId and selectedConcept are set before proceeding
-    if (!selectedBlockId || !selectedConcept) return;
+    // Determine which block to add the tag to: use pendingHighlight's blockId
+    // if available (from agent mode), otherwise use the selectedBlockId prop
+    const targetBlockId = pendingHighlight?.blockId || selectedBlockId;
+
+    // Ensure both a target block and selectedConcept are set before proceeding
+    if (!targetBlockId || !selectedConcept) return;
 
     // Get the selected context by contextId, or undefined if no context is selected
     const contextToUse = selectedContextId
@@ -641,6 +649,11 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     const convertedContext = contextToUse
       ? convertContextOutToXbrlContext(contextToUse) // Convert ContextOut to XbrlContext
       : undefined;
+
+    // Use pendingHighlight positions if available (from agent mode),
+    // otherwise fall back to highlightedText prop
+    const startIndex = pendingHighlight?.startIndex ?? highlightedText?.startIndex ?? 0;
+    const endIndex = pendingHighlight?.endIndex ?? highlightedText?.endIndex ?? 0;
 
     // Creating the new tag object. If the selected concept originated from a
     // recommendation, it may carry a feedbackId property that should be
@@ -669,15 +682,15 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
         ? { feedbackId: (selectedConcept as any).feedbackId }
         : {}),
       createdAt: new Date().toISOString(), // Record creation timestamp
-      startIndex: highlightedText?.startIndex || 0, // Use the start index from the highlighted text
-      endIndex: highlightedText?.endIndex || 0, // Use the end index from the highlighted text
+      startIndex: startIndex,
+      endIndex: endIndex,
     };
 
     // Update the report with the new tag added to the correct block
     const updatedReport: ReportDocument = {
       ...report,
       blocks: report.blocks.map((block) =>
-        block.id === selectedBlockId
+        block.id === targetBlockId
           ? { ...block, tags: [...block.tags, newTag] } // Add the new tag to the block's tags
           : block
       ),
@@ -687,15 +700,21 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     // Apply the updated report to the global state (or parent component)
     onReportChange(updatedReport);
 
-    // Reset the selected concept and search query after applying the tag
+    // Reset the selected concept, search query, and pending highlight after applying the tag
     setSelectedConcept(null);
     setSearchQuery('');
+    // Clear pending highlight from agent mode if it was used
+    if (pendingHighlight) {
+      setPendingHighlight(null);
+    }
   }, [
     selectedBlockId,
     selectedConcept,
     selectedContextId,
     highlightedText?.startIndex,
     highlightedText?.endIndex,
+    pendingHighlight,
+    setPendingHighlight,
     onReportChange,
     report,
     contexts, // Make sure to include contexts here for conversion
@@ -996,7 +1015,9 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
               <Button
                 className='w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-indigo-600'
                 disabled={
-                  isInitialLoading || !selectedBlockId || !selectedConcept
+                  isInitialLoading ||
+                  (!selectedBlockId && !pendingHighlight?.blockId) ||
+                  !selectedConcept
                 }
                 onClick={handleAddTag}
                 size='lg'

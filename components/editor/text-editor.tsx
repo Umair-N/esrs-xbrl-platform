@@ -95,7 +95,7 @@ export function TextEditor({
   // The tagging panel reads this and preselects the concept for context
   // assignment. We also expose the currently selected context ID should we
   // choose to automatically create tags when a context is already selected.
-  const { setPendingConcept, selectedContextId, agentMode } = useTaggingStore();
+  const { setPendingConcept, setPendingHighlight, selectedContextId, agentMode } = useTaggingStore();
 
   // const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showPopover, setShowPopover] = useState(false);
@@ -156,9 +156,6 @@ export function TextEditor({
     null
   );
 
-  // Track if auto-detection has run for current agent mode session
-  const [hasAutoDetected, setHasAutoDetected] = useState(false);
-
   // Helper to generate a unique key for an entity
   const getEntityKey = (entity: NEREntity) => `${entity.start}-${entity.end}`;
 
@@ -173,93 +170,12 @@ export function TextEditor({
     setExpandedEntityKey(null);
   };
 
-  /**
-   * Auto-detect entities in the entire block when agent mode is enabled
-   */
-  const autoDetectEntities = async () => {
-    // Get the first block's content (or selected block if available)
-    const targetBlock = selectedBlockId
-      ? report.blocks.find((b) => b.id === selectedBlockId)
-      : report.blocks[0];
-
-    if (!targetBlock || !targetBlock.content) {
-      return;
-    }
-
-    // Wait for taxonomy to be available (don't show error - useEffect will retry)
-    if (!selectedTaxonomy?.name) {
-      return;
-    }
-
-    // Clear previous state
-    setAgentEntities([]);
-    setEntityRecommendations(new Map());
-    setLoadingEntityKeys(new Set());
-    setExpandedEntityKey(null);
-
-    // Show loading notification
-    showSuccess({
-      title: 'Detecting entities...',
-      message: 'AI Agent is analyzing the document.',
-      duration: 2000,
-    });
-
-    predictEntities(
-      { data: { text: targetBlock.content } },
-      {
-        onSuccess: async (res) => {
-          const entities = res?.entities ?? [];
-          setAgentEntities(entities);
-          // Start from 0 since we're processing the entire block
-          setAgentHighlightBlock({
-            blockId: targetBlock.id,
-            selectionStart: 0,
-          });
-          setHasAutoDetected(true);
-
-          if (entities.length === 0) {
-            showError({
-              title: 'No entities detected',
-              message: 'AI Agent could not detect any entities in the document.',
-            });
-            return;
-          }
-
-          showSuccess({
-            title: `${entities.length} entit${entities.length > 1 ? 'ies' : 'y'} detected`,
-            message: 'Hover over highlighted text to see XBRL tag suggestions.',
-            duration: 3000,
-          });
-        },
-        onError: () => {
-          setAgentEntities([]);
-          setAgentHighlightBlock(null);
-          showError({
-            title: 'Detection failed',
-            message: 'AI Agent failed to detect entities. Please try again.',
-          });
-        },
-      }
-    );
-  };
-
-  // Auto-detect entities when agent mode is enabled and taxonomy is available
+  // Clear agent highlights when agent mode is disabled
   useEffect(() => {
-    if (
-      agentMode.enabled &&
-      !hasAutoDetected &&
-      report.blocks.length > 0 &&
-      selectedTaxonomy?.name
-    ) {
-      autoDetectEntities();
-    }
-    // Reset auto-detection flag when agent mode is disabled
     if (!agentMode.enabled) {
-      setHasAutoDetected(false);
       clearAgentHighlights();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentMode.enabled, selectedTaxonomy?.name]);
+  }, [agentMode.enabled]);
 
   const handleBlockClick = (blockId: string) => {
     if (editingBlockId !== blockId) onBlockSelect(blockId);
@@ -500,9 +416,11 @@ export function TextEditor({
   };
 
   /**
-   * Apply a tag from agent mode recommendations
+   * Select a tag from agent mode recommendations - sets it as pending in the
+   * tagging panel rather than directly applying it. The user must click
+   * "Add Tag" in the tagging panel to actually apply the tag.
    */
-  const applyAgentTag = (
+  const selectAgentTag = (
     entity: NEREntity,
     recommendation: { tag: string; reference: string; datatype: string }
   ) => {
@@ -513,42 +431,26 @@ export function TextEditor({
     const entityEnd = selectionStart + entity.end;
     const entityKey = getEntityKey(entity);
 
-    // Get context if selected
-    const context = selectedContextId
-      ? sampleContexts.find((c) => c.id === selectedContextId)
-      : undefined;
+    // Set the pending concept in the tagging store - the tagging panel will
+    // pick this up and preselect it for context assignment
+    setPendingConcept({
+      id: recommendation.tag,
+      label: recommendation.reference,
+      definition: `Detected as ${entity.label}: "${entity.text}"`,
+      type: recommendation.datatype,
+      periodType: 'duration',
+    });
 
-    const newTag: XbrlTag = {
-      id: `${Date.now()}-${entity.start}`,
-      concept: {
-        id: recommendation.tag,
-        label: recommendation.reference,
-        definition: `Detected as ${entity.label}: "${entity.text}"`,
-        type: recommendation.datatype,
-        dataType: recommendation.datatype,
-        periodType: 'duration' as const,
-        abstract: false,
-      },
+    // Set the pending highlight info so the tagging panel knows where to
+    // place the tag and which block to add it to
+    setPendingHighlight({
+      text: entity.text,
       startIndex: entityStart,
       endIndex: entityEnd,
-      createdAt: new Date().toISOString(),
-      ...(context ? { context } : {}),
-    };
+      blockId: blockId,
+    });
 
-    // Update report with new tag
-    const updatedReport: ReportDocument = {
-      ...report,
-      blocks: report.blocks.map((blk) =>
-        blk.id === blockId
-          ? { ...blk, tags: [...(blk.tags || []), newTag] }
-          : blk
-      ),
-      updatedAt: new Date().toISOString(),
-    };
-
-    onReportChange(updatedReport);
-
-    // Remove the entity from agent highlights since it's now tagged
+    // Remove the entity from agent highlights since it's now selected
     const remainingEntities = agentEntities.filter(
       (e) => getEntityKey(e) !== entityKey
     );
@@ -559,9 +461,9 @@ export function TextEditor({
     }
 
     showSuccess({
-      title: 'Tag applied',
-      message: `Tagged "${entity.text}" with ${recommendation.tag}`,
-      duration: 2000,
+      title: 'Tag selected',
+      message: `"${entity.text}" ready for tagging. Click "Add Tag" in the panel to apply.`,
+      duration: 3000,
     });
   };
 
@@ -779,7 +681,7 @@ export function TextEditor({
                       className='w-full justify-start h-auto p-2 text-left hover:bg-muted/80'
                       onClick={(e) => {
                         e.stopPropagation();
-                        applyAgentTag(entity, rec);
+                        selectAgentTag(entity, rec);
                       }}
                     >
                       <div className='flex-1 min-w-0'>
