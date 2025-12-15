@@ -34,7 +34,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 import type { ReportDocument, XbrlContext, XbrlTag } from '@/types/report';
 import type { TaxonomyData, TaxonomyNode } from '@/types/taxonomy';
@@ -50,6 +51,7 @@ import { useTaxonomyStore } from '@/store/taxonomoy-store';
 import { useTaggingStore } from '@/store/tagging-store';
 import { ContextOut, useContexts } from '@/features/contexts/api/list-contexts';
 import { CreateContextModal } from './create-context-modal';
+import { Skeleton } from '../ui/skeleton';
 
 /* -------------------------------- Types -------------------------------- */
 
@@ -498,6 +500,8 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     setPendingHighlight,
     selectedContextId: globalContextId,
     setSelectedContextId: setGlobalContextId,
+    recommenderEnabled,
+    setRecommenderEnabled,
   } = useTaggingStore();
   const { data: contexts } = useContexts({});
 
@@ -521,6 +525,10 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
     entity: activeTab,
     search_query: debouncedSearchQuery,
   });
+
+  const handleRecommenderToggle = (checked: boolean) => {
+    setRecommenderEnabled(checked);
+  };
 
   // Normalize incoming taxonomy structure
   const taxonomyData: TaxonomyData | null = useMemo(() => {
@@ -652,8 +660,10 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
     // Use pendingHighlight positions if available (from agent mode),
     // otherwise fall back to highlightedText prop
-    const startIndex = pendingHighlight?.startIndex ?? highlightedText?.startIndex ?? 0;
-    const endIndex = pendingHighlight?.endIndex ?? highlightedText?.endIndex ?? 0;
+    const startIndex =
+      pendingHighlight?.startIndex ?? highlightedText?.startIndex ?? 0;
+    const endIndex =
+      pendingHighlight?.endIndex ?? highlightedText?.endIndex ?? 0;
 
     // Creating the new tag object. If the selected concept originated from a
     // recommendation, it may carry a feedbackId property that should be
@@ -859,75 +869,266 @@ const TaggingPanel: React.FC<TaggingPanelProps> = ({
 
           {/* Tabs */}
           <Card className='border-0 shadow-sm'>
-            <CardHeader className='flex flex-row items-center justify-between pb-2'>
-              <div className='flex items-center gap-2'>
-                <ActiveIcon className='w-4 h-4 text-muted-foreground' />
-                <CardTitle className='text-base'>Taxonomy</CardTitle>
-                {isUpdating && (
-                  <span className='inline-flex items-center gap-1 ml-1 text-xs text-muted-foreground'>
-                    <Loader2 className='w-3 h-3 animate-spin' /> updating…
-                  </span>
+            {/* <CardHeader className='flex flex-row items-center justify-between pb-2'> */}
+            <CardHeader className='p-4 border-b space-y-4'>
+              <div className='flex items-center justify-between'>
+                <CardTitle className='text-lg font-semibold'>
+                  Tagging Panel
+                </CardTitle>
+                {myTaxonomies && myTaxonomies.length > 0 ? (
+                  <Select onValueChange={handleValueChange} value={value}>
+                    <SelectTrigger className='w-[180px]'>
+                      <SelectValue placeholder='Select Taxonomy' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {myTaxonomies.map((taxonomy) => (
+                        <SelectItem
+                          key={taxonomy.id}
+                          value={taxonomy.id.toString()}
+                        >
+                          {taxonomy.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className='text-sm text-muted-foreground'>
+                    No taxonomies found.
+                  </div>
                 )}
               </div>
-              {myTaxonomies && myTaxonomies.length > 0 && (
-                <Select value={value} onValueChange={handleValueChange}>
-                  <SelectTrigger className='w-[180px]'>
-                    <SelectValue placeholder='Taxonomy' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {myTaxonomies.map((item) => (
-                      <SelectItem value={item.id.toString()} key={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <div className='flex items-center space-x-2'>
+                <Switch
+                  id='recommender-mode'
+                  checked={recommenderEnabled}
+                  onCheckedChange={handleRecommenderToggle}
+                />
+                <Label
+                  htmlFor='recommender-mode'
+                  className='text-sm font-medium'
+                >
+                  Auto-suggest tags
+                  <p className='text-xs font-normal text-muted-foreground'>
+                    Show suggestions when selecting text
+                  </p>
+                </Label>
+              </div>
             </CardHeader>
-            <CardContent className='p-0'>
+
+            <CardContent className='flex-1 p-0 overflow-hidden min-h-0 flex flex-col'>
               <Tabs
+                defaultValue='presentations'
                 value={activeTab}
                 onValueChange={(v) => setActiveTab(v as TabKey)}
-                className='w-full'
+                className='flex flex-col h-full'
               >
-                <TabsList className='grid w-full grid-cols-4'>
-                  {(Object.keys(TAB_META) as TabKey[]).map((tab) => {
-                    const Icon = TAB_META[tab].icon;
-                    return (
-                      <TabsTrigger
-                        key={tab}
-                        value={tab}
-                        className='flex items-center gap-1'
-                      >
-                        <Icon className='w-3 h-3' />
-                        <span className='hidden sm:inline'>
-                          {TAB_META[tab].label}
-                        </span>
-                        <span className='sm:hidden'>
-                          {TAB_META[tab].label.slice(0, 4)}
-                        </span>
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
+                <div className='px-4 pt-4 pb-0'>
+                  <TabsList className='w-full grid grid-cols-4 h-9 p-1 bg-muted/50 rounded-lg mb-2'>
+                    {(Object.keys(TAB_META) as TabKey[]).map((tabKey) => {
+                      const Icon = TAB_META[tabKey].icon;
+                      return (
+                        <TabsTrigger
+                          key={tabKey}
+                          value={tabKey}
+                          className='flex items-center justify-center gap-1.5 py-1 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all'
+                          title={TAB_META[tabKey].label}
+                        >
+                          <Icon className='w-3.5 h-3.5' />
+                          <span className='hidden sm:inline truncate max-w-[60px]'>
+                            {TAB_META[tabKey].label}
+                          </span>
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </div>
 
-                {(Object.keys(TAB_META) as TabKey[]).map((tab) => (
-                  <TabsContent key={tab} value={tab}>
-                    <TaxonomyBrowser
-                      activeTab={tab}
-                      taxonomyData={activeTab === tab ? taxonomyData : null}
-                      isInitialLoading={
-                        activeTab === tab ? isInitialLoading : false
-                      }
-                      isUpdating={activeTab === tab ? isUpdating : false}
-                      searchQuery={activeTab === tab ? searchQuery : ''}
-                      setSearchQuery={setSearchQuery}
-                      selectedConcept={selectedConcept}
-                      setSelectedConcept={setSelectedConcept}
-                    />
+                <ScrollArea className='flex-1'>
+                  <TabsContent
+                    value='presentations'
+                    className='m-0 h-full flex flex-col focus-visible:outline-none focus:outline-none ring-0'
+                  >
+                    <div className='p-4 space-y-4 pb-20'>
+                      <TaxonomyBrowser
+                        activeTab='presentations'
+                        taxonomyData={taxonomyData}
+                        isInitialLoading={isInitialLoading}
+                        isUpdating={isUpdating}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedConcept={selectedConcept}
+                        setSelectedConcept={setSelectedConcept}
+                      />
+                    </div>
                   </TabsContent>
-                ))}
+
+                  <TabsContent
+                    value='dimensions'
+                    className='m-0 h-full flex flex-col focus-visible:outline-none focus:outline-none ring-0'
+                  >
+                    <div className='p-4 space-y-4 pb-20'>
+                      <TaxonomyBrowser
+                        activeTab='dimensions'
+                        taxonomyData={taxonomyData}
+                        isInitialLoading={isInitialLoading}
+                        isUpdating={isUpdating}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedConcept={selectedConcept}
+                        setSelectedConcept={setSelectedConcept}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value='formulae'
+                    className='m-0 h-full flex flex-col focus-visible:outline-none focus:outline-none ring-0'
+                  >
+                    <div className='p-4 space-y-4 pb-20'>
+                      <TaxonomyBrowser
+                        activeTab='formulae'
+                        taxonomyData={taxonomyData}
+                        isInitialLoading={isInitialLoading}
+                        isUpdating={isUpdating}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedConcept={selectedConcept}
+                        setSelectedConcept={setSelectedConcept}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value='calculations'
+                    className='m-0 h-full flex flex-col focus-visible:outline-none focus:outline-none ring-0'
+                  >
+                    <div className='p-4 space-y-4 pb-20'>
+                      <TaxonomyBrowser
+                        activeTab='calculations'
+                        taxonomyData={taxonomyData}
+                        isInitialLoading={isInitialLoading}
+                        isUpdating={isUpdating}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedConcept={selectedConcept}
+                        setSelectedConcept={setSelectedConcept}
+                      />
+                    </div>
+                  </TabsContent>
+                </ScrollArea>
               </Tabs>
+
+              {/* Floating Add Tag Panel - Always visible at bottom when concept is selected */}
+              <div className='border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 shadow-lg shrink-0 z-10'>
+                {selectedConcept ? (
+                  <div className='space-y-4 animate-in slide-in-from-bottom-5 duration-200'>
+                    <div className='flex items-start justify-between gap-4'>
+                      <div className='space-y-1 overflow-hidden'>
+                        <div className='flex items-center gap-2'>
+                          <Badge
+                            variant='outline'
+                            className='bg-primary/10 text-primary border-primary/20 shrink-0'
+                          >
+                            Selected Concept
+                          </Badge>
+                          <code className='text-xs font-mono text-muted-foreground truncate'>
+                            {selectedConcept.id}
+                          </code>
+                        </div>
+                        <h4
+                          className='font-semibold text-sm truncate'
+                          title={selectedConcept.label}
+                        >
+                          {selectedConcept.label}
+                        </h4>
+                        {selectedConcept.originalLabel &&
+                          selectedConcept.originalLabel !==
+                            selectedConcept.label && (
+                            <p className='text-xs text-muted-foreground truncate italic'>
+                              {selectedConcept.originalLabel}
+                            </p>
+                          )}
+                      </div>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => setSelectedConcept(null)}
+                        className='h-8 w-8 p-0 shrink-0 hover:bg-destructive/10 hover:text-destructive'
+                      >
+                        <AlertCircle className='h-4 w-4' />
+                      </Button>
+                    </div>
+
+                    {/* Context Selector */}
+                    <div className='space-y-2'>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-xs font-medium text-muted-foreground uppercase tracking-wider'>
+                          Context
+                        </span>
+                        <CreateContextModal />
+                      </div>
+
+                      <Select
+                        value={selectedContextId || ''}
+                        onValueChange={(val) =>
+                          setSelectedContextId(val === 'none' ? null : val)
+                        }
+                      >
+                        <SelectTrigger
+                          className={`w-full ${!selectedContextId ? 'text-muted-foreground italic' : ''}`}
+                        >
+                          <SelectValue placeholder='Select a context...' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            value='none'
+                            className='text-muted-foreground italic'
+                          >
+                            No context selected
+                          </SelectItem>
+                          {contexts?.map((ctx) => (
+                            <SelectItem
+                              key={ctx.context_id}
+                              value={ctx.context_id}
+                            >
+                              <div className='flex flex-col text-left'>
+                                <span className='font-medium text-sm truncate max-w-[280px]'>
+                                  {ctx.entity_name || ctx.entity_identifier}
+                                </span>
+                                <span className='text-xs text-muted-foreground'>
+                                  {ctx.period_type} •{' '}
+                                  {ctx.period_type === 'instant'
+                                    ? new Date(
+                                        ctx.instant_date || ''
+                                      ).toLocaleDateString()
+                                    : `${new Date(ctx.start_date || '').toLocaleDateString()} - ${new Date(ctx.end_date || '').toLocaleDateString()}`}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Add Tag Button */}
+                    <Button
+                      className='w-full shadow-md hover:shadow-lg transition-all'
+                      onClick={handleAddTag}
+                      disabled={!selectedContextId}
+                    >
+                      <Plus className='w-4 h-4 mr-2' />
+                      Add Tag
+                    </Button>
+                  </div>
+                ) : (
+                  <div className='flex flex-col items-center justify-center py-2 text-center text-muted-foreground space-y-2 opacity-60'>
+                    <Target className='w-8 h-8 opacity-20' />
+                    <p className='text-sm'>
+                      Select a concept from the taxonomy above to start tagging
+                    </p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 

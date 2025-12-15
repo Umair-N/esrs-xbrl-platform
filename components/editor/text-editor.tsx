@@ -94,6 +94,7 @@ export function TextEditor({
     setPendingHighlight,
     selectedContextId,
     agentMode,
+    recommenderEnabled,
   } = useTaggingStore();
 
   // const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -319,8 +320,9 @@ export function TextEditor({
               message: '',
             });
           }
-          // Query recommendations
-          if (selectedTaxonomy?.name) {
+
+          // Query recommendations only if enabled
+          if (recommenderEnabled && selectedTaxonomy?.name) {
             mutate(
               {
                 data: {
