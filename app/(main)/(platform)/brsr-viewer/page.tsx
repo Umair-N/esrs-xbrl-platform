@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TagSelector } from '@/components/ui/tag-selector';
@@ -43,7 +45,11 @@ export default function InteractiveViewerPage() {
   const [editTagName, setEditTagName] = useState<string>('');
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<TagUpdate[]>([]);
+  const [removedTags, setRemovedTags] = useState<Set<string>>(new Set());
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isAddingNewTag, setIsAddingNewTag] = useState(false);
+  const [newTagName, setNewTagName] = useState<string>('');
+  const [newTags, setNewTags] = useState<Map<string, TagInfo[]>>(new Map());
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -53,7 +59,13 @@ export default function InteractiveViewerPage() {
 
   // Get tags for selected cell
   const selectedTags = selectedCellId && result?.tag_mapping
-    ? result.tag_mapping[selectedCellId] || []
+    ? [
+        ...(result.tag_mapping[selectedCellId] || []).filter((tag) => {
+          const tagKey = `${selectedCellId}:${tag.t}`;
+          return !removedTags.has(tagKey);
+        }),
+        ...(newTags.get(selectedCellId) || [])
+      ]
     : [];
 
   // Max file size (10MB)
@@ -95,6 +107,7 @@ export default function InteractiveViewerPage() {
         const data = await convertMutation.mutateAsync({ file });
         setResult(data);
         setPendingUpdates([]);
+        setRemovedTags(new Set());
       } catch (error) {
         console.error('Conversion failed:', error);
       }
@@ -106,11 +119,67 @@ export default function InteractiveViewerPage() {
 
   // Handle cell click from iframe
   const handleCellClick = useCallback((cellId: string, cellText: string) => {
+    // Check if cell has any tags (original or newly added)
+    const hasOriginalTags = result?.tag_mapping[cellId]?.some((tag) => {
+      const tagKey = `${cellId}:${tag.t}`;
+      return !removedTags.has(tagKey);
+    });
+    
+    const hasNewTags = newTags.has(cellId) && (newTags.get(cellId)?.length || 0) > 0;
+    
+    const hasTags = hasOriginalTags || hasNewTags;
+
     setSelectedCellId(cellId);
     setSelectedCellText(cellText);
     setEditingTagIndex(null);
     setIsPanelCollapsed(false);
-  }, []);
+    setIsAddingNewTag(false);
+    setNewTagName('');
+  }, [result, removedTags, newTags]);
+
+  // Update cell styling based on removed tags
+  const updateCellStyling = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc || !result) return;
+
+    const cells = doc.querySelectorAll('.xml-linked');
+    cells.forEach((cell) => {
+      const cellId = (cell as HTMLElement).getAttribute('data-id');
+      if (!cellId) return;
+
+      // Check if cell has any remaining tags (original or new)
+      const cellTags = result.tag_mapping[cellId] || [];
+      const hasRemainingOriginalTags = cellTags.some((tag) => {
+        const tagKey = `${cellId}:${tag.t}`;
+        return !removedTags.has(tagKey);
+      });
+
+      const hasNewTagsForCell = newTags.has(cellId) && (newTags.get(cellId)?.length || 0) > 0;
+      const hasRemainingTags = hasRemainingOriginalTags || hasNewTagsForCell;
+
+      // Update styling - remove ALL styling if no tags remain
+      if (hasRemainingTags) {
+        cell.classList.add('has-tag');
+        cell.classList.add('xml-linked');
+        (cell as HTMLElement).style.cursor = 'pointer';
+      } else {
+        cell.classList.remove('has-tag');
+        cell.classList.remove('xml-linked');
+        cell.classList.remove('selected');
+        // Remove all custom styling
+        (cell as HTMLElement).style.borderLeft = '';
+        (cell as HTMLElement).style.backgroundColor = '';
+        (cell as HTMLElement).style.cursor = 'text';
+        (cell as HTMLElement).style.outline = '';
+        (cell as HTMLElement).style.outlineOffset = '';
+      }
+    });
+  }, [result, removedTags, newTags]);
+
+  // Update cell styling when removed tags change
+  useEffect(() => {
+    updateCellStyling();
+  }, [updateCellStyling]);
 
   // Setup iframe content and click handlers
   useEffect(() => {
@@ -145,6 +214,8 @@ export default function InteractiveViewerPage() {
             padding: 10px 12px;
             text-align: left;
             vertical-align: top;
+            cursor: pointer;
+            user-select: text;
           }
           th {
             background: #f9fafb;
@@ -199,6 +270,20 @@ export default function InteractiveViewerPage() {
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
           }
 
+          /* Selectable cells (any td) */
+          td.cell-selectable {
+            cursor: text;
+            transition: background-color 0.15s ease;
+          }
+          td.cell-selectable:hover {
+            background-color: rgba(191, 219, 254, 0.2) !important;
+          }
+          td.cell-selectable.selected {
+            outline: 2px solid #3b82f6;
+            outline-offset: -1px;
+            background-color: rgba(191, 219, 254, 0.3) !important;
+          }
+
           h1, h2, h3, h4, h5, h6 {
             color: #111827;
             margin-top: 24px;
@@ -246,20 +331,35 @@ export default function InteractiveViewerPage() {
       doc.write(htmlContent);
       doc.close();
 
-      // Add click handlers
-      const cells = doc.querySelectorAll('.xml-linked');
-      console.log(`[Viewer] Found ${cells.length} tagged cells`);
+      // Add click handlers to all table cells
+      const allCells = doc.querySelectorAll('td');
+      console.log(`[Viewer] Found ${allCells.length} total cells`);
 
-      cells.forEach((cell) => {
+      allCells.forEach((cell, cellIndex) => {
+        // Add selectable class to all cells
+        cell.classList.add('cell-selectable');
+        
+        // Generate a cell ID if it doesn't have one
+        let cellId = (cell as HTMLElement).getAttribute('data-id');
+        if (!cellId) {
+          cellId = `cell-${cellIndex}`;
+          (cell as HTMLElement).setAttribute('data-id', cellId);
+        }
+
+        // Check if this cell has new tags and should be highlighted
+        if (newTags.has(cellId) && (newTags.get(cellId)?.length || 0) > 0) {
+          cell.classList.add('xml-linked', 'has-tag');
+          (cell as HTMLElement).style.cursor = 'pointer';
+        }
+
         cell.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
 
-          const cellId = (cell as HTMLElement).getAttribute('data-id');
           const cellText = (cell as HTMLElement).textContent?.trim() || '';
 
           // Update selection visuals
-          cells.forEach((c) => c.classList.remove('selected'));
+          allCells.forEach((c) => c.classList.remove('selected'));
           cell.classList.add('selected');
 
           if (cellId) {
@@ -267,12 +367,15 @@ export default function InteractiveViewerPage() {
           }
         });
       });
+
+      // Apply initial styling for xml-linked cells
+      updateCellStyling();
     };
 
     iframe.onload = setupIframe;
     const timer = setTimeout(setupIframe, 100);
     return () => clearTimeout(timer);
-  }, [result?.annotated_html, handleCellClick]);
+  }, [result?.annotated_html, handleCellClick, updateCellStyling, newTags]);
 
   // Close panel
   const closePanel = useCallback(() => {
@@ -281,7 +384,7 @@ export default function InteractiveViewerPage() {
 
     const doc = iframeRef.current?.contentDocument;
     if (doc) {
-      doc.querySelectorAll('.xml-linked.selected').forEach((cell) => {
+      doc.querySelectorAll('.selected').forEach((cell) => {
         cell.classList.remove('selected');
       });
     }
@@ -308,33 +411,154 @@ export default function InteractiveViewerPage() {
     setEditTagName(currentTag);
   }, []);
 
+  // Add new tag
+  const addNewTag = useCallback(() => {
+    if (!selectedCellId || !newTagName || !selectedCellText) return;
+
+    const newTag: TagInfo = {
+      t: newTagName,
+      v: selectedCellText,
+      c: 'instant',
+      p: undefined,
+      u: undefined,
+      d: [],
+      s: 'User Added'
+    };
+
+    setNewTags((prev) => {
+      const updated = new Map(prev);
+      const existing = updated.get(selectedCellId) || [];
+      updated.set(selectedCellId, [...existing, newTag]);
+      return updated;
+    });
+
+    // Update cell styling in iframe to show it's now tagged
+    const doc = iframeRef.current?.contentDocument;
+    if (doc) {
+      const cell = doc.querySelector(`[data-id="${selectedCellId}"]`);
+      if (cell) {
+        cell.classList.add('xml-linked', 'has-tag');
+        (cell as HTMLElement).style.cursor = 'pointer';
+      }
+    }
+
+    setIsAddingNewTag(false);
+    setNewTagName('');
+  }, [selectedCellId, newTagName, selectedCellText]);
+
+  // Remove tag
+  const removeTag = useCallback((tag: TagInfo, isNewTag: boolean = false) => {
+    if (!selectedCellId) return;
+
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to remove this tag?\n\nTag: ${tag.t}\nValue: ${tag.v}\n\nThis action will remove the tag from the XML output.`
+    );
+
+    if (!confirmed) return;
+
+    if (isNewTag) {
+      // Remove from new tags
+      setNewTags((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(selectedCellId) || [];
+        const filtered = existing.filter(t => t.t !== tag.t || t.v !== tag.v);
+        if (filtered.length === 0) {
+          updated.delete(selectedCellId);
+        } else {
+          updated.set(selectedCellId, filtered);
+        }
+        return updated;
+      });
+    } else {
+      // Remove from original tags
+      const tagKey = `${selectedCellId}:${tag.t}`;
+      setRemovedTags((prev) => new Set(prev).add(tagKey));
+
+      // Also remove any pending updates for this tag
+      setPendingUpdates((prev) =>
+        prev.filter((u) => !(u.cell_id === selectedCellId && u.tag === tag.t))
+      );
+    }
+
+    // Check if this was the last tag for the selected cell
+    const originalTags = result?.tag_mapping[selectedCellId] || [];
+    const remainingOriginalTags = originalTags.filter((t) => {
+      const tKey = `${selectedCellId}:${t.t}`;
+      return !removedTags.has(tKey) && !(t.t === tag.t && !isNewTag);
+    });
+    
+    const remainingNewTags = isNewTag 
+      ? (newTags.get(selectedCellId) || []).filter(t => t.t !== tag.t || t.v !== tag.v)
+      : (newTags.get(selectedCellId) || []);
+
+    // If no tags remain, remove highlighting and close the panel
+    if (remainingOriginalTags.length === 0 && remainingNewTags.length === 0) {
+      // Remove cell highlighting
+      const doc = iframeRef.current?.contentDocument;
+      if (doc) {
+        const cell = doc.querySelector(`[data-id="${selectedCellId}"]`);
+        if (cell) {
+          cell.classList.remove('xml-linked', 'has-tag', 'selected');
+          (cell as HTMLElement).style.borderLeft = '';
+          (cell as HTMLElement).style.backgroundColor = '';
+          (cell as HTMLElement).style.cursor = 'text';
+          (cell as HTMLElement).style.outline = '';
+          (cell as HTMLElement).style.outlineOffset = '';
+        }
+      }
+      closePanel();
+    }
+  }, [selectedCellId, result, removedTags, newTags, closePanel]);
+
   // Save edit
-  const saveEdit = useCallback((tag: TagInfo) => {
+  const saveEdit = useCallback((tag: TagInfo, isNewTag: boolean = false) => {
     if (!selectedCellId) return;
 
     const hasValueChange = editingField === 'value' && editValue !== tag.v;
     const hasTagChange = editingField === 'tag' && editTagName !== tag.t;
 
     if (hasValueChange || hasTagChange) {
-      const update: TagUpdate = {
-        cell_id: selectedCellId,
-        tag: tag.t,
-        old_value: tag.v,
-        new_value: editingField === 'value' ? editValue : tag.v,
-        new_tag: editingField === 'tag' ? editTagName : undefined,
-      };
+      if (isNewTag) {
+        // Update new tag directly
+        setNewTags((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(selectedCellId) || [];
+          const updatedTags = existing.map(t => {
+            if (t.t === tag.t && t.v === tag.v) {
+              return {
+                ...t,
+                t: editingField === 'tag' ? editTagName : t.t,
+                v: editingField === 'value' ? editValue : t.v,
+              };
+            }
+            return t;
+          });
+          updated.set(selectedCellId, updatedTags);
+          return updated;
+        });
+      } else {
+        // Add to pending updates for original tags
+        const update: TagUpdate = {
+          cell_id: selectedCellId,
+          tag: tag.t,
+          old_value: tag.v,
+          new_value: editingField === 'value' ? editValue : tag.v,
+          new_tag: editingField === 'tag' ? editTagName : undefined,
+        };
 
-      setPendingUpdates((prev) => {
-        const existingIndex = prev.findIndex(
-          (u) => u.cell_id === selectedCellId && u.tag === tag.t
-        );
-        if (existingIndex >= 0) {
-          const newUpdates = [...prev];
-          newUpdates[existingIndex] = { ...newUpdates[existingIndex], ...update };
-          return newUpdates;
-        }
-        return [...prev, update];
-      });
+        setPendingUpdates((prev) => {
+          const existingIndex = prev.findIndex(
+            (u) => u.cell_id === selectedCellId && u.tag === tag.t
+          );
+          if (existingIndex >= 0) {
+            const newUpdates = [...prev];
+            newUpdates[existingIndex] = { ...newUpdates[existingIndex], ...update };
+            return newUpdates;
+          }
+          return [...prev, update];
+        });
+      }
     }
     setEditingTagIndex(null);
     setEditingField('value');
@@ -354,17 +578,122 @@ export default function InteractiveViewerPage() {
 
     let xbrlContent = result.xbrl_content;
 
-    // Apply pending updates if any
-    if (pendingUpdates.length > 0) {
-      try {
-        const updateResult = await updateTagsMutation.mutateAsync({
-          originalXbrl: xbrlContent,
-          updates: pendingUpdates,
-        });
-        xbrlContent = updateResult.updated_xbrl;
-      } catch (error) {
-        console.error('Failed to apply updates:', error);
+    try {
+      // Parse XML
+      const parser = new DOMParser();
+      let xmlDoc = parser.parseFromString(xbrlContent, 'text/xml');
+
+      // Check for parse errors
+      const parseError = xmlDoc.querySelector('parsererror');
+      if (parseError) {
+        throw new Error('Failed to parse XML');
       }
+
+      // Step 1: Apply value updates manually
+      if (pendingUpdates.length > 0) {
+        pendingUpdates.forEach((update) => {
+          // Find elements with matching tag name
+          const elements = xmlDoc.getElementsByTagName(update.tag);
+          
+          for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            const currentValue = element.textContent?.trim();
+            
+            // Match by old value to ensure we're updating the right element
+            if (currentValue === update.old_value) {
+              element.textContent = update.new_value;
+              console.log(`Updated ${update.tag}: "${update.old_value}" → "${update.new_value}"`);
+            }
+          }
+
+          // If tag name changed, rename the element
+          if (update.new_tag && update.new_tag !== update.tag) {
+            const elements = xmlDoc.getElementsByTagName(update.tag);
+            for (let i = elements.length - 1; i >= 0; i--) {
+              const element = elements[i];
+              const currentValue = element.textContent?.trim();
+              
+              if (currentValue === update.new_value || currentValue === update.old_value) {
+                // Create new element with new tag name
+                const newElement = xmlDoc.createElement(update.new_tag);
+                newElement.textContent = update.new_value;
+                
+                // Copy attributes
+                for (let j = 0; j < element.attributes.length; j++) {
+                  const attr = element.attributes[j];
+                  newElement.setAttribute(attr.name, attr.value);
+                }
+                
+                // Replace old element
+                element.parentNode?.replaceChild(newElement, element);
+                console.log(`Renamed tag: ${update.tag} → ${update.new_tag}`);
+              }
+            }
+          }
+        });
+      }
+
+      // Step 2: Add new tags to XML
+      if (newTags.size > 0) {
+        const rootElement = xmlDoc.documentElement;
+        
+        newTags.forEach((tags, cellId) => {
+          tags.forEach((tag) => {
+            const newElement = xmlDoc.createElement(tag.t);
+            newElement.textContent = tag.v;
+            
+            // Add contextRef attribute if available
+            if (tag.c) {
+              newElement.setAttribute('contextRef', tag.c);
+            }
+            
+            // Add unitRef if available
+            if (tag.u) {
+              newElement.setAttribute('unitRef', tag.u);
+            }
+            
+            // Add decimals attribute for numeric values
+            if (!isNaN(parseFloat(tag.v))) {
+              newElement.setAttribute('decimals', '0');
+            }
+            
+            rootElement.appendChild(newElement);
+            console.log(`Added new tag: ${tag.t} = ${tag.v}`);
+          });
+        });
+      }
+
+      // Step 3: Remove tags from XML
+      if (removedTags.size > 0) {
+        let removalCount = 0;
+
+        removedTags.forEach((tagKey) => {
+          // Extract tag name from key (format: "cellId:tagName")
+          const tagName = tagKey.split(':').slice(1).join(':');
+          
+          // Find and remove all elements with this tag name
+          const elements = xmlDoc.getElementsByTagName(tagName);
+          
+          // Convert to array and remove (iterate backwards to avoid index issues)
+          const elementsArray = Array.from(elements);
+          elementsArray.forEach((element) => {
+            element.parentNode?.removeChild(element);
+            removalCount++;
+          });
+        });
+
+        console.log(`Removed ${removalCount} tag elements from XML`);
+      }
+
+      // Serialize back to string
+      const serializer = new XMLSerializer();
+      xbrlContent = serializer.serializeToString(xmlDoc);
+
+      console.log(`Applied ${pendingUpdates.length} updates, added ${newTags.size} new tag groups, removed ${removedTags.size} tags`);
+    } catch (error) {
+      console.error('Failed to apply updates:', error);
+      alert(`Failed to apply updates to XML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return;
     }
 
     // Download
@@ -377,13 +706,16 @@ export default function InteractiveViewerPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [result, pendingUpdates, updateTagsMutation, file]);
+  }, [result, pendingUpdates, removedTags, newTags, file]);
 
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (editingTagIndex !== null) {
+        if (isAddingNewTag) {
+          setIsAddingNewTag(false);
+          setNewTagName('');
+        } else if (editingTagIndex !== null) {
           cancelEdit();
         } else if (selectedCellId) {
           closePanel();
@@ -393,7 +725,7 @@ export default function InteractiveViewerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closePanel, cancelEdit, editingTagIndex, selectedCellId]);
+  }, [closePanel, cancelEdit, editingTagIndex, selectedCellId, isAddingNewTag]);
 
   // Reset everything
   const handleReset = useCallback(() => {
@@ -401,6 +733,10 @@ export default function InteractiveViewerPage() {
     setResult(null);
     setSelectedCellId(null);
     setPendingUpdates([]);
+    setRemovedTags(new Set());
+    setNewTags(new Map());
+    setIsAddingNewTag(false);
+    setNewTagName('');
     convertMutation.reset();
   }, [convertMutation]);
 
@@ -519,7 +855,9 @@ export default function InteractiveViewerPage() {
           {/* Stats */}
           <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
             <span>
-              <span className="font-medium text-green-600">{Number(result.statistics.cells_with_xbrl_tags) || 0}</span>
+              <span className="font-medium text-green-600">
+                {Number(result.statistics.cells_with_xbrl_tags) - removedTags.size + Array.from(newTags.values()).reduce((sum, tags) => sum + tags.length, 0) || 0}
+              </span>
               {' '}matched tags
             </span>
             <span>
@@ -532,6 +870,13 @@ export default function InteractiveViewerPage() {
           {pendingUpdates.length > 0 && (
             <div className="flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
               {pendingUpdates.length} pending change{pendingUpdates.length > 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Removed tags badge */}
+          {removedTags.size > 0 && (
+            <div className="flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              {removedTags.size} removed
             </div>
           )}
 
@@ -643,29 +988,80 @@ export default function InteractiveViewerPage() {
                       </p>
                     </div>
 
+                    {/* Add Tag Button - Only show if cell has no tags */}
+                    {selectedTags.length === 0 && !isAddingNewTag && (
+                      <button
+                        onClick={() => setIsAddingNewTag(true)}
+                        className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-600 transition-colors hover:border-blue-400 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add New Tag
+                      </button>
+                    )}
+
+                    {/* Add Tag Interface - Only show if cell has no tags */}
+                    {selectedTags.length === 0 && isAddingNewTag && (
+                      <div className="mb-4 rounded-lg border border-blue-300 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950/30">
+                        <p className="mb-2 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          Add New Tag
+                        </p>
+                        <TagSelector
+                          value={newTagName}
+                          onValueChange={setNewTagName}
+                          placeholder="Search BRSR tags..."
+                          className="mb-2"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={addNewTag}
+                            disabled={!newTagName}
+                            className="flex-1 rounded bg-green-500 px-3 py-2 text-xs font-medium text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Save className="h-3 w-3 inline mr-1" />
+                            Add Tag
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsAddingNewTag(false);
+                              setNewTagName('');
+                            }}
+                            className="flex-1 rounded bg-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-400"
+                          >
+                            <X className="h-3 w-3 inline mr-1" />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Tags */}
                     {selectedTags.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-slate-400">
                         <Info className="mb-3 h-10 w-10" />
                         <p className="text-sm font-medium">No XML mapping found</p>
-                        <p className="mt-1 text-xs">This cell has no associated XBRL tag</p>
+                        <p className="mt-1 text-xs">Click "Add New Tag" to create one</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {selectedTags.map((tag, index) => {
+                          // Determine if this is a new tag
+                          const isNewTag = tag.s === 'User Added';
+                          
                           // Check if this tag has been updated
-                          const pendingUpdate = pendingUpdates.find(
+                          const pendingUpdate = !isNewTag ? pendingUpdates.find(
                             (u) => u.cell_id === selectedCellId && u.tag === tag.t
-                          );
+                          ) : undefined;
                           const displayValue = pendingUpdate?.new_value || tag.v;
                           const isModified = !!pendingUpdate;
 
                           return (
                             <div
-                              key={index}
+                              key={`${index}-${tag.t}-${tag.v}`}
                               className={cn(
                                 'overflow-hidden rounded-lg border',
-                                isModified
+                                isNewTag
+                                  ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30'
+                                  : isModified
                                   ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30'
                                   : 'border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-700'
                               )}
@@ -682,7 +1078,7 @@ export default function InteractiveViewerPage() {
                                     />
                                     <div className="flex gap-1">
                                       <button
-                                        onClick={() => saveEdit(tag)}
+                                        onClick={() => saveEdit(tag, isNewTag)}
                                         className="flex-1 rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
                                       >
                                         <Save className="h-3 w-3 inline mr-1" />
@@ -713,9 +1109,21 @@ export default function InteractiveViewerPage() {
                                     >
                                       <Edit3 className="h-3 w-3" />
                                     </button>
+                                    <button
+                                      onClick={() => removeTag(tag, isNewTag)}
+                                      className="shrink-0 p-0.5 text-slate-400 hover:text-red-600"
+                                      title="Remove tag"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
                                   </div>
                                 )}
                                 <div className="flex items-center gap-1 shrink-0">
+                                  {isNewTag && (
+                                    <span className="rounded bg-green-200 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-800 dark:text-green-200">
+                                      New
+                                    </span>
+                                  )}
                                   {isModified && (
                                     <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-800 dark:text-amber-200">
                                       Modified
@@ -761,12 +1169,12 @@ export default function InteractiveViewerPage() {
                                         className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none dark:border-slate-500 dark:bg-slate-600"
                                         autoFocus
                                         onKeyDown={(e) => {
-                                          if (e.key === 'Enter') saveEdit(tag);
+                                          if (e.key === 'Enter') saveEdit(tag, isNewTag);
                                           if (e.key === 'Escape') cancelEdit();
                                         }}
                                       />
                                       <button
-                                        onClick={() => saveEdit(tag)}
+                                        onClick={() => saveEdit(tag, isNewTag)}
                                         className="rounded bg-green-500 p-1 text-white hover:bg-green-600"
                                       >
                                         <Save className="h-3 w-3" />
@@ -869,14 +1277,23 @@ export default function InteractiveViewerPage() {
               </div>
 
               {/* Pending Updates Footer */}
-              {pendingUpdates.length > 0 && (
+              {(pendingUpdates.length > 0 || removedTags.size > 0) && (
                 <div className="border-t border-slate-200 p-3 dark:border-slate-700">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      {pendingUpdates.length} unsaved change{pendingUpdates.length > 1 ? 's' : ''}
-                    </span>
+                    <div className="text-xs text-slate-500">
+                      {pendingUpdates.length > 0 && (
+                        <span>{pendingUpdates.length} unsaved change{pendingUpdates.length > 1 ? 's' : ''}</span>
+                      )}
+                      {pendingUpdates.length > 0 && removedTags.size > 0 && <span> • </span>}
+                      {removedTags.size > 0 && (
+                        <span>{removedTags.size} removed</span>
+                      )}
+                    </div>
                     <button
-                      onClick={() => setPendingUpdates([])}
+                      onClick={() => {
+                        setPendingUpdates([]);
+                        setRemovedTags(new Set());
+                      }}
                       className="text-xs text-red-600 hover:text-red-800"
                     >
                       Discard all
