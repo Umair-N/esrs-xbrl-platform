@@ -530,6 +530,16 @@ class BRSRInteractiveParser:
 
         text_lower = cell_text.lower()
 
+        # CRITICAL: First column cells are ALWAYS labels in BRSR tables
+        # Never highlight anything in column 0 - it's always row labels/headers
+        # Examples: "Permanent (D)", "Other than Permanent (E)", "National", "Male", etc.
+        if col_idx == 0:
+            return True  # Always treat column 0 as label - no exceptions
+
+        # Note: Column 0 is already handled above, so we don't need serial number check here
+        # Small numbers (1-2 digits) in other columns are most likely actual data values
+        # NOT serial numbers (e.g., "28 plants", "10 offices")
+
         # Cells starting with numbered/lettered list patterns are labels
         # Matches: "1.", "2.", "23.", "a.", "b.", "i.", "ii.", "(a)", "(1)", etc.
         list_pattern = re.match(
@@ -704,7 +714,8 @@ class BRSRInteractiveParser:
         # Step 6: Annotate tables with actual XBRL tags
         self._annotate_all_tables()
 
-        # Step 7: Annotate paragraphs
+        # Step 7: Annotate specific paragraphs with data values
+        # Only annotates Q20.b and Q20.c in Section A (exports & customers)
         self._annotate_paragraphs()
 
         # Get annotated HTML
@@ -789,6 +800,10 @@ class BRSRInteractiveParser:
                 for col_idx, cell in enumerate(cells):
                     cell_text = self.clean_text(cell.get_text())
                     cell_tag = cell.name  # 'td' or 'th'
+
+                    # CRITICAL: Only highlight <td> cells, NEVER <th> cells
+                    if cell_tag.lower() != 'td':
+                        continue
 
                     # Skip only truly empty cells or dash separators
                     # Keep NA, NIL, N/A, 0 values - they should be tagged
@@ -879,24 +894,34 @@ class BRSRInteractiveParser:
         return 'in-capmkt:TextValue (unmatched)'
 
     def _annotate_paragraphs(self):
-        """Annotate paragraphs that contain actual data values (not just questions/labels)."""
+        """
+        Annotate ONLY specific paragraphs that contain data values.
+
+        Currently enabled for:
+        - Section A, Q20.b (exports contribution)
+        - Section A, Q20.c (types of customers)
+        """
         for p in self.soup.find_all('p'):
             text = self.clean_text(p.get_text())
             if not text:
                 continue
 
-            # Skip paragraphs that are purely questions/labels (no actual value)
-            # A paragraph is a label if it ends with '?' or contains question indicators
-            # and doesn't contain actual data values
             text_lower = text.lower()
-            is_purely_label = (
-                text.endswith('?') or
-                ('whether' in text_lower and not self._looks_like_value(text)) or
-                ('specify' in text_lower and not self._looks_like_value(text)) or
-                ('provide details' in text_lower and not self._looks_like_value(text))
+
+            # HIGHLY SELECTIVE: Only tag specific paragraphs
+            # Check if this is Section A, Q20.b or Q20.c
+            is_q20_b = (
+                ('contribution of export' in text_lower or 'exports contribute' in text_lower) and
+                'turnover' in text_lower and
+                '%' in text
+            )
+            is_q20_c = (
+                ('types of customer' in text_lower or 'brief on types of customer' in text_lower) and
+                ('years of presence' in text_lower or 'households' in text_lower or 'retail outlet' in text_lower)
             )
 
-            if is_purely_label:
+            # Only proceed if it's one of the specific paragraphs
+            if not (is_q20_b or is_q20_c):
                 continue
 
             # Only annotate if the paragraph has an actual XBRL tag match

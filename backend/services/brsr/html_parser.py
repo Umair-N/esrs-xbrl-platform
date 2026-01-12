@@ -663,7 +663,73 @@ class BRSRHTMLParser:
                     elif 'net worth' in q:
                         data.net_worth = self.clean_number(row[1])
 
+        # Extract CSR projects in aspirational districts (Leadership Indicator)
+        data.aspirational_districts = self.extract_csr_aspirational_districts()
+
         return data
+
+    def extract_csr_aspirational_districts(self) -> List['CSRProject']:
+        """
+        Extract CSR projects undertaken in aspirational districts.
+
+        This is a Leadership Indicator under Principle 8.
+        Table structure: State | Aspirational District | Amount spent (In INR)
+        """
+        from schemas.brsr import CSRProject
+
+        projects = []
+
+        for table in self._tables:
+            rows = self.extract_table_data(table)
+            if len(rows) < 2:
+                continue
+
+            # Check if this is the aspirational districts table
+            # Header should have "State" and "Aspirational District" columns
+            table_text = ' '.join([' '.join(r) for r in rows[:2]]).lower()
+            if 'aspirational district' in table_text and 'state' in table_text:
+                # Found the table, now extract data rows
+                # Header row might contain: State, Aspirational District, Amount spent
+
+                # Find the header row index (row containing 'State' and 'Aspirational District')
+                header_idx = 0
+                for idx, row in enumerate(rows):
+                    row_text = ' '.join(row).lower()
+                    if 'state' in row_text and 'aspirational' in row_text and 'amount' in row_text:
+                        header_idx = idx
+                        break
+
+                # Extract data rows (starting after header)
+                for row in rows[header_idx + 1:]:
+                    if len(row) >= 3:
+                        state = row[0].strip()
+                        district = row[1].strip()
+                        amount_text = row[2].strip()
+
+                        # Skip empty rows or header-like rows
+                        if not state or state.lower() in ['state', 's.no', 's. no', 'sr. no', 'total']:
+                            continue
+                        if not district or district.lower() in ['aspirational district', 'district']:
+                            continue
+
+                        # Parse amount
+                        amount = self.clean_number(amount_text)
+
+                        # Accept rows even with amount = 0 (might be valid data)
+                        if state and district:
+                            projects.append(CSRProject(
+                                state=state,
+                                aspirational_district=district,
+                                amount_spent=amount
+                            ))
+
+                # Log extraction results
+                logger.info(f"Extracted {len(projects)} CSR aspirational district projects")
+                break  # Found and processed the table
+
+        if not projects:
+            logger.warning("No CSR aspirational districts table found or no data extracted")
+        return projects
 
     def extract_complaints(self) -> List[Complaint]:
         """Extract Q26: Stakeholder complaints/grievances."""

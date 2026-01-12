@@ -2475,6 +2475,12 @@ XBRL_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <in-capmkt:Turnover contextRef="DCYMain" decimals="1" unitRef="INR">{{ csr.turnover }}</in-capmkt:Turnover>
 <in-capmkt:NetWorth contextRef="DCYMain" decimals="2" unitRef="INR">{{ csr.net_worth }}</in-capmkt:NetWorth>
 
+<!-- CSR Projects in Aspirational Districts (Principle 8, Leadership Indicator) -->
+{% for project in csr.aspirational_districts %}
+<in-capmkt:StateOfCSRProjectsUndertaken contextRef="{{ project.axis_id }}">{{ project.state }}</in-capmkt:StateOfCSRProjectsUndertaken>
+<in-capmkt:AspirationalDistrictOfCSRProjectsUndertaken contextRef="{{ project.axis_id }}">{{ project.aspirational_district }}</in-capmkt:AspirationalDistrictOfCSRProjectsUndertaken>
+<in-capmkt:AmountSpentForCSRProjectsUndertaken contextRef="{{ project.axis_id }}" decimals="0" unitRef="INR">{{ project.amount_spent }}</in-capmkt:AmountSpentForCSRProjectsUndertaken>
+{% endfor %}
 
 
 <!-- ==================== SECTION B: MANAGEMENT AND PROCESS DISCLOSURES ==================== -->
@@ -3876,6 +3882,14 @@ XBRL_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8" standalone="no"?>
     <!-- PRINCIPLE 7 - Trade/Industry Chamber Affiliations Contexts -->
     {% for i in range(1, 21) %}
     <xbrli:context id="D_IndustryChambersOrAssociations{{ i }}">
+      <xbrli:entity><xbrli:identifier scheme="http://www.mca.gov.in/CIN">{{ cin }}</xbrli:identifier></xbrli:entity>
+      <xbrli:period><xbrli:startDate>{{ start_date_cy }}</xbrli:startDate><xbrli:endDate>{{ end_date_cy }}</xbrli:endDate></xbrli:period>
+    </xbrli:context>
+    {% endfor %}
+
+    <!-- CSR Projects in Aspirational Districts Contexts -->
+    {% for project in csr.aspirational_districts %}
+    <xbrli:context id="{{ project.axis_id }}">
       <xbrli:entity><xbrli:identifier scheme="http://www.mca.gov.in/CIN">{{ cin }}</xbrli:identifier></xbrli:entity>
       <xbrli:period><xbrli:startDate>{{ start_date_cy }}</xbrli:startDate><xbrli:endDate>{{ end_date_cy }}</xbrli:endDate></xbrli:period>
     </xbrli:context>
