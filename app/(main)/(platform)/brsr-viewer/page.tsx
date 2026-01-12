@@ -415,15 +415,16 @@ export default function InteractiveViewerPage() {
   const addNewTag = useCallback(() => {
     if (!selectedCellId || !newTagName || !selectedCellText) return;
 
-    const newTag: TagInfo = {
+    const newTag = {
       t: newTagName,
       v: selectedCellText,
       c: 'instant',
       p: undefined,
       u: undefined,
       d: [],
-      s: 'User Added'
-    };
+      s: 'User Added',
+      orig_v: selectedCellText,
+    } as TagInfo & { orig_v?: string };
 
     setNewTags((prev) => {
       const updated = new Map(prev);
@@ -445,6 +446,50 @@ export default function InteractiveViewerPage() {
     setIsAddingNewTag(false);
     setNewTagName('');
   }, [selectedCellId, newTagName, selectedCellText]);
+
+  // Undo a value change (for original tags remove pending update; for new tags restore original value)
+  const undoValue = useCallback((tag: TagInfo, isNewTag: boolean = false) => {
+    if (!selectedCellId) return;
+
+    if (isNewTag) {
+      setNewTags((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(selectedCellId) || [];
+        const restored = existing.map((t) => {
+          if (t.t === tag.t) {
+            const orig = (t as any).orig_v ?? tag.v ?? '';
+            return { ...t, v: orig } as TagInfo;
+          }
+          return t;
+        });
+        updated.set(selectedCellId, restored);
+        return updated;
+      });
+
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        const cell = doc?.querySelector(`[data-id="${selectedCellId}"]`);
+        if (cell) {
+          const orig = (tag as any).orig_v ?? tag.v ?? '';
+          (cell as HTMLElement).textContent = orig;
+        }
+      } catch (e) {
+        // ignore
+      }
+    } else {
+      setPendingUpdates((prev) => prev.filter((u) => !(u.cell_id === selectedCellId && u.tag === tag.t)));
+
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        const cell = doc?.querySelector(`[data-id="${selectedCellId}"]`);
+        if (cell) {
+          (cell as HTMLElement).textContent = tag.v || '';
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [selectedCellId]);
 
   // Remove tag
   const removeTag = useCallback((tag: TagInfo, isNewTag: boolean = false) => {
@@ -537,6 +582,21 @@ export default function InteractiveViewerPage() {
           updated.set(selectedCellId, updatedTags);
           return updated;
         });
+
+          // Reflect value change in iframe immediately (keep everything else unchanged)
+          if (editingField === 'value') {
+            try {
+              const doc = iframeRef.current?.contentDocument;
+              const cell = doc?.querySelector(`[data-id="${selectedCellId}"]`);
+              if (cell) {
+                (cell as HTMLElement).textContent = editValue;
+                cell.classList.add('xml-linked', 'has-tag');
+                (cell as HTMLElement).style.cursor = 'pointer';
+              }
+            } catch (e) {
+              // ignore DOM update errors
+            }
+          }
       } else {
         // Add to pending updates for original tags
         const update: TagUpdate = {
@@ -558,6 +618,21 @@ export default function InteractiveViewerPage() {
           }
           return [...prev, update];
         });
+
+        // Reflect pending value change in iframe immediately (keep everything else unchanged)
+        if (editingField === 'value') {
+          try {
+            const doc = iframeRef.current?.contentDocument;
+            const cell = doc?.querySelector(`[data-id="${selectedCellId}"]`);
+            if (cell) {
+              (cell as HTMLElement).textContent = editValue;
+              cell.classList.add('xml-linked', 'has-tag');
+              (cell as HTMLElement).style.cursor = 'pointer';
+            }
+          } catch (e) {
+            // ignore DOM update errors
+          }
+        }
       }
     }
     setEditingTagIndex(null);
@@ -1191,6 +1266,20 @@ export default function InteractiveViewerPage() {
                                       <code className="break-all rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-600 dark:text-slate-300">
                                         {displayValue}
                                       </code>
+                                      {/* Undo button (reset to original) */}
+                                      {(
+                                        (!isNewTag && isModified) ||
+                                        (isNewTag && ((tag as any).orig_v && (tag as any).orig_v !== tag.v))
+                                      ) && (
+                                        <button
+                                          onClick={() => undoValue(tag, isNewTag)}
+                                          className="shrink-0 mr-2 flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                                          title="Undo value change"
+                                        >
+                                          Undo
+                                        </button>
+                                      )}
+
                                       <button
                                         onClick={() => startEditValue(index, displayValue)}
                                         className="shrink-0 flex items-center gap-1 rounded border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400"
