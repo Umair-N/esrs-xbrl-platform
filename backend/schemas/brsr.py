@@ -157,11 +157,19 @@ class Subsidiary(BaseModel):
     participates: str = "No"
 
 
+class CSRProject(BaseModel):
+    """CSR project in aspirational district (Principle 8, Leadership Indicator)"""
+    state: str = ""
+    aspirational_district: str = ""
+    amount_spent: float = 0
+
+
 class CSRData(BaseModel):
     """Q25: CSR applicability"""
     applicable: str = "Yes"
     turnover: float = 0
     net_worth: float = 0
+    aspirational_districts: List['CSRProject'] = Field(default_factory=list, description="CSR projects in aspirational districts")
 
 
 # Complaints and Material Issues

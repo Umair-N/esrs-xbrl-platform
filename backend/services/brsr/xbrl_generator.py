@@ -492,10 +492,22 @@ class BRSRXBRLGenerator:
         }
 
         # Build CSR structure
+        # Build CSR aspirational districts list
+        csr_aspirational_districts = []
+        if hasattr(d.csr, 'aspirational_districts'):
+            for idx, project in enumerate(d.csr.aspirational_districts, start=1):
+                csr_aspirational_districts.append({
+                    'axis_id': f'CSRProjectsUndertakenAxis{idx}',
+                    'state': project.state,
+                    'aspirational_district': project.aspirational_district,
+                    'amount_spent': int(project.amount_spent),  # Convert to int for XBRL
+                })
+
         csr = {
             'applicable': d.csr.applicable if hasattr(d.csr, 'applicable') else 'Yes',
             'turnover': d.csr.turnover if hasattr(d.csr, 'turnover') else 0,
             'net_worth': d.csr.net_worth if hasattr(d.csr, 'net_worth') else 0,
+            'aspirational_districts': csr_aspirational_districts,
         }
 
         # Build complaints list
