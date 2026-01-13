@@ -75,23 +75,32 @@ export function TagSelector({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-1">
+      <div className="space-y-2">
         {value && (
-          <div className="px-2 py-1 text-xs text-muted-foreground bg-muted/50 rounded border">
-            <div className="flex items-center justify-between gap-2">
+          <div className="px-3 py-2.5 rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 dark:border-blue-800">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <span className="font-semibold">Current: </span>
-                <span className="font-mono break-all">{value}</span>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">
+                  Selected Tag
+                </div>
+                <code className="text-sm font-bold text-slate-800 dark:text-slate-100 break-all block leading-relaxed">
+                  {value}
+                </code>
               </div>
               {currentTagData?.reference && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button type="button" className="focus:outline-none">
-                      <Info className="h-4 w-4 text-blue-500 shrink-0 cursor-help hover:text-blue-600" />
+                    <button
+                      type="button"
+                      className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-md">
-                    <p className="text-sm">{currentTagData.reference}</p>
+                  <TooltipContent side="top" className="max-w-md p-3 bg-white dark:bg-slate-800 shadow-lg">
+                    <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-200">
+                      {currentTagData.reference}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -106,58 +115,90 @@ export function TagSelector({
               aria-expanded={open}
               title={value || placeholder}
               className={cn(
-                'w-full justify-between font-mono text-sm',
-                !value && 'text-muted-foreground',
+                'w-full justify-between h-11 px-4 font-semibold text-sm border-2 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all',
+                !value && 'text-muted-foreground font-normal',
+                value && 'font-mono text-slate-700 dark:text-slate-200',
                 className
               )}
             >
               <span className="truncate">
                 {value || placeholder}
               </span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[600px] p-0" align="start">
+          <PopoverContent className="w-[650px] p-0 shadow-xl" align="start">
             <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="Search all 2,646 BRSR tags..."
-                value={search}
-                onValueChange={setSearch}
-              />
+              <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+                  Search BRSR Tags
+                </div>
+                <CommandInput
+                  placeholder="Type to search all 2,646 tags..."
+                  value={search}
+                  onValueChange={setSearch}
+                  className="font-medium"
+                />
+              </div>
               <CommandList>
-                <CommandEmpty>No tags found.</CommandEmpty>
-                <CommandGroup>
+                <CommandEmpty className="py-8 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <span className="text-2xl">🔍</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 dark:text-slate-300">No tags found</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Try a different search term</p>
+                    </div>
+                  </div>
+                </CommandEmpty>
+                <CommandGroup className="p-2">
                   {filteredTags.map((tagData) => (
                     <CommandItem
                       key={tagData.tag}
                       value={tagData.tag}
                       onSelect={handleSelect}
-                      className="font-mono text-xs py-2"
+                      className={cn(
+                        "px-3 py-3 rounded-md mb-1 cursor-pointer transition-all",
+                        "hover:bg-blue-50 dark:hover:bg-blue-950",
+                        value === tagData.tag && "bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700"
+                      )}
                     >
                       <Check
                         className={cn(
-                          'mr-2 h-4 w-4 shrink-0',
+                          'mr-3 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400',
                           value === tagData.tag ? 'opacity-100' : 'opacity-0'
                         )}
                       />
-                      <div className="flex-1 min-w-0 flex items-center gap-2">
-                        <span className="break-all flex-1">{tagData.tag}</span>
+                      <div className="flex-1 min-w-0 flex items-center gap-3">
+                        <code className="break-all flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200 leading-relaxed">
+                          {tagData.tag}
+                        </code>
                         {tagData.reference && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                className="focus:outline-none"
+                                className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 cursor-help hover:text-blue-600" />
+                                <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-md">
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium">{tagData.reference}</p>
+                            <TooltipContent side="right" className="max-w-md p-4 bg-white dark:bg-slate-800 shadow-xl border-2 border-blue-200 dark:border-blue-700">
+                              <div className="space-y-2">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                                  Reference
+                                </div>
+                                <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-200">
+                                  {tagData.reference}
+                                </p>
                                 {tagData.type && (
-                                  <p className="text-xs text-muted-foreground">Type: {tagData.type}</p>
+                                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                      Type: <span className="font-mono text-slate-600 dark:text-slate-300">{tagData.type}</span>
+                                    </p>
+                                  </div>
                                 )}
                               </div>
                             </TooltipContent>
@@ -168,15 +209,22 @@ export function TagSelector({
                   ))}
                 </CommandGroup>
                 {!search && filteredTags.length > 0 && (
-                  <div className="border-t px-2 py-1.5 text-xs text-muted-foreground bg-muted/30">
-                    Showing first 100 of 2,646 tags. Type to search all.
+                  <div className="border-t-2 border-slate-200 dark:border-slate-700 px-4 py-2.5 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      📋 Showing first <span className="text-blue-600 dark:text-blue-400">100</span> of{' '}
+                      <span className="text-blue-600 dark:text-blue-400">2,646</span> tags. Type to search all.
+                    </p>
                   </div>
                 )}
                 {search && filteredTags.length > 0 && (
-                  <div className="border-t px-2 py-1.5 text-xs text-muted-foreground bg-muted/30">
-                    Showing {filteredTags.length} of{' '}
-                    {allTags.filter((t) => t.searchText.includes(search.toLowerCase())).length}{' '}
-                    results
+                  <div className="border-t-2 border-slate-200 dark:border-slate-700 px-4 py-2.5 bg-gradient-to-r from-slate-50 to-green-50 dark:from-slate-900 dark:to-green-950">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      🔍 Found <span className="text-green-600 dark:text-green-400">{filteredTags.length}</span> of{' '}
+                      <span className="text-green-600 dark:text-green-400">
+                        {allTags.filter((t) => t.searchText.includes(search.toLowerCase())).length}
+                      </span>{' '}
+                      matching tags
+                    </p>
                   </div>
                 )}
               </CommandList>
