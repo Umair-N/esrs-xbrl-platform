@@ -29,9 +29,18 @@ import {
   type TagInfo,
 } from '@/features/brsr-validator/api';
 
+// Available taxonomies
+const TAXONOMIES = [
+  { value: 'brsr', label: 'BRSR (Business Responsibility & Sustainability Reporting)', description: 'Indian sustainability reporting standard' },
+  // Future taxonomies can be added here
+  // { value: 'gri', label: 'GRI (Global Reporting Initiative)', description: 'International sustainability standard' },
+  // { value: 'sasb', label: 'SASB (Sustainability Accounting Standards Board)', description: 'Industry-specific sustainability standards' },
+] as const;
+
 export default function InteractiveViewerPage() {
   // File state
   const [file, setFile] = useState<File | null>(null);
+  const [selectedTaxonomy, setSelectedTaxonomy] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,9 +107,9 @@ export default function InteractiveViewerPage() {
     }
   }, []);
 
-  // Auto-process when file is selected
+  // Auto-process when both file and taxonomy are selected
   useEffect(() => {
-    if (!file || convertMutation.isPending) return;
+    if (!file || !selectedTaxonomy || convertMutation.isPending) return;
 
     const processFile = async () => {
       try {
@@ -115,7 +124,7 @@ export default function InteractiveViewerPage() {
 
     processFile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file]);
+  }, [file, selectedTaxonomy]);
 
   // Handle cell click from iframe
   const handleCellClick = useCallback((cellId: string, cellText: string) => {
@@ -805,6 +814,7 @@ export default function InteractiveViewerPage() {
   // Reset everything
   const handleReset = useCallback(() => {
     setFile(null);
+    setSelectedTaxonomy('');
     setResult(null);
     setSelectedCellId(null);
     setPendingUpdates([]);
@@ -817,21 +827,23 @@ export default function InteractiveViewerPage() {
 
   // If no result, show upload screen
   if (!result) {
+    const canProcess = file && selectedTaxonomy;
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
         {/* Header */}
         <div className="border-b border-slate-200 bg-white/80 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/80">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
-                <Tag className="h-7 w-7 text-white" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+                <Tag className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
-                  BRSR Interactive Viewer
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+                  Interactive XBRL Viewer
                 </h1>
                 <p className="mt-1 text-slate-600 dark:text-slate-400">
-                  Upload your BRSR HTML file to view and edit XBRL tags interactively
+                  Select taxonomy and upload your file to view and edit XBRL tags
                 </p>
               </div>
             </div>
@@ -839,64 +851,232 @@ export default function InteractiveViewerPage() {
         </div>
 
         {/* Upload Area */}
-        <div className="mx-auto max-w-2xl px-4 py-16">
-          <div
-            onDrop={handleDrop}
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              'relative cursor-pointer rounded-2xl border-2 border-dashed p-16 text-center transition-all',
-              isDragging
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
-                : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-blue-500'
-            )}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".html,.htm"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+        <div className="mx-auto max-w-4xl px-4 py-12">
+          {/* Step Indicator */}
+          <div className="mb-8 flex items-center justify-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full font-semibold text-sm transition-all",
+                selectedTaxonomy
+                  ? "bg-green-500 text-white"
+                  : "bg-blue-500 text-white"
+              )}>
+                1
+              </div>
+              <span className={cn(
+                "font-medium text-sm",
+                selectedTaxonomy ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"
+              )}>
+                Select Taxonomy
+              </span>
+            </div>
+            <div className="h-0.5 w-12 bg-slate-300 dark:bg-slate-600" />
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full font-semibold text-sm transition-all",
+                file
+                  ? "bg-green-500 text-white"
+                  : selectedTaxonomy
+                  ? "bg-blue-500 text-white"
+                  : "bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-400"
+              )}>
+                2
+              </div>
+              <span className={cn(
+                "font-medium text-sm",
+                file
+                  ? "text-green-600 dark:text-green-400"
+                  : selectedTaxonomy
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-500 dark:text-slate-400"
+              )}>
+                Upload File
+              </span>
+            </div>
+          </div>
 
-            {convertMutation.isPending ? (
-              <div className="flex flex-col items-center">
-                <Loader2 className="h-16 w-16 animate-spin text-blue-500" />
-                <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">
-                  Processing {file?.name}...
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Parsing HTML and generating XBRL tags
+          {/* Taxonomy Selector Card */}
+          <div className="mb-6 rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+                <FileCode className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Step 1: Select Taxonomy
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Choose the reporting standard for your document
                 </p>
               </div>
-            ) : (
-              <>
-                <Upload className={cn(
-                  'mx-auto h-16 w-16 transition-colors',
-                  isDragging ? 'text-blue-500' : 'text-slate-400'
-                )} />
-                <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">
-                  Drop your BRSR HTML file here
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  or click to browse (.html, .htm)
-                </p>
-              </>
-            )}
+            </div>
+
+            <div className="grid gap-3">
+              {TAXONOMIES.map((taxonomy) => (
+                <button
+                  key={taxonomy.value}
+                  onClick={() => setSelectedTaxonomy(taxonomy.value)}
+                  className={cn(
+                    "group relative flex items-start gap-4 rounded-xl border-2 p-4 text-left transition-all",
+                    selectedTaxonomy === taxonomy.value
+                      ? "border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/30"
+                      : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-blue-600"
+                  )}
+                >
+                  <div className={cn(
+                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                    selectedTaxonomy === taxonomy.value
+                      ? "border-blue-500 bg-blue-500"
+                      : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-700"
+                  )}>
+                    {selectedTaxonomy === taxonomy.value && (
+                      <Check className="h-4 w-4 text-white" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-900 dark:text-white">
+                      {taxonomy.label}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {taxonomy.description}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* File Upload Card */}
+          <div className={cn(
+            "rounded-2xl border-2 transition-all",
+            selectedTaxonomy
+              ? "border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+              : "border-slate-200 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-900"
+          )}>
+            <div className="p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-lg text-white transition-all",
+                  selectedTaxonomy
+                    ? "bg-gradient-to-br from-blue-500 to-indigo-600"
+                    : "bg-slate-400"
+                )}>
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Step 2: Upload HTML File
+                  </h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    {selectedTaxonomy ? "Drag and drop or click to browse" : "Select a taxonomy first"}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                onDrop={selectedTaxonomy ? handleDrop : undefined}
+                onDragOver={selectedTaxonomy ? (e) => { e.preventDefault(); setIsDragging(true); } : undefined}
+                onDragLeave={selectedTaxonomy ? () => setIsDragging(false) : undefined}
+                onClick={selectedTaxonomy ? () => fileInputRef.current?.click() : undefined}
+                className={cn(
+                  'relative rounded-xl border-2 border-dashed p-12 text-center transition-all',
+                  !selectedTaxonomy && 'cursor-not-allowed opacity-50',
+                  selectedTaxonomy && (
+                    isDragging
+                      ? 'border-blue-500 bg-blue-50 cursor-pointer dark:bg-blue-950/30'
+                      : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-blue-500'
+                  )
+                )}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".html,.htm"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={!selectedTaxonomy}
+                />
+
+                {convertMutation.isPending ? (
+                  <div className="flex flex-col items-center">
+                    <Loader2 className="h-14 w-14 animate-spin text-blue-500" />
+                    <p className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-300">
+                      Processing {file?.name}...
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Parsing HTML and generating XBRL tags for {TAXONOMIES.find(t => t.value === selectedTaxonomy)?.label}
+                    </p>
+                  </div>
+                ) : file ? (
+                  <div className="flex flex-col items-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+                      <Check className="h-7 w-7 text-green-600 dark:text-green-400" />
+                    </div>
+                    <p className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-300">
+                      {file.name}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {(file.size / 1024).toFixed(1)} KB • Ready to process
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className={cn(
+                      'mx-auto h-14 w-14 transition-colors',
+                      isDragging ? 'text-blue-500' : 'text-slate-400'
+                    )} />
+                    <p className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-300">
+                      {selectedTaxonomy ? 'Drop your HTML file here' : 'Select taxonomy first'}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {selectedTaxonomy ? 'or click to browse • .html, .htm files up to 10MB' : 'Taxonomy selection is required'}
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {file && selectedTaxonomy && !convertMutation.isPending && (
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-800 dark:bg-green-950/30">
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                      Ready to process with {TAXONOMIES.find(t => t.value === selectedTaxonomy)?.label.split('(')[0].trim()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFile(null);
+                      setSelectedTaxonomy('');
+                    }}
+                    className="text-sm font-medium text-green-600 hover:text-green-800 dark:text-green-400"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {convertMutation.isError && (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
-              <p className="text-sm text-red-700 dark:text-red-300">
-                {convertMutation.error?.message || 'Failed to process file'}
-              </p>
-              <button
-                onClick={handleReset}
-                className="mt-2 text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400"
-              >
-                Try again
-              </button>
+            <div className="mt-6 rounded-xl border-2 border-red-200 bg-red-50 p-5 dark:border-red-800 dark:bg-red-950/30">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-red-700 dark:text-red-300">
+                    Processing Failed
+                  </p>
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {convertMutation.error?.message || 'An error occurred while processing your file'}
+                  </p>
+                  <button
+                    onClick={handleReset}
+                    className="mt-3 font-medium text-sm text-red-600 hover:text-red-800 dark:text-red-400 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
