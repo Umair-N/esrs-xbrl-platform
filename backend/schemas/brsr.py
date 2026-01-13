@@ -297,6 +297,34 @@ class HRTraining(BaseModel):
     total_workers: HRTrainingCategory = Field(default_factory=HRTrainingCategory)
 
 
+class SafetySkillTrainingGender(BaseModel):
+    """Training data for a specific gender (Principle 3, Q8)"""
+    total_cy: int = 0  # Total (A) for current year
+    hs_num_cy: int = 0  # Health & Safety number (B) current year
+    hs_pct_cy: float = 0  # Health & Safety percentage (B/A) current year
+    skill_num_cy: int = 0  # Skill upgradation number (C) current year
+    skill_pct_cy: float = 0  # Skill upgradation percentage (C/A) current year
+    total_py: int = 0  # Total (D) for previous year
+    hs_num_py: int = 0  # Health & Safety number (E) previous year
+    hs_pct_py: float = 0  # Health & Safety percentage (E/D) previous year
+    skill_num_py: int = 0  # Skill upgradation number (F) previous year
+    skill_pct_py: float = 0  # Skill upgradation percentage (F/D) previous year
+
+
+class SafetySkillTrainingCategory(BaseModel):
+    """Training data for employees or workers (Principle 3, Q8)"""
+    male: SafetySkillTrainingGender = Field(default_factory=SafetySkillTrainingGender)
+    female: SafetySkillTrainingGender = Field(default_factory=SafetySkillTrainingGender)
+    others: SafetySkillTrainingGender = Field(default_factory=SafetySkillTrainingGender)
+    total: SafetySkillTrainingGender = Field(default_factory=SafetySkillTrainingGender)
+
+
+class SafetySkillTraining(BaseModel):
+    """Principle 3, Q8: Health & Safety and Skill Upgradation Training"""
+    employees: SafetySkillTrainingCategory = Field(default_factory=SafetySkillTrainingCategory)
+    workers: SafetySkillTrainingCategory = Field(default_factory=SafetySkillTrainingCategory)
+
+
 class MinimumWageGenderData(BaseModel):
     """Minimum wage compliance data for a single gender"""
     total_cy: int = 0
@@ -702,6 +730,9 @@ class BRSRReportData(BaseModel):
 
     # Principle 3 - Safety Incidents (Section 11)
     safety_incidents_data: dict = Field(default_factory=dict, description="Safety related incidents data (LTIFR, injuries, fatalities, high consequence)")
+
+    # Principle 3 - Training (Q8: Health & Safety and Skill Upgradation)
+    safety_skill_training: SafetySkillTraining = Field(default_factory=SafetySkillTraining, description="Training on health & safety and skill upgradation for employees and workers")
 
     # Principle 5 - Minimum Wages Compliance
     minimum_wages: MinimumWagesData = Field(default_factory=MinimumWagesData, description="Minimum wages compliance data by category and gender")
