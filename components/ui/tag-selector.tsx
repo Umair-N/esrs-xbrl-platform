@@ -74,7 +74,7 @@ export function TagSelector({
   const currentTagData = allTags.find((t) => t.tag === value);
 
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={300}>
       <div className="space-y-1">
         {value && (
           <div className="px-2 py-1 text-xs text-muted-foreground bg-muted/50 rounded border">
@@ -86,7 +86,9 @@ export function TagSelector({
               {currentTagData?.reference && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-blue-500 shrink-0 cursor-help" />
+                    <button type="button" className="focus:outline-none">
+                      <Info className="h-4 w-4 text-blue-500 shrink-0 cursor-help hover:text-blue-600" />
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-md">
                     <p className="text-sm">{currentTagData.reference}</p>
@@ -143,7 +145,13 @@ export function TagSelector({
                         {tagData.reference && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 cursor-help" />
+                              <button
+                                type="button"
+                                className="focus:outline-none"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 cursor-help hover:text-blue-600" />
+                              </button>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-md">
                               <div className="space-y-1">
