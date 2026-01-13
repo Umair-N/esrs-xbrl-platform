@@ -505,7 +505,7 @@ class BRSRInteractiveParser:
             return 'Section C'
         return None
 
-    def _is_label_cell(self, cell_text: str, col_idx: int, cell_tag: str) -> bool:
+    def _is_label_cell(self, cell_text: str, col_idx: int, cell_tag: str, table_headers: list = None) -> bool:
         """
         Detect if a cell is a label/description cell (should not be clickable).
 
@@ -520,6 +520,7 @@ class BRSRInteractiveParser:
             cell_text: The cleaned text content of the cell
             col_idx: Column index (0-based)
             cell_tag: The HTML tag name ('td' or 'th')
+            table_headers: List of table header texts for context detection
 
         Returns:
             True if the cell is a label, False if it's a value cell
@@ -552,12 +553,24 @@ class BRSRInteractiveParser:
         # BRSR category labels - standalone category values used as row labels
         # Examples: "Employees", "Workers", "Male", "Female"
         # These appear in "Category" columns and should NOT be highlighted
-        # Note: "National"/"State" are NOT included as they are legitimate data in some tables
-        # (e.g., trade associations reach, locations)
         category_labels = [
             'employees', 'workers', 'male', 'female', 'others', 'total',
             'permanent', 'other than permanent'
         ]
+
+        # Detect if we're in the trade associations table (Principle 7b)
+        # This table has headers like "Name of the trade and industry chambers" and "Reach of trade"
+        is_trade_associations_table = False
+        if table_headers:
+            headers_text = ' '.join([h.lower() for h in table_headers])
+            if 'trade and industry chambers' in headers_text or 'reach of trade' in headers_text:
+                is_trade_associations_table = True
+
+        # For trade associations table, allow "National"/"State" to be highlighted
+        # For other tables (locations, etc.), treat them as labels
+        if not is_trade_associations_table:
+            category_labels.extend(['national', 'international', 'state'])
+
         if text_lower.strip() in category_labels:
             return True
 
@@ -833,7 +846,7 @@ class BRSRInteractiveParser:
                         continue
 
                     # Skip label/description cells - only annotate value cells
-                    if self._is_label_cell(cell_text, col_idx, cell_tag):
+                    if self._is_label_cell(cell_text, col_idx, cell_tag, headers):
                         continue
 
                     # Get column context from header
