@@ -550,11 +550,13 @@ class BRSRInteractiveParser:
             return True
 
         # BRSR category labels - standalone category values used as row labels
-        # Examples: "Employees", "Workers", "Male", "Female", "Permanent", "National"
+        # Examples: "Employees", "Workers", "Male", "Female"
         # These appear in "Category" columns and should NOT be highlighted
+        # Note: "National"/"State" are NOT included as they are legitimate data in some tables
+        # (e.g., trade associations reach, locations)
         category_labels = [
             'employees', 'workers', 'male', 'female', 'others', 'total',
-            'permanent', 'other than permanent', 'national', 'international'
+            'permanent', 'other than permanent'
         ]
         if text_lower.strip() in category_labels:
             return True
