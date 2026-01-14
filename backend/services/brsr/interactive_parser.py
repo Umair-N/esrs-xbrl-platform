@@ -549,8 +549,6 @@ class BRSRInteractiveParser:
         # Small numbers (1-2 digits) in other columns are most likely actual data values
         # NOT serial numbers (e.g., "28 plants", "10 offices")
 
-<<<<<<< HEAD
-=======
         # BRSR formula/category labels with parenthetical notation
         # These appear in "Particulars" columns and are labels, not values
         # Examples: "Permanent (D)", "Other than Permanent (E)", "Total employees (D + E)"
@@ -582,7 +580,6 @@ class BRSRInteractiveParser:
         if text_lower.strip() in category_labels:
             return True
 
->>>>>>> 618ccb24b2abb09cd9e58ff42780611248823db2
         # Cells starting with numbered/lettered list patterns are labels
         # Matches: "1.", "2.", "23.", "a.", "b.", "i.", "ii.", "(a)", "(1)", etc.
         list_pattern = re.match(

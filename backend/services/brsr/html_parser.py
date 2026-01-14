@@ -771,8 +771,6 @@ class BRSRHTMLParser:
             logger.warning("No CSR aspirational districts table found or no data extracted")
         return projects
 
-<<<<<<< HEAD
-=======
     def extract_safety_skill_training(self) -> 'SafetySkillTraining':
         """
         Extract Principle 3, Q8: Details of training given to employees and workers.
@@ -859,7 +857,6 @@ class BRSRHTMLParser:
 
         return training
 
->>>>>>> 618ccb24b2abb09cd9e58ff42780611248823db2
     def extract_complaints(self) -> List[Complaint]:
         """Extract Q26: Stakeholder complaints/grievances."""
         complaints = []
