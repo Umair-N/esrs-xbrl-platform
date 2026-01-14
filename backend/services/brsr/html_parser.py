@@ -731,6 +731,97 @@ class BRSRHTMLParser:
             logger.warning("No CSR aspirational districts table found or no data extracted")
         return projects
 
+<<<<<<< HEAD
+=======
+    def extract_safety_skill_training(self) -> 'SafetySkillTraining':
+        """
+        Extract Principle 3, Q8: Details of training given to employees and workers.
+
+        Table structure:
+        - Category (Employees/Workers with Male, Female, Others, Total)
+        - FY Current: Total(A), Health&Safety No.(B), %(B/A), Skill No.(C), %(C/A)
+        - FY Previous: Total(D), Health&Safety No.(E), %(E/D), Skill No.(F), %(F/D)
+        """
+        from schemas.brsr import SafetySkillTraining, SafetySkillTrainingCategory, SafetySkillTrainingGender
+
+        training = SafetySkillTraining()
+
+        for table in self._tables:
+            rows = self.extract_table_data(table)
+            if len(rows) < 3:
+                continue
+
+            # Check if this is the training table
+            table_text = ' '.join([' '.join(r) for r in rows[:3]]).lower()
+            if ('training' in table_text and 'health and safety' in table_text and
+                'skill upgradation' in table_text):
+
+                # Process rows to find employee and worker data
+                current_category = None  # 'employees' or 'workers'
+
+                for row in rows:
+                    if len(row) < 8:  # Need at least 8 columns for all data
+                        continue
+
+                    first_cell = row[0].lower().strip()
+
+                    # Detect category headers
+                    if 'employee' in first_cell:
+                        current_category = 'employees'
+                        continue
+                    elif 'worker' in first_cell:
+                        current_category = 'workers'
+                        continue
+
+                    # Skip if no category set or if it's a header row
+                    if not current_category or 'total' in first_cell and '(' not in first_cell:
+                        continue
+
+                    # Determine gender
+                    gender_key = None
+                    if 'male' in first_cell and 'female' not in first_cell:
+                        gender_key = 'male'
+                    elif 'female' in first_cell:
+                        gender_key = 'female'
+                    elif 'other' in first_cell:
+                        gender_key = 'others'
+                    elif 'total' in first_cell:
+                        gender_key = 'total'
+                    else:
+                        continue  # Skip rows that don't match gender categories
+
+                    # Extract values (indices may vary, but typical structure):
+                    # [Category, Total(A), HS No.(B), HS %(B/A), Skill No.(C), Skill %(C/A),
+                    #  Total(D), HS No.(E), HS %(E/D), Skill No.(F), Skill %(F/D)]
+                    try:
+                        gender_data = SafetySkillTrainingGender(
+                            total_cy=int(self.clean_number(row[1])) if len(row) > 1 else 0,
+                            hs_num_cy=int(self.clean_number(row[2])) if len(row) > 2 else 0,
+                            hs_pct_cy=self.clean_number(row[3]) if len(row) > 3 else 0,
+                            skill_num_cy=int(self.clean_number(row[4])) if len(row) > 4 else 0,
+                            skill_pct_cy=self.clean_number(row[5]) if len(row) > 5 else 0,
+                            total_py=int(self.clean_number(row[6])) if len(row) > 6 else 0,
+                            hs_num_py=int(self.clean_number(row[7])) if len(row) > 7 else 0,
+                            hs_pct_py=self.clean_number(row[8]) if len(row) > 8 else 0,
+                            skill_num_py=int(self.clean_number(row[9])) if len(row) > 9 else 0,
+                            skill_pct_py=self.clean_number(row[10]) if len(row) > 10 else 0,
+                        )
+
+                        # Assign to appropriate category and gender
+                        if current_category == 'employees':
+                            setattr(training.employees, gender_key, gender_data)
+                        elif current_category == 'workers':
+                            setattr(training.workers, gender_key, gender_data)
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error extracting training data for {current_category} {gender_key}: {e}")
+                        continue
+
+                logger.info(f"Extracted safety & skill training data")
+                break  # Found and processed the table
+
+        return training
+
+>>>>>>> 618ccb24b2abb09cd9e58ff42780611248823db2
     def extract_complaints(self) -> List[Complaint]:
         """Extract Q26: Stakeholder complaints/grievances."""
         complaints = []
@@ -2934,6 +3025,9 @@ class BRSRHTMLParser:
 
         # Extract Principle 3: Safety Incidents (Section 11)
         data.safety_incidents_data = self.extract_safety_incidents_data()
+
+        # Extract Principle 3 Q8: Training on Health & Safety and Skill Upgradation
+        data.safety_skill_training = self.extract_safety_skill_training()
 
         logger.info(f"Parsing complete. Company: {data.company.company_name}")
         return data
