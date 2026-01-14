@@ -29,6 +29,7 @@ from schemas.brsr import (
     TurnoverPeriod,
     Subsidiary,
     CSRData,
+    CSRProject,
     Complaint,
     MaterialIssue,
     PrincipleDisclosure,
@@ -56,6 +57,10 @@ from schemas.brsr import (
     RetirementBenefitItem,
     OtherRetirementBenefitItem,
     BRSRValidationResult,
+    SafetySkillTraining,
+    SafetySkillTrainingCategory,
+    SafetySkillTrainingGender,
+    GrievanceMechanismData,
 )
 
 logger = logging.getLogger(__name__)
@@ -712,8 +717,6 @@ class BRSRHTMLParser:
         This is a Leadership Indicator under Principle 8.
         Table structure: State | Aspirational District | Amount spent (In INR)
         """
-        from schemas.brsr import CSRProject
-
         projects = []
 
         for table in self._tables:
@@ -779,8 +782,6 @@ class BRSRHTMLParser:
         - FY Current: Total(A), Health&Safety No.(B), %(B/A), Skill No.(C), %(C/A)
         - FY Previous: Total(D), Health&Safety No.(E), %(E/D), Skill No.(F), %(F/D)
         """
-        from schemas.brsr import SafetySkillTraining, SafetySkillTrainingCategory, SafetySkillTrainingGender
-
         training = SafetySkillTraining()
 
         for table in self._tables:
@@ -1841,8 +1842,6 @@ class BRSRHTMLParser:
         Returns:
             GrievanceMechanismData: Grievance mechanism information
         """
-        from schemas.brsr import GrievanceMechanismData
-
         data = GrievanceMechanismData()
         has_any_mechanism = False
 
