@@ -332,17 +332,44 @@ class BRSRHTMLParser:
     def extract_products_services(self) -> List[ProductService]:
         """Extract Q18: Products/Services."""
         products = []
+
+        # Try multiple detection strategies
+        table = None
+
+        # Strategy 1: Look for "NIC Code" in headers
         table = self.find_table_by_header('nic code')
 
-        if table:
-            for row in self.extract_table_data(table)[1:]:
-                if len(row) >= 4 and row[0].isdigit():
-                    products.append(ProductService(
-                        product=row[1],
-                        nic_code=row[2],
-                        turnover_pct=self.clean_percentage(row[3])
-                    ))
+        # Strategy 2: Search for table containing product/service + nic + turnover keywords
+        if not table:
+            for tbl in self._tables:
+                all_text = tbl.get_text().lower()
+                # Check if table contains relevant keywords
+                has_product = 'product' in all_text or 'service' in all_text
+                has_nic = 'nic' in all_text
+                has_turnover = 'turnover' in all_text or '%' in all_text
 
+                # Look for the specific section marker
+                if has_product and has_nic and has_turnover:
+                    # Check if it's near "18." or contains "sold by the entity"
+                    if '18.' in all_text or 'sold by the entity' in all_text:
+                        table = tbl
+                        logger.debug("Found products/services table using fallback detection")
+                        break
+
+        if table:
+            rows = self.extract_table_data(table)
+            for row in rows[1:]:  # Skip header row
+                if len(row) >= 4:
+                    # More flexible detection: check if first column looks like a serial number
+                    first_col = row[0].strip()
+                    if first_col.isdigit() or re.match(r'^\d+\.?$', first_col):
+                        products.append(ProductService(
+                            product=row[1],
+                            nic_code=row[2],
+                            turnover_pct=self.clean_percentage(row[3])
+                        ))
+
+        logger.info(f"Extracted {len(products)} products/services")
         return products
 
     def extract_locations(self) -> Locations:
@@ -380,30 +407,40 @@ class BRSRHTMLParser:
         data = Markets()
 
         # Find markets table for states/countries
+        # Q20 is about "Markets served" - NOT "Locations" (which is Q19)
+        # Q20 mentions "states" and "countries", Q19 mentions "plants" and "offices"
         for table in self._tables:
             rows = self.extract_table_data(table)
             table_text = ' '.join([' '.join(r) for r in rows]).lower()
 
-            # Look for markets locations table (states/countries)
-            if 'national' in table_text and 'states' in table_text:
+            # Look for markets table (Q20) - must have "states" AND not have "plants"/"offices"
+            # This distinguishes Q20 (markets) from Q19 (locations)
+            if ('states' in table_text or 'countries' in table_text) and \
+               not ('plants' in table_text or 'offices' in table_text):
+                logger.debug(f"Found potential Q20 markets table: {table_text[:100]}")
+
                 for row in rows:
                     if len(row) >= 2:
                         label = row[0].lower()
                         value = row[1]
 
-                        if 'national' in label and 'states' in label:
+                        # National: Number of states
+                        if 'national' in label and ('states' in label or 'state' in label):
                             data.national_states = self.clean_text(value)
-                            # Extract number from text like "28 states and 8 union territories"
-                            match = re.search(r'(\d+)\s*(?:states|state)', value.lower())
+                            # Extract number from text like "28 states and 8 union territories" or just "28"
+                            match = re.search(r'(\d+)\s*(?:states|state)?', value.lower())
                             if match:
                                 data.national_states_count = int(match.group(1))
+                                logger.info(f"Extracted national states count: {data.national_states_count}")
 
-                        elif 'international' in label and 'countries' in label:
+                        # International: Number of countries
+                        elif 'international' in label and ('countries' in label or 'country' in label):
                             data.international_countries = self.clean_text(value)
-                            # Extract number from text like "58 countries"
-                            match = re.search(r'(\d+)\s*(?:countries|country)', value.lower())
+                            # Extract number from text like "58 countries" or just "58"
+                            match = re.search(r'(\d+)\s*(?:countries|country)?', value.lower())
                             if match:
                                 data.international_countries_count = int(match.group(1))
+                                logger.info(f"Extracted international countries count: {data.international_countries_count}")
 
             # Look for export percentage in tables (Q20 part b)
             # Common patterns: "contribution of exports", "export as percentage", "exports in total turnover"

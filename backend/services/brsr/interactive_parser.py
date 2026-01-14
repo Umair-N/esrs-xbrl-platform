@@ -365,6 +365,14 @@ class XBRLTagExtractor:
             'total': ['total', 'aggregate', 'sum'],
             # Percentage keywords
             'percent': ['percent', 'pct', 'percentage', '%'],
+            # Q19 Location keywords (plants/offices)
+            'plant': ['plant', 'plants', 'location'],
+            'office': ['office', 'offices'],
+            # Q20 Markets keywords (states/countries)
+            'states': ['states', 'state', 'stateswheremarket'],
+            'countries': ['countries', 'country', 'countrieswheremarket'],
+            'market': ['market', 'markets', 'marketserved'],
+            'export': ['export', 'exports', 'exportsinthe'],
         }
 
         scored_candidates = []
