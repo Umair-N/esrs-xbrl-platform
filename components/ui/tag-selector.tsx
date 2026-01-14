@@ -185,22 +185,10 @@ export function TagSelector({
                                 <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-md p-4 bg-white dark:bg-slate-800 shadow-xl border-2 border-blue-200 dark:border-blue-700">
-                              <div className="space-y-2">
-                                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                                  Reference
-                                </div>
-                                <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-200">
-                                  {tagData.reference}
-                                </p>
-                                {tagData.type && (
-                                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                      Type: <span className="font-mono text-slate-600 dark:text-slate-300">{tagData.type}</span>
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
+                            <TooltipContent side="right" className="max-w-md p-3 bg-white dark:bg-slate-800 shadow-lg">
+                              <p className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-200">
+                                {tagData.reference}
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
