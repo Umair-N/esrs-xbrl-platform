@@ -44,12 +44,18 @@ class XBRLTagExtractor:
             'in-capmkt:DateOfStartOfPriorToPreviousYear',
             'in-capmkt:DateOfEndOfPriorToPreviousYear',
         ],
-        # Add more groups as needed, e.g.:
-        # 'company_registration': [
-        #     'in-capmkt:CINOfCompany',
-        #     'in-capmkt:DateOfIncorporation',
-        #     'in-capmkt:YearOfIncorporation',
-        # ],
+        'disciplinary_action_bribery': [
+            'in-capmkt:NumberOfDirectorsAgainstWhomDisciplinaryActionWasTaken',
+            'in-capmkt:NumberOfKMPsAgainstWhomDisciplinaryActionWasTaken',
+            'in-capmkt:NumberOfEmployeesAgainstWhomDisciplinaryActionWasTaken',
+            'in-capmkt:NumberOfWorkersAgainstWhomDisciplinaryActionWasTaken',
+        ],
+        'conflict_of_interest_complaints': [
+            'in-capmkt:NumberOfComplaintsReceivedInRelationToIssuesOfConflictOfInterestOfTheDirectors',
+            'in-capmkt:RemarksInCaseComplaintsReceivedInRelationToIssuesOfConflictOfInterestOfTheDirectors',
+            'in-capmkt:NumberOfComplaintsReceivedInRelationToIssuesOfConflictOfInterestOfTheKMPs',
+            'in-capmkt:RemarksInCaseComplaintsReceivedInRelationToIssuesOfConflictOfInterestOfTheKmps',
+        ],
     }
 
     # Keywords that trigger showing all tags from a group
@@ -60,6 +66,19 @@ class XBRLTagExtractor:
             'fy ',
             'f.y.',
             'fiscal year',
+        ],
+        'disciplinary_action_bribery': [
+            'disciplinary action',
+            'bribery',
+            'corruption',
+            'anti-bribery',
+            'anti-corruption',
+            'law enforcement agency',
+        ],
+        'conflict_of_interest_complaints': [
+            'conflict of interest',
+            'complaints received',
+            'conflict',
         ],
     }
 
@@ -356,8 +375,11 @@ class XBRLTagExtractor:
             # Employee type keywords
             'permanent': ['permanent', 'perm'],
             'other': ['other', 'contractual', 'temporary', 'temp'],
-            'worker': ['worker', 'labour', 'labor'],
-            'employee': ['employee', 'staff'],
+            'worker': ['worker', 'labour', 'labor', 'workers'],
+            'employee': ['employee', 'staff', 'employees'],
+            # Leadership keywords
+            'director': ['director', 'directors', 'board'],
+            'kmp': ['kmp', 'kmps', 'keymanagerial', 'key managerial'],
             # Period keywords
             'current': ['currentyear', 'cy', 'current'],
             'previous': ['previousyear', 'py', 'previous', 'prior'],
@@ -373,12 +395,40 @@ class XBRLTagExtractor:
             'countries': ['countries', 'country', 'countrieswheremarket'],
             'market': ['market', 'markets', 'marketserved'],
             'export': ['export', 'exports', 'exportsinthe'],
+            # Q24 Holding/Subsidiary/Associate keywords
+            'holding': ['holding', 'holdingcompany', 'holdingsubsidiary'],
+            'subsidiary': ['subsidiary', 'subsidiarycompany', 'subsidiaryassociate'],
+            'associate': ['associate', 'associatecompany', 'associatecompanies'],
+            'jointventure': ['jointventure', 'joint venture', 'jv', 'joint'],
+            'category': ['categoryofcompany', 'category'],
+            'participates': ['participate', 'participates', 'doescompanyparticipate'],
+            'sharesheld': ['sharesheld', 'percentageofshares', 'shares held'],
+            # Q23 Turnover rate keywords
+            'turnover': ['turnover', 'turnoverrate', 'turnover rate'],
+            'fy': ['fy', 'fy ', 'cy', 'py', 'ppy', 'currentyear', 'previousyear'],
         }
 
         scored_candidates = []
+        combined_context = f"{row_lower} {col_lower}"
+
         for tag in candidates:
             tag_name = tag.get('t', '').lower()
             score = 0
+
+            # HIGH PRIORITY: Explicit tag-context matching for specific tables
+            # Q23: Turnover rate table - strongly prefer TurnoverRate tags
+            if 'turnover' in combined_context:
+                if 'turnoverrate' in tag_name:
+                    score += 100  # Very high score for exact match
+                elif 'numberof' in tag_name or 'employees' in tag_name or 'workers' in tag_name:
+                    score -= 50  # Penalize employee count tags in turnover context
+
+            # Q24: Holding/Subsidiary table - strongly prefer those tags
+            if 'holding' in combined_context or 'subsidiary' in combined_context:
+                if 'holdingsubsidiary' in tag_name or 'categoryofcompany' in tag_name or 'percentageofshares' in tag_name:
+                    score += 100
+                elif 'numberof' in tag_name:
+                    score -= 50
 
             # Score based on row context
             if row_lower:
@@ -821,11 +871,30 @@ class BRSRInteractiveParser:
                 for th in header_row.find_all(['th', 'td']):
                     headers.append(self.clean_text(th.get_text()))
 
-            # Track current table context
-            table_text = self.clean_text(table.get_text())[:200]
-            section = self._detect_section(table_text)
+            # Track current table context - include preceding text (p, h4 tags before table)
+            table_text = self.clean_text(table.get_text())[:500].lower()
+
+            # Also check preceding siblings for table title (e.g., <p>23. Turnover rate...</p>)
+            preceding_text = ""
+            prev_sibling = table.find_previous_sibling(['p', 'h4', 'h3', 'h5'])
+            if prev_sibling:
+                preceding_text = self.clean_text(prev_sibling.get_text()).lower()
+
+            # Combine table text with preceding text for better context detection
+            context_text = f"{preceding_text} {table_text}"
+
+            section = self._detect_section(context_text)
             if section:
                 self._current_section = section
+
+            # Detect Q24 Holding/Subsidiary table for enhanced context
+            is_q24_table = ('holding' in context_text and 'subsidiary' in context_text) or \
+                           ('joint venture' in context_text and 'category' in context_text) or \
+                           ('associate companies' in context_text and 'category' in context_text)
+
+            # Detect Q23 Turnover rate table for enhanced context
+            is_q23_table = ('turnover rate' in context_text or 'turnover rate' in table_text) and \
+                           ('permanent' in context_text or 'employees' in context_text or 'workers' in context_text)
 
             # Process all rows
             rows = table.find_all('tr')
@@ -836,6 +905,14 @@ class BRSRInteractiveParser:
                 row_context = ""
                 if cells:
                     row_context = self.clean_text(cells[0].get_text())
+
+                # For Q24 tables, enhance row context with table type indicator
+                if is_q24_table:
+                    row_context = f"holding subsidiary {row_context}"
+
+                # For Q23 tables, enhance row context with turnover indicator
+                if is_q23_table:
+                    row_context = f"turnover rate {row_context}"
 
                 for col_idx, cell in enumerate(cells):
                     cell_text = self.clean_text(cell.get_text())
@@ -925,9 +1002,30 @@ class BRSRInteractiveParser:
     def _infer_fallback_tag(self, cell_text: str, row_context: str, col_context: str) -> str:
         """Infer a fallback tag when no XBRL match is found."""
         text_lower = cell_text.lower().strip()
+        row_lower = row_context.lower() if row_context else ''
+        col_lower = col_context.lower() if col_context else ''
+        combined_context = f"{row_lower} {col_lower}"
 
         # Check if numeric
         is_numeric = bool(re.match(r'^[\d,.\-\s%₹$]+$', text_lower.replace(',', '')))
+
+        # Q24 Holding/Subsidiary context-based inference
+        if 'holding' in combined_context or 'subsidiary' in combined_context or 'associate' in combined_context or 'joint venture' in combined_context:
+            if 'name' in col_lower:
+                return 'in-capmkt:NameOfTheHoldingOrSubsidiaryAssociateCompaniesOrJointVentures'
+            elif 'category' in col_lower:
+                return 'in-capmkt:CategoryOfCompany'
+            elif '%' in col_lower or 'percentage' in col_lower or 'shares' in col_lower:
+                return 'in-capmkt:PercentageOfSharesHeldByListedEntity'
+            elif 'participate' in col_lower or 'business responsibility' in col_lower:
+                return 'in-capmkt:DoesCompanyParticipateInTheBusinessResponsibilityInitiativesOfTheListedEntity'
+            elif not is_numeric:
+                # Default for text in Q24 table
+                return 'in-capmkt:NameOfTheHoldingOrSubsidiaryAssociateCompaniesOrJointVentures'
+
+        # Q23 Turnover rate context-based inference
+        if 'turnover' in combined_context and is_numeric:
+            return 'in-capmkt:TurnoverRate'
 
         if is_numeric:
             return 'in-capmkt:NumericValue (unmatched)'

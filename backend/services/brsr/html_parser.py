@@ -61,6 +61,14 @@ from schemas.brsr import (
     SafetySkillTrainingCategory,
     SafetySkillTrainingGender,
     GrievanceMechanismData,
+    FinesPenaltiesData,
+    DisciplinaryActionData,
+    ConflictOfInterestData,
+    MonetaryCaseData,
+    NonMonetaryCaseData,
+    AppealRevisionData,
+    AntiCorruptionData,
+    ConflictProcessData,
 )
 
 logger = logging.getLogger(__name__)
@@ -133,17 +141,29 @@ class BRSRHTMLParser:
         """Extract percentage as decimal (0-1 range)."""
         if text is None or text == '' or text == '-':
             return 0
-        text_upper = str(text).upper()
+        text_str = str(text).strip()
+        text_upper = text_str.upper()
         if text_upper in ('NA', 'NIL', 'N/A'):
             return 0
-        text = str(text).replace('%', '').strip()
-        try:
-            value = float(text)
-            if value > 1:
-                return value / 100
-            return value
-        except ValueError:
+        if 'liquidated' in text_str.lower():
             return 0
+
+        # Remove % and try to extract numeric value
+        text_str = text_str.replace('%', '').strip()
+
+        # Try to extract a number from the beginning of the string
+        # This handles cases like "100 (To be verified)" -> "100"
+        import re
+        match = re.match(r'^[\d.]+', text_str)
+        if match:
+            try:
+                value = float(match.group())
+                if value > 1:
+                    return value / 100
+                return value
+            except ValueError:
+                return 0
+        return 0
 
     def extract_table_data(self, table: Tag) -> List[List[str]]:
         """Extract table data as list of lists."""
@@ -612,8 +632,10 @@ class BRSRHTMLParser:
     def extract_turnover_rates(self) -> TurnoverRates:
         """Extract Q23: Turnover rates for permanent employees and workers.
 
-        HTML table structure has columns:
-        [Category] | Male CY | Female CY | Total CY | Male PY | Female PY | Total PY | Male PPY | Female PPY | Total PPY
+        HTML table structure can have different formats:
+        Format 1 (13 cols): [Category] | Male CY | Female CY | Other CY | Total CY | Male PY | Female PY | Other PY | Total PY | Male PPY | Female PPY | Other PPY | Total PPY
+        Format 2 (10 cols): [Category] | Male CY | Female CY | Total CY | Male PY | Female PY | Total PY | Male PPY | Female PPY | Total PPY
+        Format 3 (4 cols): [Category] | Male | Female | Total (CY only)
 
         With rows: Permanent Employees, Permanent Workers
         """
@@ -625,68 +647,136 @@ class BRSRHTMLParser:
             if 'turnover rate' in table_text:
                 rows = self.extract_table_data(table)
 
+                # Detect table structure from headers
+                header_row = rows[0] if rows else []
+                header_text = ' '.join(header_row).lower()
+                has_other_col = 'other' in header_text
+
                 for row in rows:
                     if len(row) < 4:
                         continue
 
                     row_type = row[0].lower()
 
-                    # Handle the common HTML format:
-                    # Row: [Category, Male CY, Female CY, Total CY, Male PY, Female PY, Total PY, Male PPY, Female PPY, Total PPY]
+                    # Handle Permanent Employees row
                     if 'permanent employees' in row_type and 'workers' not in row_type:
                         category = data.employees
-                        if len(row) >= 10:
-                            # Full 9-column format (Male/Female/Total for CY/PY/PPY)
-                            category.cy.male = self.clean_percentage(row[1])
-                            category.cy.female = self.clean_percentage(row[2])
-                            category.cy.total = self.clean_percentage(row[3])
-                            category.py.male = self.clean_percentage(row[4])
-                            category.py.female = self.clean_percentage(row[5])
-                            category.py.total = self.clean_percentage(row[6])
-                            category.ppy.male = self.clean_percentage(row[7])
-                            category.ppy.female = self.clean_percentage(row[8])
-                            category.ppy.total = self.clean_percentage(row[9])
-                        elif len(row) >= 4:
-                            # Shorter format - just CY values
-                            category.cy.male = self.clean_percentage(row[1])
-                            category.cy.female = self.clean_percentage(row[2])
-                            category.cy.total = self.clean_percentage(row[3])
+                        self._extract_turnover_row(row, category, has_other_col)
 
+                    # Handle Permanent Workers row
                     elif 'permanent workers' in row_type and 'employees' not in row_type:
                         category = data.workers
-                        if len(row) >= 10:
-                            # Full 9-column format
-                            category.cy.male = self.clean_percentage(row[1])
-                            category.cy.female = self.clean_percentage(row[2])
-                            category.cy.total = self.clean_percentage(row[3])
-                            category.py.male = self.clean_percentage(row[4])
-                            category.py.female = self.clean_percentage(row[5])
-                            category.py.total = self.clean_percentage(row[6])
-                            category.ppy.male = self.clean_percentage(row[7])
-                            category.ppy.female = self.clean_percentage(row[8])
-                            category.ppy.total = self.clean_percentage(row[9])
-                        elif len(row) >= 4:
-                            # Shorter format - just CY values
-                            category.cy.male = self.clean_percentage(row[1])
-                            category.cy.female = self.clean_percentage(row[2])
-                            category.cy.total = self.clean_percentage(row[3])
+                        self._extract_turnover_row(row, category, has_other_col)
 
         return data
+
+    def _extract_turnover_row(self, row: List[str], category: 'TurnoverCategory', has_other_col: bool):
+        """Extract turnover data from a single row."""
+        if has_other_col and len(row) >= 13:
+            # Full format with Other column: Male/Female/Other/Total for CY/PY/PPY
+            # Columns: [0]Category [1]Male CY [2]Female CY [3]Other CY [4]Total CY
+            #          [5]Male PY [6]Female PY [7]Other PY [8]Total PY
+            #          [9]Male PPY [10]Female PPY [11]Other PPY [12]Total PPY
+            category.cy.male = self.clean_percentage(row[1])
+            category.cy.female = self.clean_percentage(row[2])
+            category.cy.other = self.clean_percentage(row[3])
+            category.cy.total = self.clean_percentage(row[4])
+            category.py.male = self.clean_percentage(row[5])
+            category.py.female = self.clean_percentage(row[6])
+            category.py.other = self.clean_percentage(row[7])
+            category.py.total = self.clean_percentage(row[8])
+            category.ppy.male = self.clean_percentage(row[9])
+            category.ppy.female = self.clean_percentage(row[10])
+            category.ppy.other = self.clean_percentage(row[11])
+            category.ppy.total = self.clean_percentage(row[12])
+        elif len(row) >= 10:
+            # Format without Other column: Male/Female/Total for CY/PY/PPY
+            category.cy.male = self.clean_percentage(row[1])
+            category.cy.female = self.clean_percentage(row[2])
+            category.cy.total = self.clean_percentage(row[3])
+            category.py.male = self.clean_percentage(row[4])
+            category.py.female = self.clean_percentage(row[5])
+            category.py.total = self.clean_percentage(row[6])
+            category.ppy.male = self.clean_percentage(row[7])
+            category.ppy.female = self.clean_percentage(row[8])
+            category.ppy.total = self.clean_percentage(row[9])
+        elif len(row) >= 5 and has_other_col:
+            # Shorter format with Other - just CY values
+            category.cy.male = self.clean_percentage(row[1])
+            category.cy.female = self.clean_percentage(row[2])
+            category.cy.other = self.clean_percentage(row[3])
+            category.cy.total = self.clean_percentage(row[4])
+        elif len(row) >= 4:
+            # Shortest format - just Male/Female/Total for CY
+            category.cy.male = self.clean_percentage(row[1])
+            category.cy.female = self.clean_percentage(row[2])
+            category.cy.total = self.clean_percentage(row[3])
 
     def extract_subsidiaries(self) -> List[Subsidiary]:
         """Extract Q24: Holding, subsidiary, and associate companies."""
         subs = []
+
+        # Try to find table by header first
         table = self.find_table_by_header('holding', 'subsidiary')
 
+        # If not found, search entire table text (some tables use <td> for headers)
+        if not table:
+            for t in self._tables:
+                table_text = t.get_text().lower()
+                # Look for Q24 characteristic keywords
+                if ('holding' in table_text and 'subsidiary' in table_text and
+                    ('category' in table_text or 'joint venture' in table_text or 'associate' in table_text)):
+                    table = t
+                    break
+
         if table:
-            for row in self.extract_table_data(table)[1:]:
+            rows = self.extract_table_data(table)
+
+            # Find the header row (contains "Name" and "Category" or similar)
+            header_idx = 0
+            for idx, row in enumerate(rows):
+                row_text = ' '.join(row).lower()
+                if ('name' in row_text and
+                    ('category' in row_text or 'holding' in row_text or '%' in row_text or 'percentage' in row_text)):
+                    header_idx = idx
+                    break
+
+            # Extract data rows (skip header and any sub-headers)
+            for row in rows[header_idx + 1:]:
                 if len(row) >= 4:
-                    subs.append(Subsidiary(
-                        name=row[1] if len(row) > 1 else '',
-                        category=row[2] if len(row) > 2 else '',
-                        shares_pct=self.clean_percentage(row[3]) if len(row) > 3 else 0,
-                        participates='Yes' if len(row) > 4 and 'yes' in row[4].lower() else 'No'
-                    ))
+                    # Skip rows that look like headers or totals
+                    first_cell = row[0].lower().strip() if row[0] else ''
+                    if first_cell in ['s.no', 'sr.no', 's. no', 'sr. no', 'total', '', 'name']:
+                        continue
+
+                    # Determine column positions based on table structure
+                    # Usually: S.No | Name | Category | % shares | Participates
+                    name_col = 1
+                    category_col = 2
+                    shares_col = 3
+                    participates_col = 4
+
+                    # Some tables may not have S.No column
+                    if len(row) == 4:
+                        name_col = 0
+                        category_col = 1
+                        shares_col = 2
+                        participates_col = 3
+
+                    name = row[name_col].strip() if len(row) > name_col else ''
+                    category = row[category_col].strip() if len(row) > category_col else ''
+                    shares_pct = self.clean_percentage(row[shares_col]) if len(row) > shares_col else 0
+                    participates_text = row[participates_col].lower() if len(row) > participates_col else ''
+                    participates = 'Yes' if 'yes' in participates_text else 'No'
+
+                    # Only add if we have a valid company name
+                    if name and name.lower() not in ['name', '-', 'na', 'n/a', 'nil']:
+                        subs.append(Subsidiary(
+                            name=name,
+                            category=category,
+                            shares_pct=shares_pct,
+                            participates=participates
+                        ))
 
         return subs
 
@@ -2931,6 +3021,118 @@ class BRSRHTMLParser:
         logger.info(f"Extracted safety incidents data: ltifr_emp_cy={result['ltifr_emp_cy']}")
         return result
 
+    def extract_fines_penalties_data(self) -> FinesPenaltiesData:
+        """
+        Extract fines, penalties, and disciplinary actions data (Principle 1).
+
+        Returns:
+            FinesPenaltiesData: Complete fines/penalties/disciplinary data
+        """
+        logger.info("Extracting fines/penalties/disciplinary data...")
+
+        data = FinesPenaltiesData()
+
+        try:
+            # Find the table with disciplinary action data
+            # Look for text "Number of Directors/KMPs/employees/workers against whom disciplinary action was taken"
+            tables = self.soup.find_all('table')
+
+            for table in tables:
+                # Check if this table contains disciplinary action data
+                table_text = table.get_text().lower()
+
+                if 'disciplinary action' in table_text and 'bribery' in table_text:
+                    logger.info("Found disciplinary action table")
+
+                    # Extract data from table rows
+                    rows = table.find_all('tr')
+
+                    for row in rows:
+                        cells = row.find_all(['td', 'th'])
+                        if len(cells) < 3:
+                            continue
+
+                        row_text = cells[0].get_text().strip().lower()
+
+                        # Extract Directors data
+                        if 'director' in row_text and 'disciplinary' in table_text:
+                            try:
+                                # Current year is typically in the 2nd column, previous year in 3rd
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                py_value = self.parse_number(cells[2].get_text().strip()) if len(cells) > 2 else 0
+                                data.disciplinary_cy.directors = int(cy_value)
+                                data.disciplinary_py.directors = int(py_value)
+                                logger.debug(f"Directors: CY={cy_value}, PY={py_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract directors data: {e}")
+
+                        # Extract KMPs data
+                        elif 'kmp' in row_text and 'disciplinary' in table_text:
+                            try:
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                py_value = self.parse_number(cells[2].get_text().strip()) if len(cells) > 2 else 0
+                                data.disciplinary_cy.kmps = int(cy_value)
+                                data.disciplinary_py.kmps = int(py_value)
+                                logger.debug(f"KMPs: CY={cy_value}, PY={py_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract KMPs data: {e}")
+
+                        # Extract Employees data
+                        elif 'employee' in row_text and 'worker' not in row_text and 'disciplinary' in table_text:
+                            try:
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                py_value = self.parse_number(cells[2].get_text().strip()) if len(cells) > 2 else 0
+                                data.disciplinary_cy.employees = int(cy_value)
+                                data.disciplinary_py.employees = int(py_value)
+                                logger.debug(f"Employees: CY={cy_value}, PY={py_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract employees data: {e}")
+
+                        # Extract Workers data
+                        elif 'worker' in row_text and 'disciplinary' in table_text:
+                            try:
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                py_value = self.parse_number(cells[2].get_text().strip()) if len(cells) > 2 else 0
+                                data.disciplinary_cy.workers = int(cy_value)
+                                data.disciplinary_py.workers = int(py_value)
+                                logger.debug(f"Workers: CY={cy_value}, PY={py_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract workers data: {e}")
+
+                        # Extract conflict of interest - Directors
+                        elif 'conflict of interest' in row_text and 'director' in row_text:
+                            try:
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                data.conflict_directors_cy.number = int(cy_value)
+                                # Remarks might be in next cell or row
+                                if len(cells) > 2:
+                                    remarks = cells[2].get_text().strip()
+                                    if remarks and remarks.lower() not in ['0', '', '-']:
+                                        data.conflict_directors_cy.remarks = remarks
+                                logger.debug(f"Conflict Directors CY: {cy_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract conflict directors data: {e}")
+
+                        # Extract conflict of interest - KMPs
+                        elif 'conflict of interest' in row_text and 'kmp' in row_text:
+                            try:
+                                cy_value = self.parse_number(cells[1].get_text().strip())
+                                data.conflict_kmps_cy.number = int(cy_value)
+                                if len(cells) > 2:
+                                    remarks = cells[2].get_text().strip()
+                                    if remarks and remarks.lower() not in ['0', '', '-']:
+                                        data.conflict_kmps_cy.remarks = remarks
+                                logger.debug(f"Conflict KMPs CY: {cy_value}")
+                            except (ValueError, IndexError) as e:
+                                logger.warning(f"Failed to extract conflict KMPs data: {e}")
+
+            logger.info(f"Extracted disciplinary data: Directors CY={data.disciplinary_cy.directors}, KMPs CY={data.disciplinary_cy.kmps}")
+
+        except Exception as e:
+            logger.error(f"Error extracting fines/penalties data: {e}")
+
+        return data
+
     # =========================================================================
     # Main Extraction Method
     # =========================================================================
@@ -2962,6 +3164,7 @@ class BRSRHTMLParser:
 
             # Section B
             principles=self.extract_section_b_principles(),
+            fines_penalties=self.extract_fines_penalties_data(),
             **self.extract_governance_data(),  # Unpack director_statement, highest_authority, etc.
 
             # Section C
