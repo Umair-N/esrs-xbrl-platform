@@ -651,6 +651,97 @@ class GrievanceMechanismData(BaseModel):
     permanent_workers_details: str = ""
     other_workers_details: str = ""
 
+
+class FinesPenaltiesData(BaseModel):
+    """Fines, penalties and disciplinary actions data (Principle 1)"""
+    # NGRBC Principle violations
+    penalty_amount_cy: float = 0
+    penalty_amount_py: float = 0
+    settlement_amount_cy: float = 0
+    settlement_amount_py: float = 0
+    compounding_fees_cy: float = 0
+    compounding_fees_py: float = 0
+    # Brief descriptions
+    penalty_brief_cy: str = ""
+    penalty_brief_py: str = ""
+    settlement_brief_cy: str = ""
+    settlement_brief_py: str = ""
+    compounding_brief_cy: str = ""
+    compounding_brief_py: str = ""
+
+
+class DisciplinaryActionData(BaseModel):
+    """Disciplinary action details"""
+    action_type: str = ""
+    count_cy: int = 0
+    count_py: int = 0
+    details: str = ""
+
+
+class ConflictOfInterestData(BaseModel):
+    """Conflict of interest data (Principle 1)"""
+    board_members_cy: int = 0
+    board_members_py: int = 0
+    kmp_cy: int = 0
+    kmp_py: int = 0
+    details: str = ""
+
+
+class MonetaryCaseData(BaseModel):
+    """Monetary case data for anti-competitive practices"""
+    penalty_amount: float = 0
+    brief: str = ""
+
+
+class NonMonetaryCaseData(BaseModel):
+    """Non-monetary case data for anti-competitive practices"""
+    case_count: int = 0
+    brief: str = ""
+
+
+class AppealRevisionData(BaseModel):
+    """Appeal/revision data for cases"""
+    case_name: str = ""
+    status: str = ""
+
+
+class AntiCorruptionData(BaseModel):
+    """Anti-corruption training data"""
+    directors_trained_cy: int = 0
+    directors_total_cy: int = 0
+    directors_pct_cy: float = 0
+    kmp_trained_cy: int = 0
+    kmp_total_cy: int = 0
+    kmp_pct_cy: float = 0
+    employees_trained_cy: int = 0
+    employees_total_cy: int = 0
+    employees_pct_cy: float = 0
+    workers_trained_cy: int = 0
+    workers_total_cy: int = 0
+    workers_pct_cy: float = 0
+    # Previous year
+    directors_trained_py: int = 0
+    directors_total_py: int = 0
+    directors_pct_py: float = 0
+    kmp_trained_py: int = 0
+    kmp_total_py: int = 0
+    kmp_pct_py: float = 0
+    employees_trained_py: int = 0
+    employees_total_py: int = 0
+    employees_pct_py: float = 0
+    workers_trained_py: int = 0
+    workers_total_py: int = 0
+    workers_pct_py: float = 0
+
+
+class ConflictProcessData(BaseModel):
+    """Conflict of interest process data"""
+    has_awareness_programs: str = "No"
+    awareness_details: str = ""
+    has_process: str = "No"
+    process_details: str = ""
+
+
 # Complete BRSR Report Data
 
 class BRSRReportData(BaseModel):
